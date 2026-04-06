@@ -209,7 +209,8 @@ window.toggleMarkCategory = function(catId) {
 }
 
 function updateMarkedCount() {
-    document.getElementById('markedCount').textContent = markedCategories.size
+    const el = document.getElementById('markedCount')
+    if (el) el.textContent = markedCategories.size
 }
 
 window.renderMarkedCategoriesList = function() {
@@ -844,8 +845,10 @@ window.toggleMarkInEdit = function() {
     
     // 更新按钮状态
     const markBtn = document.getElementById('editMarkBtn')
-    const isMarked = markedCategories.has(id)
-    markBtn.textContent = isMarked ? '⭐ 已标记' : '☆ 标记'
+    if (markBtn) {
+        const isMarked = markedCategories.has(id)
+        markBtn.textContent = isMarked ? '⭐ 已标记' : '☆ 标记'
+    }
 }
 
 window.closeEditCategoryModal = function() {
