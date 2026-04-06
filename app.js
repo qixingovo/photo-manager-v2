@@ -669,11 +669,11 @@ function renderCategoryItem(cat, level) {
     
     return `
         <div class="category-item" style="padding-left:${indent}px;">
-            <div class="category-tag ${isActive}" onclick="toggleCategoryChildren('${cat.id}', event)">
-                <span onclick="event.stopPropagation(); filterByCategory('${cat.id}')">${cat.name}${arrow}</span>
+            <div class="category-tag ${isActive}" onclick="window.toggleCategoryChildren('${cat.id}', event)">
+                <span onclick="event.stopPropagation(); window.filterByCategory('${cat.id}')">${cat.name}${arrow}</span>
                 <span class="count">${count}</span>
-                <button onclick="event.stopPropagation(); toggleMarkCategory('${cat.id}')" title="${isMarked ? '取消标记' : '标记'}" style="background:none;border:none;cursor:pointer;padding:0 2px;color:${isMarked ? '#FFD700' : '#ccc'};">${isMarked ? '⭐' : '☆'}</button>
-                <button onclick="event.stopPropagation(); openEditCategoryModal('${cat.id}', '${cat.name}')" title="编辑" style="background:none;border:none;cursor:pointer;padding:0 2px;">✏️</button>
+                <button onclick="event.stopPropagation(); window.toggleMarkCategory('${cat.id}')" title="${isMarked ? '取消标记' : '标记'}" style="background:none;border:none;cursor:pointer;padding:0 2px;color:${isMarked ? '#FFD700' : '#ccc'};">${isMarked ? '⭐' : '☆'}</button>
+                <button onclick="event.stopPropagation(); window.openEditCategoryModal('${cat.id}', '${cat.name}')" title="编辑" style="background:none;border:none;cursor:pointer;padding:0 2px;">✏️</button>
                 <button class="btn-danger" onclick="event.stopPropagation(); window.deleteCategory('${cat.id}')" title="删除">×</button>
             </div>
             ${childrenHtml}
