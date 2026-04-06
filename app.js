@@ -215,6 +215,8 @@ window.renderMarkedCategoriesList = function() {
     const container = document.getElementById('markedCategoriesList')
     const widget = document.getElementById('markedWidget')
     
+    if (!container || !widget) return
+    
     if (markedCategories.size === 0) {
         widget.style.display = 'none'
         return
@@ -222,13 +224,30 @@ window.renderMarkedCategoriesList = function() {
     
     widget.style.display = 'block'
     
-    container.innerHTML = [...markedCategories].map(catId => {
+    // 过滤出仍然存在的分类
+    const validCats = [...markedCategories].filter(catId => {
+        return categories.some(c => c.id === catId)
+    })
+    
+    // 如果有无效的分类ID，清除它们
+    if (validCats.length !== markedCategories.size) {
+        markedCategories = new Set(validCats)
+        localStorage.setItem('markedCategories', JSON.stringify(validCats))
+        updateMarkedCount()
+    }
+    
+    if (validCats.length === 0) {
+        widget.style.display = 'none'
+        return
+    }
+    
+    container.innerHTML = validCats.map(catId => {
         const cat = categories.find(c => c.id === catId)
         if (!cat) return ''
         return `
-            <div class="marked-item" onclick="filterByCategory('${cat.id}')">
+            <div class="marked-item" onclick="window.filterByCategory('${cat.id}')">
                 <span>${cat.name}</span>
-                <span class="unmark-btn" onclick="event.stopPropagation(); toggleMarkCategory('${cat.id}')">×</span>
+                <span class="unmark-btn" onclick="event.stopPropagation(); window.toggleMarkCategory('${cat.id}')">×</span>
             </div>
         `
     }).join('')
@@ -274,7 +293,10 @@ async function loadCategories() {
         renderCategories()
         updateCategorySelects()
         updateMarkedCount()
-        renderMarkedCategoriesList()
+        // 确保分类加载完成后再渲染标记列表
+        setTimeout(() => {
+            renderMarkedCategoriesList()
+        }, 100)
     } catch (err) {
         console.error('加载分类失败:', err)
     }
