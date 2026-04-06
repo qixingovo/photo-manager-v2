@@ -87,9 +87,14 @@ function showBirthdayWelcome() {
     overlay.innerHTML = `
         <div style="text-align:center;color:white;animation: scaleIn 0.8s ease;">
             <div style="font-size:80px;margin-bottom:20px;">🎂</div>
-            <h1 style="font-size:3rem;margin-bottom:20px;text-shadow:2px 2px 4px rgba(0,0,0,0.3);">生日快乐！</h1>
-            <h2 style="font-size:2rem;margin-bottom:30px;font-weight:normal;">老大 🎉</h2>
-            <p style="font-size:1.2rem;opacity:0.9;margin-bottom:40px;">祝你天天开心，万事如意！</p>
+            <h1 style="font-size:2rem;margin-bottom:20px;text-shadow:2px 2px 4px rgba(0,0,0,0.3);">生日快乐！</h1>
+            <h2 id="laodaText" onclick="laodaPrank()" style="font-size:4rem;margin-bottom:10px;font-weight:bold;cursor:pointer;text-shadow:3px 3px 6px rgba(0,0,0,0.3);transition: transform 0.1s;"
+                onmouseover="this.style.transform='scale(1.1)'" 
+                onmouseout="this.style.transform='scale(1)'">
+                老大 🎉
+            </h2>
+            <p id="prankText" style="font-size:1.5rem;opacity:0;margin-bottom:30px;transition: opacity 0.3s;color:#FFD700;font-weight:bold;"></p>
+            <p style="font-size:1.3rem;opacity:0.9;margin-bottom:40px;text-shadow:1px 1px 2px rgba(0,0,0,0.3);">老大万岁万岁万万岁≧▽≦</p>
             <button onclick="enterMainApp()" style="
                 padding: 15px 50px;
                 font-size: 1.2rem;
@@ -108,10 +113,27 @@ function showBirthdayWelcome() {
         <style>
             @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
             @keyframes scaleIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+            @keyframes shake { 0%, 100% { transform: translateX(0) scale(1); } 25% { transform: translateX(-10px) scale(0.3); } 50% { transform: translateX(10px) scale(0.3); } 75% { transform: translateX(-5px) scale(0.3); } }
         </style>
     `
     
     document.body.appendChild(overlay)
+}
+
+window.laodaPrank = function() {
+    const laodaText = document.getElementById('laodaText')
+    const prankText = document.getElementById('prankText')
+    
+    // 抖动缩小动画
+    laodaText.style.animation = 'shake 0.5s ease'
+    laodaText.style.transform = 'scale(0.1)'
+    laodaText.style.fontSize = '1rem'
+    
+    // 显示文字
+    setTimeout(() => {
+        prankText.textContent = '你是小弟嘻嘻嘻'
+        prankText.style.opacity = '1'
+    }, 500)
 }
 
 window.enterMainApp = function() {
