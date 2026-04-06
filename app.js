@@ -839,6 +839,27 @@ window.filterByCategory = function(categoryId) {
     loadPhotos()
 }
 
+// 刷新所有数据
+window.refreshData = async function() {
+    // 显示加载状态
+    const btn = document.querySelector('.nav-section[onclick="window.refreshData()"] .nav-icon')
+    if (btn) btn.textContent = '⏳'
+    
+    try {
+        // 并行加载分类和照片
+        await Promise.all([
+            loadCategories(),
+            loadPhotos()
+        ])
+    } catch (err) {
+        console.error('刷新失败:', err)
+        alert('刷新失败，请稍后重试')
+    }
+    
+    // 恢复按钮状态
+    if (btn) btn.textContent = '🔄'
+}
+
 // 级联选择器：渲染父分类选择器
 function renderParentCategorySelect() {
     const container = document.getElementById('parentCategoryCascade')
