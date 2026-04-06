@@ -293,7 +293,7 @@ async function loadCategories() {
         
         renderCategories() // 渲染分类管理区域
         renderCategorySelect() // 渲染照片浏览筛选下拉
-        updateCategorySelects() // 渲染所有下拉选择器
+        renderParentCategorySelect() // 渲染添加分类的级联选择器
         updateMarkedCount()
         renderMarkedCategoriesList()
     } catch (err) {
@@ -839,31 +839,65 @@ window.filterByCategory = function(categoryId) {
     loadPhotos()
 }
 
-function updateCategorySelects() {
-    const uploadSelect = document.getElementById('categorySelect')
-    const filterSelect = document.getElementById('filterCategory')
-    const parentSelect = document.getElementById('parentCategorySelect')
+// 级联选择器：渲染父分类选择器
+function renderParentCategorySelect() {
+    const container = document.getElementById('parentCategoryCascade')
+    if (!container) return
+    container.innerHTML = ''
     
-    if (!uploadSelect || !filterSelect || !parentSelect) return
+    const topLevel = categories.filter(c => !c.parent_id)
+    if (topLevel.length === 0) return
     
-    const options = categories.map(cat => 
-        `<option value="${cat.id}">${cat.name}</option>`
-    ).join('')
+    const select = document.createElement('select')
+    select.id = 'parentLevel0'
+    select.className = 'category-select'
+    select.onchange = () => window.onParentLevelChange(0)
+    select.innerHTML = `<option value="">作为顶级分类</option>${topLevel.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`
+    container.appendChild(select)
+}
+
+window.onParentLevelChange = function(level) {
+    const container = document.getElementById('parentCategoryCascade')
+    const select = document.getElementById(`parentLevel${level}`)
+    if (!select) return
     
-    uploadSelect.innerHTML = `<option value="">选择分类（可选）</option>${options}`
-    filterSelect.innerHTML = `<option value="all">全部分类</option>${options}`
-    parentSelect.innerHTML = `<option value="">作为顶级分类</option>${options}`
+    const selectedValue = select.value
     
-    if (currentCategory !== 'all') {
-        filterSelect.value = currentCategory
+    // 删除高于当前级别的选择器
+    const selects = container.querySelectorAll('select')
+    selects.forEach((s, i) => {
+        if (i > level) s.remove()
+    })
+    
+    // 如果选中了某个分类，显示其子分类作为下一级
+    if (selectedValue) {
+        const children = categories.filter(c => c.parent_id === selectedValue)
+        if (children.length > 0) {
+            const nextLevel = level + 1
+            const nextSelect = document.createElement('select')
+            nextSelect.id = `parentLevel${nextLevel}`
+            nextSelect.className = 'category-select'
+            nextSelect.onchange = () => window.onParentLevelChange(nextLevel)
+            nextSelect.innerHTML = `<option value="">选择子分类</option>${children.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`
+            container.appendChild(nextSelect)
+        }
     }
+}
+
+window.getSelectedParentId = function() {
+    const container = document.getElementById('parentCategoryCascade')
+    if (!container) return null
+    const selects = container.querySelectorAll('select')
+    for (let i = selects.length - 1; i >= 0; i--) {
+        if (selects[i].value) return selects[i].value
+    }
+    return null
 }
 
 window.createCategory = async function() {
     const input = document.getElementById('newCategory')
     const name = input.value.trim()
-    const parentSelect = document.getElementById('parentCategorySelect')
-    const parentId = parentSelect ? parentSelect.value : null
+    const parentId = window.getSelectedParentId()
     
     if (!name) {
         alert('请输入分类名称')

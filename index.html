@@ -89,9 +89,7 @@
             <h2>分类管理</h2>
             <div class="category-controls">
                 <input type="text" id="newCategory" placeholder="新分类名称">
-                <select id="parentCategorySelect" class="category-select">
-                    <option value="">作为顶级分类</option>
-                </select>
+                <div id="parentCategoryCascade" class="cascade-select"></div>
                 <button onclick="window.createCategory()" class="btn btn-secondary">添加分类</button>
             </div>
             <div id="categoryList" class="category-list"></div>
