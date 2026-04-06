@@ -250,6 +250,12 @@ window.toggleMarkedCategories = function(event) {
 document.addEventListener('DOMContentLoaded', () => {
     checkLogin()
     
+    // 重置筛选状态
+    currentCategory = 'all'
+    showFavoritesOnly = false
+    const filterSelect = document.getElementById('filterCategory')
+    if (filterSelect) filterSelect.value = 'all'
+    
     let searchTimeout
     document.getElementById('searchInput').addEventListener('input', () => {
         clearTimeout(searchTimeout)
@@ -296,6 +302,7 @@ async function loadPhotos() {
     const search = document.getElementById('searchInput').value
     
     try {
+        // 先加载所有照片（不过滤）
         let query = supabase
             .from('photos')
             .select('*')
@@ -318,13 +325,15 @@ async function loadPhotos() {
         // 先加载所有照片的分类关联
         await loadAllPhotoCategories()
         
-        // 如果有分类筛选，只显示该分类的照片
-        if (currentCategory && currentCategory !== 'all') {
+        // 如果有分类筛选且有分类数据，才过滤
+        if (currentCategory && currentCategory !== 'all' && categories.length > 0) {
             const categoryIds = getCategoryAndChildrenIds(currentCategory)
-            photos = photos.filter(p => {
-                const photoCats = photoCategories[p.id] || []
-                return categoryIds.some(cid => photoCats.includes(cid))
-            })
+            if (categoryIds.length > 0) {
+                photos = photos.filter(p => {
+                    const photoCats = photoCategories[p.id] || []
+                    return categoryIds.some(cid => photoCats.includes(cid))
+                })
+            }
         }
         
         renderCategories()
