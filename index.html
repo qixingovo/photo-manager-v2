@@ -91,6 +91,14 @@
                         <button onclick="openEditModal()" class="btn btn-secondary">✏️ 编辑</button>
                         <button onclick="openCategoryModal()" class="btn btn-secondary">📁 改分类</button>
                     </div>
+                    <div class="modal-comments">
+                        <h4>留言</h4>
+                        <div id="commentsList" class="comments-list"></div>
+                        <form id="commentForm" onsubmit="addComment(event)">
+                            <input type="text" id="commentInput" placeholder="写下你的留言...">
+                            <button type="submit" class="btn btn-secondary">发送</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -121,14 +129,31 @@
         <div class="modal-content modal-small">
             <span class="modal-close" onclick="closeCategoryModal()">&times;</span>
             <h3>更改分类</h3>
+            <p style="font-size:12px;color:#666;margin-bottom:10px;">可选择多个分类</p>
             <div class="category-select-list">
                 <label class="category-option">
-                    <input type="radio" name="newCategory" value="">
+                    <input type="checkbox" id="noCategoryCheck">
                     <span>未分类</span>
                 </label>
-                <div id="categoryRadioList"></div>
+                <div id="categoryCheckboxList"></div>
             </div>
             <button onclick="saveCategoryChange()" class="btn btn-primary">保存</button>
+        </div>
+    </div>
+
+    <!-- 编辑分类弹窗 -->
+    <div id="editCategoryModal" class="modal">
+        <div class="modal-content modal-small">
+            <span class="modal-close" onclick="closeEditCategoryModal()">&times;</span>
+            <h3>编辑分类</h3>
+            <form id="editCategoryForm" onsubmit="saveCategoryName(event)">
+                <input type="hidden" id="editCategoryId">
+                <div class="form-group">
+                    <label>分类名称</label>
+                    <input type="text" id="editCategoryName" required>
+                </div>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </form>
         </div>
     </div>
 
