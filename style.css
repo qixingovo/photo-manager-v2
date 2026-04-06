@@ -190,10 +190,13 @@ input[type="file"] {
 
 .category-children {
     display: none;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding-left: 20px;
-    margin-top: 4px;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 10px;
+}
+
+.category-children.show {
+    display: flex;
 }
 
 .category-tag.child {
@@ -206,10 +209,6 @@ input[type="file"] {
 .category-item {
     display: flex;
     flex-direction: column;
-}
-
-.category-children {
-    display: none;
 }
 
 #favoritesFilterBtn.active {

@@ -15,6 +15,7 @@ let currentComments = []
 let selectMode = false
 let selectedPhotos = new Set()
 let markedCategories = new Set(JSON.parse(localStorage.getItem('markedCategories') || '[]'))
+let expandedCategories = new Set()
 
 // 固定用户账号
 const USERS = [
@@ -671,27 +672,31 @@ function renderCategoryItem(cat, level) {
         return photoCats.includes(cat.id)
     }).length
     
-    // 顶级分类显示 ▼ ，子分类显示 ▶
-    const arrow = hasChildren ? (level === 0 ? ' ▼' : ' ▶') : ''
+    // 获取当前展开状态
+    const isExpanded = expandedCategories.has(cat.id)
+    const arrow = hasChildren ? (isExpanded ? ' ▼' : ' ▶') : ''
     
     const childrenHtml = hasChildren ? `
-        <div class="category-children" id="children-${cat.id}" style="display:none;">
+        <div class="category-children" id="children-${cat.id}" style="display:${isExpanded ? 'flex' : 'none'};">
             ${children.map(child => renderCategoryItem(child, level + 1)).join('')}
         </div>
     ` : ''
     
-    // 如果有子分类，点击整个标签展开/收起；如果没有，点击文字筛选
-    const mainOnclick = hasChildren 
-        ? `window.toggleCategoryChildren('${cat.id}', event)` 
-        : `window.filterByCategory('${cat.id}')`
+    // 点击标签文字筛选该分类
+    const mainOnclick = `window.filterByCategory('${cat.id}')`
+    
+    // 点击箭头展开/收起子分类
+    const arrowOnclick = hasChildren 
+        ? `event.stopPropagation(); window.toggleCategoryChildren('${cat.id}')` 
+        : ''
     
     return `
         <div class="category-item" style="padding-left:${indent}px;">
             <div class="category-tag ${isActive}" onclick="${mainOnclick}">
-                <span class="cat-name">${cat.name}</span>${hasChildren ? `<span class="cat-arrow" onclick="event.stopPropagation(); window.toggleCategoryChildren('${cat.id}')">${arrow}</span>` : ''}
+                <span class="cat-name">${cat.name}</span>
+                ${hasChildren ? `<span class="cat-arrow" onclick="${arrowOnclick}">${arrow}</span>` : ''}
                 <span class="count">${count}</span>
-                <button onclick="event.stopPropagation(); window.toggleMarkCategory('${cat.id}')" title="${isMarked ? '取消标记' : '标记'}" style="background:none;border:none;cursor:pointer;padding:0 2px;color:${isMarked ? '#FFD700' : '#ccc'};">${isMarked ? '⭐' : '☆'}</button>
-                <button onclick="event.stopPropagation(); window.openEditCategoryModal('${cat.id}', '${cat.name}')" title="编辑" style="background:none;border:none;cursor:pointer;padding:0 2px;">✏️</button>
+                ${hasChildren ? '' : `<button onclick="event.stopPropagation(); window.openEditCategoryModal('${cat.id}', '${cat.name}')" title="编辑" style="background:none;border:none;cursor:pointer;padding:0 2px;">✏️</button>`}
                 <button class="btn-danger" onclick="event.stopPropagation(); window.deleteCategory('${cat.id}')" title="删除">×</button>
             </div>
             ${childrenHtml}
@@ -702,16 +707,24 @@ function renderCategoryItem(cat, level) {
 window.toggleCategoryChildren = function(catId, event) {
     if (event) event.stopPropagation()
     
-    const childrenEl = document.getElementById('children-' + catId)
-    if (!childrenEl) return
-    
-    const isHidden = childrenEl.style.display === 'none' || childrenEl.style.display === ''
-    
-    if (isHidden) {
-        childrenEl.style.display = 'block'
+    if (expandedCategories.has(catId)) {
+        expandedCategories.delete(catId)
     } else {
-        childrenEl.style.display = 'none'
+        expandedCategories.add(catId)
     }
+    
+    // 直接操作 DOM 而不是重新渲染
+    const childrenEl = document.getElementById('children-' + catId)
+    if (childrenEl) {
+        if (expandedCategories.has(catId)) {
+            childrenEl.classList.add('show')
+        } else {
+            childrenEl.classList.remove('show')
+        }
+    }
+    
+    // 更新箭头
+    renderCategories()
 }
 
 window.filterByCategory = function(categoryId) {
@@ -797,7 +810,33 @@ window.deleteCategory = async function(id) {
 window.openEditCategoryModal = function(id, name) {
     document.getElementById('editCategoryId').value = id
     document.getElementById('editCategoryName').value = name
+    
+    // 设置标记按钮状态
+    const markBtn = document.getElementById('editMarkBtn')
+    const isMarked = markedCategories.has(id)
+    markBtn.textContent = isMarked ? '⭐ 已标记' : '☆ 标记'
+    markBtn.style.color = isMarked ? '#FFD700' : '#FFD700'
+    
     document.getElementById('editCategoryModal').classList.add('active')
+}
+
+window.toggleMarkInEdit = function() {
+    const id = document.getElementById('editCategoryId').value
+    if (!id) return
+    
+    if (markedCategories.has(id)) {
+        markedCategories.delete(id)
+    } else {
+        markedCategories.add(id)
+    }
+    localStorage.setItem('markedCategories', JSON.stringify([...markedCategories]))
+    updateMarkedCount()
+    renderMarkedCategoriesList()
+    
+    // 更新按钮状态
+    const markBtn = document.getElementById('editMarkBtn')
+    const isMarked = markedCategories.has(id)
+    markBtn.textContent = isMarked ? '⭐ 已标记' : '☆ 标记'
 }
 
 window.closeEditCategoryModal = function() {
