@@ -59,6 +59,8 @@
                     <select id="filterCategory" onchange="onCategoryFilterChange()">
                         <option value="all">全部分类</option>
                     </select>
+                    <button id="selectModeBtn" onclick="toggleSelectMode()" class="btn btn-secondary">☑️ 多选</button>
+                    <button id="batchDeleteBtn" onclick="batchDeletePhotos()" class="btn btn-danger" style="display:none;">🗑️ 删除 (<span id="selectedCount">0</span>)</button>
                     <button id="favoritesFilterBtn" onclick="toggleFavoritesFilter()" class="btn btn-secondary">❤️ 收藏</button>
                 </div>
             </div>

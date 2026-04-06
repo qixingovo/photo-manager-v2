@@ -12,6 +12,8 @@ let currentCategory = 'all'
 let currentPhoto = null
 let showFavoritesOnly = false
 let currentComments = []
+let selectMode = false
+let selectedPhotos = new Set()
 
 document.addEventListener('DOMContentLoaded', () => {
     loadCategories()
@@ -191,6 +193,95 @@ window.toggleFavorite = async function() {
         }
     } catch (err) {
         alert('操作失败: ' + err.message)
+    }
+}
+
+window.toggleSelectMode = function() {
+    selectMode = !selectMode
+    selectedPhotos.clear()
+    
+    const selectBtn = document.getElementById('selectModeBtn')
+    const batchBtn = document.getElementById('batchDeleteBtn')
+    
+    if (selectMode) {
+        selectBtn.classList.add('active')
+        selectBtn.textContent = '❌ 取消'
+        batchBtn.style.display = 'inline-block'
+    } else {
+        selectBtn.classList.remove('active')
+        selectBtn.textContent = '☑️ 多选'
+        batchBtn.style.display = 'none'
+    }
+    
+    renderPhotos()
+}
+
+window.togglePhotoSelect = function(photoId) {
+    if (selectedPhotos.has(photoId)) {
+        selectedPhotos.delete(photoId)
+    } else {
+        selectedPhotos.add(photoId)
+    }
+    
+    document.getElementById('selectedCount').textContent = selectedPhotos.size
+    renderPhotos()
+}
+
+window.batchDeletePhotos = async function() {
+    if (selectedPhotos.size === 0) {
+        alert('请先选择要删除的照片')
+        return
+    }
+    
+    if (!confirm(`确定删除选中的 ${selectedPhotos.size} 张照片？`)) return
+    
+    let successCount = 0
+    let failCount = 0
+    
+    for (const photoId of selectedPhotos) {
+        const photo = photos.find(p => p.id === photoId)
+        if (!photo) continue
+        
+        try {
+            // 删除存储文件
+            await supabase.storage
+                .from('photo')
+                .remove([photo.storage_path])
+            
+            // 删除关联
+            await supabase
+                .from('photo_categories')
+                .delete()
+                .eq('photo_id', photoId)
+            
+            // 删除留言
+            await supabase
+                .from('comments')
+                .delete()
+                .eq('photo_id', photoId)
+            
+            // 删除记录
+            await supabase
+                .from('photos')
+                .delete()
+                .eq('id', photoId)
+            
+            successCount++
+        } catch (err) {
+            console.error('删除失败:', photoId, err)
+            failCount++
+        }
+    }
+    
+    selectedPhotos.clear()
+    toggleSelectMode()
+    await loadPhotos()
+    await loadCategories()
+    
+    if (failCount === 0) {
+        alert(`删除成功！${successCount}张照片已删除`)
+    } else {
+        alert(`删除完成：${successCount}张成功，${failCount}张失败`)
     }
 }
 
@@ -655,8 +746,15 @@ function renderPhotos() {
     grid.innerHTML = photos.map(photo => {
         const photoUrl = getPhotoUrl(photo.storage_path)
         const favoriteIcon = photo.is_favorite ? '❤️' : '🤍'
+        const isSelected = selectedPhotos.has(photo.id)
+        const checkboxHtml = selectMode ? `
+            <div class="photo-checkbox" onclick="event.stopPropagation(); togglePhotoSelect('${photo.id}')">
+                <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); togglePhotoSelect('${photo.id}')">
+            </div>
+        ` : ''
         return `
-            <div class="photo-card" onclick="openPhotoModal('${photo.id}')">
+            <div class="photo-card ${isSelected ? 'selected' : ''}" onclick="${selectMode ? "event.stopPropagation(); togglePhotoSelect('" + photo.id + "')" : "openPhotoModal('" + photo.id + "')"}">
+                ${checkboxHtml}
                 <img src="${photoUrl}" alt="${photo.name}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🖼️</text></svg>'">
                 <div class="photo-info">
                     <h3 title="${photo.name}">${favoriteIcon} ${photo.name}</h3>
@@ -666,9 +764,9 @@ function renderPhotos() {
                             ? `<span class="photo-category">${photo.categories.name}</span>` 
                             : '<span class="photo-category" style="background:#e9ecef">未分类</span>'
                         }
-                        <div class="photo-actions" onclick="event.stopPropagation()">
+                        ${selectMode ? '' : `<div class="photo-actions" onclick="event.stopPropagation()">
                             <button class="btn-delete" onclick="window.deletePhoto('${photo.id}', '${photo.storage_path}')" title="删除">🗑️</button>
-                        </div>
+                        </div>`}
                     </div>
                 </div>
             </div>
