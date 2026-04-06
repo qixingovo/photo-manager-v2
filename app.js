@@ -53,11 +53,77 @@ window.handleLogin = function(e) {
     if (user) {
         localStorage.setItem('photo_manager_user', username)
         errorEl.textContent = ''
-        showMainApp()
-        loadCategories()
-        loadPhotos()
+        
+        // 如果是老大，显示生日快乐欢迎界面
+        if (username === 'laoda') {
+            showBirthdayWelcome()
+        } else {
+            showMainApp()
+            loadCategories()
+            loadPhotos()
+        }
     } else {
         errorEl.textContent = '账号或密码错误'
+    }
+}
+
+function showBirthdayWelcome() {
+    const overlay = document.createElement('div')
+    overlay.id = 'birthdayOverlay'
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        animation: fadeIn 0.5s ease;
+    `
+    
+    overlay.innerHTML = `
+        <div style="text-align:center;color:white;animation: scaleIn 0.8s ease;">
+            <div style="font-size:80px;margin-bottom:20px;">🎂</div>
+            <h1 style="font-size:3rem;margin-bottom:20px;text-shadow:2px 2px 4px rgba(0,0,0,0.3);">生日快乐！</h1>
+            <h2 style="font-size:2rem;margin-bottom:30px;font-weight:normal;">老大 🎉</h2>
+            <p style="font-size:1.2rem;opacity:0.9;margin-bottom:40px;">祝你天天开心，万事如意！</p>
+            <button onclick="enterMainApp()" style="
+                padding: 15px 50px;
+                font-size: 1.2rem;
+                background: white;
+                color: #764ba2;
+                border: none;
+                border-radius: 50px;
+                cursor: pointer;
+                font-weight: bold;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                transition: transform 0.2s;
+            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                进入系统 🎈
+            </button>
+        </div>
+        <style>
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes scaleIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        </style>
+    `
+    
+    document.body.appendChild(overlay)
+}
+
+window.enterMainApp = function() {
+    const overlay = document.getElementById('birthdayOverlay')
+    if (overlay) {
+        overlay.style.animation = 'fadeOut 0.5s ease forwards'
+        setTimeout(() => {
+            overlay.remove()
+            showMainApp()
+            loadCategories()
+            loadPhotos()
+        }, 500)
     }
 }
 
