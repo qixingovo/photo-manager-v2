@@ -265,11 +265,6 @@ window.toggleMarkedCategories = function(event) {
 document.addEventListener('DOMContentLoaded', () => {
     checkLogin()
     
-    if (localStorage.getItem('photo_manager_user')) {
-        loadCategories()
-        loadPhotos()
-    }
-    
     let searchTimeout
     document.getElementById('searchInput').addEventListener('input', () => {
         clearTimeout(searchTimeout)
@@ -293,10 +288,7 @@ async function loadCategories() {
         renderCategories()
         updateCategorySelects()
         updateMarkedCount()
-        // 确保分类加载完成后再渲染标记列表
-        setTimeout(() => {
-            renderMarkedCategoriesList()
-        }, 100)
+        renderMarkedCategoriesList()
     } catch (err) {
         console.error('加载分类失败:', err)
     }
@@ -682,6 +674,7 @@ function renderCategoryItem(cat, level) {
         return photoCats.includes(cat.id)
     }).length
     
+    // 顶级分类显示 ▼ ，子分类显示 ▶
     const arrow = hasChildren ? (level === 0 ? ' ▼' : ' ▶') : ''
     
     const childrenHtml = hasChildren ? `
@@ -690,10 +683,15 @@ function renderCategoryItem(cat, level) {
         </div>
     ` : ''
     
+    // 如果有子分类，点击整个标签展开/收起；如果没有，点击文字筛选
+    const mainOnclick = hasChildren 
+        ? `window.toggleCategoryChildren('${cat.id}', event)` 
+        : `window.filterByCategory('${cat.id}')`
+    
     return `
         <div class="category-item" style="padding-left:${indent}px;">
-            <div class="category-tag ${isActive}" onclick="window.toggleCategoryChildren('${cat.id}', event)">
-                <span onclick="event.stopPropagation(); window.filterByCategory('${cat.id}')">${cat.name}${arrow}</span>
+            <div class="category-tag ${isActive}" onclick="${mainOnclick}">
+                <span class="cat-name">${cat.name}</span>${hasChildren ? `<span class="cat-arrow" onclick="event.stopPropagation(); window.toggleCategoryChildren('${cat.id}')">${arrow}</span>` : ''}
                 <span class="count">${count}</span>
                 <button onclick="event.stopPropagation(); window.toggleMarkCategory('${cat.id}')" title="${isMarked ? '取消标记' : '标记'}" style="background:none;border:none;cursor:pointer;padding:0 2px;color:${isMarked ? '#FFD700' : '#ccc'};">${isMarked ? '⭐' : '☆'}</button>
                 <button onclick="event.stopPropagation(); window.openEditCategoryModal('${cat.id}', '${cat.name}')" title="编辑" style="background:none;border:none;cursor:pointer;padding:0 2px;">✏️</button>

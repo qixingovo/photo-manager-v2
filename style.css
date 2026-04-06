@@ -224,6 +224,16 @@ input[type="file"] {
     font-size: 12px;
 }
 
+.category-tag .cat-name {
+    cursor: pointer;
+}
+
+.category-tag .cat-arrow {
+    cursor: pointer;
+    font-size: 10px;
+    color: #666;
+}
+
 .category-tag.active .count {
     background: rgba(255,255,255,0.3);
 }
