@@ -89,12 +89,13 @@ function showBirthdayWelcome() {
             <div style="font-size:80px;margin-bottom:20px;">🎂</div>
             <h1 style="font-size:2rem;margin-bottom:20px;text-shadow:2px 2px 4px rgba(0,0,0,0.3);">生日快乐！</h1>
             
-            <!-- 箭头提示区域 -->
-            <div id="arrowHint" style="position:absolute;top:-60px;left:50%;transform:translateX(-50%);cursor:pointer;animation: bounce 1s infinite;" onclick="hideLaoda()">
-                <div style="font-size:2rem;color:#FFD700;font-weight:bold;white-space:nowrap;margin-bottom:5px;">快点击这个老大，有惊喜 ➜</div>
+            <!-- 箭头提示区域 - 放在老大左边 -->
+            <div id="arrowHint" style="position:absolute;top:50%;left:-120px;transform:translateY(-100%);cursor:pointer;animation: arrowPoint 1s infinite;" onclick="hideLaoda()">
+                <div style="font-size:1.5rem;color:#FFD700;font-weight:bold;white-space:nowrap;text-shadow:1px 1px 2px rgba(0,0,0,0.3);">➜ 快点击这个老大</div>
+                <div style="font-size:1.5rem;color:#FFD700;font-weight:bold;text-shadow:1px 1px 2px rgba(0,0,0,0.3);">有惊喜</div>
             </div>
             
-            <h2 id="laodaText" onclick="laodaPrank()" style="font-size:5rem;margin-bottom:10px;font-weight:bold;cursor:pointer;text-shadow:3px 3px 6px rgba(0,0,0,0.3);transition: all 0.3s;"
+            <h2 id="laodaText" onclick="hideLaoda()" style="font-size:5rem;margin-bottom:10px;font-weight:bold;cursor:pointer;text-shadow:3px 3px 6px rgba(0,0,0,0.3);transition: all 0.3s;display:inline-block;"
                 onmouseover="this.style.transform='scale(1.1)'" 
                 onmouseout="this.style.transform='scale(1)'">
                 老大 🎉
@@ -119,9 +120,9 @@ function showBirthdayWelcome() {
         <style>
             @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
             @keyframes scaleIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-            @keyframes shake { 0%, 100% { transform: translateX(0) scale(1); } 25% { transform: translateX(-10px) scale(0.3); } 50% { transform: translateX(10px) scale(0.3); } 75% { transform: translateX(-5px) scale(0.3); } }
-            @keyframes bounce { 0%, 100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-10px); } }
-            @keyframes laodaHide { to { transform: scale(0) rotate(720deg); opacity: 0; } }
+            @keyframes arrowPoint { 0%, 100% { transform: translateY(-100%) translateX(0); } 50% { transform: translateY(-100%) translateX(10px); } }
+            @keyframes laodaSpin { to { transform: rotate(720deg) scale(0); opacity: 0; } }
+            @keyframes arrowFade { to { opacity: 0; transform: translateY(-100%) scale(0.5); } }
         </style>
     `
     
@@ -134,34 +135,21 @@ window.hideLaoda = function() {
     const wishText = document.getElementById('wishText')
     const prankText = document.getElementById('prankText')
     
-    // 老大消失动画
-    laodaText.style.animation = 'laodaHide 0.8s ease forwards'
-    arrowHint.style.display = 'none'
+    // 老大旋转消失
+    laodaText.style.animation = 'laodaSpin 0.8s ease forwards'
+    
+    // 箭头逐渐消失
+    arrowHint.style.animation = 'arrowFade 0.5s ease forwards'
     
     // 显示小弟文字
     setTimeout(() => {
         laodaText.style.display = 'none'
+        arrowHint.style.display = 'none'
         prankText.textContent = '你是小弟嘻嘻嘻'
         prankText.style.opacity = '1'
         prankText.style.fontSize = '2.5rem'
         wishText.style.display = 'none'
     }, 800)
-}
-
-window.laodaPrank = function() {
-    const laodaText = document.getElementById('laodaText')
-    const prankText = document.getElementById('prankText')
-    
-    // 抖动缩小动画
-    laodaText.style.animation = 'shake 0.5s ease'
-    laodaText.style.transform = 'scale(0.1)'
-    laodaText.style.fontSize = '1rem'
-    
-    // 显示文字
-    setTimeout(() => {
-        prankText.textContent = '你是小弟嘻嘻嘻'
-        prankText.style.opacity = '1'
-    }, 500)
 }
 
 window.enterMainApp = function() {
