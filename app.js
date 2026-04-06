@@ -293,7 +293,7 @@ async function loadCategories() {
         
         renderCategories() // 渲染分类管理区域
         renderCategorySelect() // 渲染照片浏览筛选下拉
-        renderParentCategorySelect() // 渲染添加分类时的父分类选择
+        updateCategorySelects() // 渲染所有下拉选择器
         updateMarkedCount()
         renderMarkedCategoriesList()
     } catch (err) {
@@ -748,68 +748,6 @@ function renderCategorySelect() {
     }
 }
 
-// 渲染父分类级联选择器
-function renderParentCategorySelect() {
-    const container = document.getElementById('parentCategoryCascade')
-    if (!container) return
-    
-    // 清空并重新开始
-    container.innerHTML = ''
-    
-    // 获取顶级分类
-    const topLevel = categories.filter(c => !c.parent_id)
-    
-    // 创建第一级选择器
-    let html = `<select id="parentLevel0" class="category-select" onchange="window.onParentLevelChange(0)">
-        <option value="">作为顶级分类</option>
-        ${topLevel.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}
-    </select>`
-    
-    container.innerHTML = html
-}
-
-// 级联选择器变化时触发
-window.onParentLevelChange = function(level) {
-    const container = document.getElementById('parentCategoryCascade')
-    const select = document.getElementById(`parentLevel${level}`)
-    if (!select) return
-    
-    const selectedValue = select.value
-    
-    // 删除高于当前级别的选择器
-    const selects = container.querySelectorAll('select')
-    selects.forEach((s, i) => {
-        if (i > level) s.remove()
-    })
-    
-    // 如果选中了某个分类，显示其子分类作为下一级
-    if (selectedValue) {
-        const children = categories.filter(c => c.parent_id === selectedValue)
-        if (children.length > 0) {
-            const nextLevel = level + 1
-            const nextSelect = document.createElement('select')
-            nextSelect.id = `parentLevel${nextLevel}`
-            nextSelect.className = 'category-select'
-            nextSelect.onchange = () => window.onParentLevelChange(nextLevel)
-            nextSelect.innerHTML = `
-                <option value="">请选择子分类（可选）</option>
-                ${children.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}
-            `
-            container.appendChild(nextSelect)
-        }
-    }
-}
-
-// 获取当前选择的父分类ID（最深层级）
-window.getSelectedParentId = function() {
-    const container = document.getElementById('parentCategoryCascade')
-    const selects = container.querySelectorAll('select')
-    // 返回最后一个有值的select的值
-    for (let i = selects.length - 1; i >= 0; i--) {
-        if (selects[i].value) return selects[i].value
-    }
-    return null
-}
 
 function renderCategoryItem(cat, level) {
     const children = categories.filter(c => c.parent_id === cat.id)
@@ -901,10 +839,31 @@ window.filterByCategory = function(categoryId) {
     loadPhotos()
 }
 
+function updateCategorySelects() {
+    const uploadSelect = document.getElementById('categorySelect')
+    const filterSelect = document.getElementById('filterCategory')
+    const parentSelect = document.getElementById('parentCategorySelect')
+    
+    if (!uploadSelect || !filterSelect || !parentSelect) return
+    
+    const options = categories.map(cat => 
+        `<option value="${cat.id}">${cat.name}</option>`
+    ).join('')
+    
+    uploadSelect.innerHTML = `<option value="">选择分类（可选）</option>${options}`
+    filterSelect.innerHTML = `<option value="all">全部分类</option>${options}`
+    parentSelect.innerHTML = `<option value="">作为顶级分类</option>${options}`
+    
+    if (currentCategory !== 'all') {
+        filterSelect.value = currentCategory
+    }
+}
+
 window.createCategory = async function() {
     const input = document.getElementById('newCategory')
     const name = input.value.trim()
-    const parentId = window.getSelectedParentId()
+    const parentSelect = document.getElementById('parentCategorySelect')
+    const parentId = parentSelect ? parentSelect.value : null
     
     if (!name) {
         alert('请输入分类名称')
@@ -921,8 +880,7 @@ window.createCategory = async function() {
         if (error) throw error
         
         input.value = ''
-        // 重置级联选择器
-        renderParentCategorySelect()
+        if (parentSelect) parentSelect.value = ''
         await loadCategories()
     } catch (err) {
         alert('创建分类失败: ' + err.message)
