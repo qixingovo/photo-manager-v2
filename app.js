@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCategories()
     loadPhotos()
     
-    const searchTimeout
+    let searchTimeout
     document.getElementById('searchInput').addEventListener('input', () => {
         clearTimeout(searchTimeout)
         searchTimeout = setTimeout(loadPhotos, 300)
