@@ -38,8 +38,13 @@ function showLoginPage() {
 }
 
 function showMainApp() {
-    document.getElementById('loginPage').style.display = 'none'
-    document.getElementById('mainContainer').style.display = 'block'
+    const mainContainer = document.getElementById('mainContainer')
+    mainContainer.style.opacity = '0'
+    mainContainer.style.display = 'block'
+    mainContainer.style.transition = 'opacity 0.6s ease'
+    setTimeout(() => {
+        mainContainer.style.opacity = '1'
+    }, 50)
 }
 
 window.handleLogin = function(e) {
@@ -119,6 +124,7 @@ function showBirthdayWelcome() {
         </div>
         <style>
             @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes fadeOut { to { opacity: 0; } }
             @keyframes scaleIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
             @keyframes arrowPoint { 0%, 100% { transform: translateY(-100%) translateX(0); } 50% { transform: translateY(-100%) translateX(15px); } }
             @keyframes laodaSpin { to { transform: rotate(720deg) scale(0); opacity: 0; } }
@@ -155,13 +161,17 @@ window.hideLaoda = function() {
 window.enterMainApp = function() {
     const overlay = document.getElementById('birthdayOverlay')
     if (overlay) {
-        overlay.style.animation = 'fadeOut 0.5s ease forwards'
+        overlay.style.animation = 'fadeOut 0.8s ease forwards'
+        document.body.style.transition = 'opacity 0.8s ease'
+        document.body.style.opacity = '0'
+        
         setTimeout(() => {
             overlay.remove()
             showMainApp()
+            document.body.style.opacity = '1'
             loadCategories()
             loadPhotos()
-        }, 500)
+        }, 800)
     }
 }
 
