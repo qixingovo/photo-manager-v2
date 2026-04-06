@@ -315,6 +315,7 @@ async function loadPhotos() {
             })
         }
         
+        renderCategories()
         renderPhotos()
         updatePhotosTitle()
     } catch (err) {
@@ -1119,6 +1120,9 @@ function renderPhotos() {
 }
 
 async function loadAllPhotoCategories() {
+    // 清空旧的关联
+    photoCategories = {}
+    
     try {
         const { data } = await supabase
             .from('photo_categories')
