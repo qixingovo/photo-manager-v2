@@ -15,9 +15,64 @@ let currentComments = []
 let selectMode = false
 let selectedPhotos = new Set()
 
+// 固定用户账号
+const USERS = [
+    { username: 'laoda', password: 'lxyajwr06225！' },
+    { username: 'xiaodi', password: 'lxyajwr06225！' }
+]
+
+// 检查登录状态
+function checkLogin() {
+    const loggedInUser = localStorage.getItem('photo_manager_user')
+    if (loggedInUser) {
+        showMainApp()
+    } else {
+        showLoginPage()
+    }
+}
+
+function showLoginPage() {
+    document.getElementById('loginPage').style.display = 'flex'
+    document.getElementById('mainContainer').style.display = 'none'
+}
+
+function showMainApp() {
+    document.getElementById('loginPage').style.display = 'none'
+    document.getElementById('mainContainer').style.display = 'block'
+}
+
+window.handleLogin = function(e) {
+    e.preventDefault()
+    
+    const username = document.getElementById('loginUsername').value.trim()
+    const password = document.getElementById('loginPassword').value
+    const errorEl = document.getElementById('loginError')
+    
+    const user = USERS.find(u => u.username === username && u.password === password)
+    
+    if (user) {
+        localStorage.setItem('photo_manager_user', username)
+        errorEl.textContent = ''
+        showMainApp()
+        loadCategories()
+        loadPhotos()
+    } else {
+        errorEl.textContent = '账号或密码错误'
+    }
+}
+
+window.handleLogout = function() {
+    localStorage.removeItem('photo_manager_user')
+    showLoginPage()
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    loadCategories()
-    loadPhotos()
+    checkLogin()
+    
+    if (localStorage.getItem('photo_manager_user')) {
+        loadCategories()
+        loadPhotos()
+    }
     
     let searchTimeout
     document.getElementById('searchInput').addEventListener('input', () => {

@@ -7,7 +7,27 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
+    <!-- 登录页面 -->
+    <div id="loginPage" class="login-page">
+        <div class="login-box">
+            <h1>📷 老大和小弟的回忆管理系统</h1>
+            <p class="subtitle">回忆我们的从前</p>
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>账号</label>
+                    <input type="text" id="loginUsername" required placeholder="请输入账号">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="loginPassword" required placeholder="请输入密码">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">登录</button>
+                <p id="loginError" class="login-error"></p>
+            </form>
+        </div>
+    </div>
+
+    <div class="container" id="mainContainer" style="display:none;">
         <header>
             <h1>📷 老大和小弟的回忆管理系统</h1>
             <p class="subtitle">回忆我们的从前</p>
@@ -49,6 +69,8 @@
             </div>
             <div id="categoryList" class="category-list"></div>
         </section>
+
+        <button onclick="handleLogout()" class="btn btn-secondary" style="position:fixed;top:20px;right:20px;z-index:100;">退出登录</button>
 
         <!-- 照片浏览 -->
         <section class="photos-section">
