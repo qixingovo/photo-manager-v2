@@ -9,6 +9,7 @@ let categories = []
 let photos = []
 let currentCategory = 'all'
 let currentPhoto = null
+let showFavoritesOnly = false
 
 document.addEventListener('DOMContentLoaded', () => {
     loadCategories()
@@ -52,6 +53,10 @@ async function loadPhotos() {
         
         if (currentCategory && currentCategory !== 'all') {
             query = query.eq('category_id', currentCategory)
+        }
+        
+        if (showFavoritesOnly) {
+            query = query.eq('is_favorite', true)
         }
         
         if (search) {
@@ -103,6 +108,52 @@ window.onCategoryFilterChange = function() {
     loadPhotos()
 }
 
+window.toggleFavoritesFilter = function() {
+    showFavoritesOnly = !showFavoritesOnly
+    const btn = document.getElementById('favoritesFilterBtn')
+    if (showFavoritesOnly) {
+        btn.classList.add('active')
+        btn.textContent = '💔 取消收藏'
+    } else {
+        btn.classList.remove('active')
+        btn.textContent = '❤️ 收藏'
+    }
+    loadPhotos()
+}
+
+window.toggleFavorite = async function() {
+    if (!currentPhoto) return
+    
+    try {
+        const newFavorite = !currentPhoto.is_favorite
+        const { error } = await supabase
+            .from('photos')
+            .update({ is_favorite: newFavorite })
+            .eq('id', currentPhoto.id)
+        
+        if (error) throw error
+        
+        currentPhoto.is_favorite = newFavorite
+        updateFavoriteButton()
+        
+        // 如果当前在收藏筛选模式下，可能需要重新渲染
+        if (showFavoritesOnly && !newFavorite) {
+            loadPhotos()
+        }
+    } catch (err) {
+        alert('操作失败: ' + err.message)
+    }
+}
+
+function updateFavoriteButton() {
+    const btn = document.getElementById('favoriteBtn')
+    if (currentPhoto && currentPhoto.is_favorite) {
+        btn.textContent = '❤️ 已收藏'
+    } else {
+        btn.textContent = '🤍 收藏'
+    }
+}
+
 function renderCategories() {
     const container = document.getElementById('categoryList')
     
@@ -116,10 +167,10 @@ function renderCategories() {
     
     container.innerHTML = topLevel.map(parent => {
         const children = categories.filter(c => c.parent_id === parent.id)
-        const parentCount = photos.filter(p => p.category_id === parent.id).length
         const isActive = currentCategory === parent.id ? 'active' : ''
         const childrenIds = children.map(c => c.id)
-        const totalCount = photos.filter(p => p.category_id === parent.id || childrenIds.includes(p.category_id)).length
+        // 父分类显示：直接属于父分类的照片数量（不包含子分类）
+        const parentCount = photos.filter(p => p.category_id === parent.id).length
         const hasChildren = children.length > 0
         
         const childrenHtml = hasChildren ? `
@@ -142,7 +193,7 @@ function renderCategories() {
             <div class="category-parent">
                 <div class="category-tag ${isActive}" onclick="toggleCategoryChildren('${parent.id}')">
                     <span>${parent.name}${hasChildren ? ' ▼' : ''}</span>
-                    <span class="count">${totalCount}</span>
+                    <span class="count">${parentCount}</span>
                     <button class="btn-danger" onclick="event.stopPropagation(); window.deleteCategory('${parent.id}')" title="删除">×</button>
                 </div>
                 ${childrenHtml}
@@ -367,11 +418,12 @@ function renderPhotos() {
     
     grid.innerHTML = photos.map(photo => {
         const photoUrl = getPhotoUrl(photo.storage_path)
+        const favoriteIcon = photo.is_favorite ? '❤️' : '🤍'
         return `
             <div class="photo-card" onclick="openPhotoModal('${photo.id}')">
                 <img src="${photoUrl}" alt="${photo.name}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🖼️</text></svg>'">
                 <div class="photo-info">
-                    <h3 title="${photo.name}">${photo.name}</h3>
+                    <h3 title="${photo.name}">${favoriteIcon} ${photo.name}</h3>
                     ${photo.description ? `<p>${photo.description}</p>` : ''}
                     <div class="photo-meta">
                         ${photo.categories 
@@ -413,6 +465,8 @@ window.openPhotoModal = function(photoId) {
     const downloadBtn = document.getElementById('modalDownloadBtn')
     downloadBtn.href = photoUrl
     downloadBtn.download = currentPhoto.original_name || currentPhoto.name
+    
+    updateFavoriteButton()
     
     document.getElementById('photoModal').classList.add('active')
 }

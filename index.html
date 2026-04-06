@@ -59,6 +59,7 @@
                     <select id="filterCategory" onchange="onCategoryFilterChange()">
                         <option value="all">全部分类</option>
                     </select>
+                    <button id="favoritesFilterBtn" onclick="toggleFavoritesFilter()" class="btn btn-secondary">❤️ 收藏</button>
                 </div>
             </div>
             <div id="photoGrid" class="photo-grid"></div>
@@ -85,6 +86,7 @@
                         <small id="modalPhotoSize"></small>
                     </div>
                     <div class="modal-actions">
+                        <button id="favoriteBtn" onclick="toggleFavorite()" class="btn btn-secondary">🤍 收藏</button>
                         <a id="modalDownloadBtn" href="" download class="btn btn-primary">⬇️ 下载</a>
                         <button onclick="openEditModal()" class="btn btn-secondary">✏️ 编辑</button>
                         <button onclick="openCategoryModal()" class="btn btn-secondary">📁 改分类</button>

@@ -203,6 +203,11 @@ input[type="file"] {
     font-size: 13px;
 }
 
+#favoritesFilterBtn.active {
+    background: #dc3545;
+    color: white;
+}
+
 .category-tag .count {
     background: rgba(255,255,255,0.3);
     padding: 2px 8px;
