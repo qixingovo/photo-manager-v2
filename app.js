@@ -731,7 +731,7 @@ window.closeCategoryModal = function() {
     document.getElementById('categoryModal').classList.remove('active')
 }
 
-async function saveCategoryChange() {
+window.saveCategoryChange = async function() {
     if (!currentPhoto) return
     
     try {
