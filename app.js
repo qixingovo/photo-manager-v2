@@ -111,32 +111,77 @@ function renderCategories() {
         return
     }
     
-    // 按层级排序：顶级分类在前，子分类在后
-    const sortedCategories = [...categories].sort((a, b) => {
-        if (!a.parent_id && b.parent_id) return -1
-        if (a.parent_id && !b.parent_id) return 1
-        return 0
-    })
+    // 获取顶级分类
+    const topLevel = categories.filter(c => !c.parent_id)
     
-    container.innerHTML = sortedCategories.map(cat => {
-        const count = photos.filter(p => p.category_id === cat.id).length
-        const isActive = currentCategory === cat.id ? 'active' : ''
-        const depth = cat.parent_id ? categories.find(c => c.id === cat.parent_id) ? '　└─ ' : '' : ''
-        const hasChildren = categories.some(c => c.parent_id === cat.id)
+    container.innerHTML = topLevel.map(parent => {
+        const children = categories.filter(c => c.parent_id === parent.id)
+        const parentCount = photos.filter(p => p.category_id === parent.id).length
+        const isActive = currentCategory === parent.id ? 'active' : ''
+        const childrenIds = children.map(c => c.id)
+        const totalCount = photos.filter(p => p.category_id === parent.id || childrenIds.includes(p.category_id)).length
+        const hasChildren = children.length > 0
+        
+        const childrenHtml = hasChildren ? `
+            <div class="category-children" id="children-${parent.id}">
+                ${children.map(child => {
+                    const childCount = photos.filter(p => p.category_id === child.id).length
+                    const childActive = currentCategory === child.id ? 'active' : ''
+                    return `
+                        <div class="category-tag child ${childActive}" onclick="filterByCategory('${child.id}')">
+                            <span>${child.name}</span>
+                            <span class="count">${childCount}</span>
+                            <button class="btn-danger" onclick="event.stopPropagation(); window.deleteCategory('${child.id}')" title="删除">×</button>
+                        </div>
+                    `
+                }).join('')}
+            </div>
+        ` : ''
+        
         return `
-            <div class="category-tag ${isActive}" onclick="filterByCategory('${cat.id}')">
-                <span>${depth}${cat.name}${hasChildren ? ' ▼' : ''}</span>
-                <span class="count">${count}</span>
-                <button class="btn-danger" onclick="event.stopPropagation(); window.deleteCategory('${cat.id}')" title="删除">×</button>
+            <div class="category-parent">
+                <div class="category-tag ${isActive}" onclick="toggleCategoryChildren('${parent.id}')">
+                    <span>${parent.name}${hasChildren ? ' ▼' : ''}</span>
+                    <span class="count">${totalCount}</span>
+                    <button class="btn-danger" onclick="event.stopPropagation(); window.deleteCategory('${parent.id}')" title="删除">×</button>
+                </div>
+                ${childrenHtml}
             </div>
         `
     }).join('')
 }
 
-window.filterByCategory = function(categoryId) {
+window.toggleCategoryChildren = function(parentId) {
+    const childrenEl = document.getElementById(`children-${parentId}`)
+    if (childrenEl) {
+        const isHidden = childrenEl.style.display === 'none'
+        childrenEl.style.display = isHidden ? 'flex' : 'none'
+        
+        // 更新箭头方向
+        const parentTag = childrenEl.previousElementSibling
+        const span = parentTag.querySelector('span')
+        if (span.textContent.endsWith(' ▼')) {
+            span.textContent = span.textContent.replace(' ▼', isHidden ? ' ▲' : ' ▼')
+        } else if (span.textContent.endsWith(' ▲')) {
+            span.textContent = span.textContent.replace(' ▲', isHidden ? ' ▲' : ' ▼')
+        }
+        
+        // 如果点击的是顶级分类且有子分类，则筛选该父分类及其子分类的照片
+        if (isHidden) {
+            filterByCategory(parentId, true)
+        }
+    }
+}
+
+window.filterByCategory = function(categoryId, fromToggle = false) {
     currentCategory = categoryId
     document.getElementById('filterCategory').value = categoryId
     loadPhotos()
+    
+    // 如果是从toggle来的，不需要再设置currentCategory
+    if (fromToggle) {
+        renderCategories()
+    }
 }
 
 function updateCategorySelects() {
