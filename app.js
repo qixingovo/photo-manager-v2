@@ -16,6 +16,7 @@ let selectMode = false
 let selectedPhotos = new Set()
 let markedCategories = new Set(JSON.parse(localStorage.getItem('markedCategories') || '[]'))
 let expandedCategories = new Set()
+let expandedInManager = new Set() // 分类管理区域的展开状态
 
 // 固定用户账号
 const USERS = [
@@ -290,8 +291,9 @@ async function loadCategories() {
             }
         }
         
-        renderCategories()
-        updateCategorySelects()
+        renderCategories() // 渲染分类管理区域
+        renderCategorySelect() // 渲染照片浏览筛选下拉
+        renderParentCategorySelect() // 渲染添加分类时的父分类选择
         updateMarkedCount()
         renderMarkedCategoriesList()
     } catch (err) {
@@ -711,6 +713,7 @@ function updateFavoriteButton() {
     }
 }
 
+// 渲染分类管理区域（层级结构）
 function renderCategories() {
     const container = document.getElementById('categoryList')
     
@@ -723,6 +726,38 @@ function renderCategories() {
     const topLevel = categories.filter(c => !c.parent_id)
     
     container.innerHTML = topLevel.map(parent => renderCategoryItem(parent, 0)).join('')
+}
+
+// 渲染照片浏览的分类下拉（扁平列表）
+function renderCategorySelect() {
+    const select = document.getElementById('filterCategory')
+    if (!select) return
+    
+    const options = categories.map(cat => {
+        const count = photos.filter(p => {
+            const photoCats = photoCategories[p.id] || []
+            return photoCats.includes(cat.id)
+        }).length
+        return `<option value="${cat.id}">${cat.name} (${count})</option>`
+    }).join('')
+    
+    select.innerHTML = `<option value="all">全部分类</option>${options}`
+    
+    if (currentCategory && currentCategory !== 'all') {
+        select.value = currentCategory
+    }
+}
+
+// 渲染分类下拉选择器（添加分类时用）
+function renderParentCategorySelect() {
+    const select = document.getElementById('parentCategorySelect')
+    if (!select) return
+    
+    const options = categories.map(cat => 
+        `<option value="${cat.id}">${cat.name}</option>`
+    ).join('')
+    
+    select.innerHTML = `<option value="">作为顶级分类</option>${options}`
 }
 
 function renderCategoryItem(cat, level) {
@@ -738,22 +773,22 @@ function renderCategoryItem(cat, level) {
         return photoCats.includes(cat.id)
     }).length
     
-    // 获取当前展开状态
-    const isExpanded = expandedCategories.has(cat.id)
+    // 获取当前展开状态（使用管理区域的展开状态）
+    const isExpanded = expandedInManager.has(cat.id)
     const arrow = hasChildren ? (isExpanded ? ' ▼' : ' ▶') : ''
     
     const childrenHtml = hasChildren ? `
-        <div class="category-children" id="children-${cat.id}" style="display:${isExpanded ? 'flex' : 'none'};">
+        <div class="category-children" id="mgr-children-${cat.id}" style="display:${isExpanded ? 'flex' : 'none'};">
             ${children.map(child => renderCategoryItem(child, level + 1)).join('')}
         </div>
     ` : ''
     
-    // 点击标签文字筛选该分类
-    const mainOnclick = `window.filterByCategory('${cat.id}')`
+    // 点击标签文字 - 在管理区域只是选中效果，不筛选
+    const mainOnclick = `window.filterByCategoryInManager('${cat.id}')`
     
     // 点击箭头展开/收起子分类
     const arrowOnclick = hasChildren 
-        ? `event.stopPropagation(); window.toggleCategoryChildren('${cat.id}')` 
+        ? `event.stopPropagation(); window.toggleCategoryInManager('${cat.id}')` 
         : ''
     
     return `
@@ -768,6 +803,22 @@ function renderCategoryItem(cat, level) {
             ${childrenHtml}
         </div>
     `
+}
+
+// 切换分类管理区域的展开状态
+window.toggleCategoryInManager = function(catId) {
+    if (expandedInManager.has(catId)) {
+        expandedInManager.delete(catId)
+    } else {
+        expandedInManager.add(catId)
+    }
+    renderCategories()
+}
+
+// 分类管理区域点击分类（只是视觉选中，不筛选照片）
+window.filterByCategoryInManager = function(categoryId) {
+    currentCategory = categoryId
+    loadPhotos()
 }
 
 window.toggleCategoryChildren = function(catId, event) {
@@ -797,24 +848,6 @@ window.filterByCategory = function(categoryId) {
     currentCategory = categoryId
     document.getElementById('filterCategory').value = categoryId
     loadPhotos()
-}
-
-function updateCategorySelects() {
-    const uploadSelect = document.getElementById('categorySelect')
-    const filterSelect = document.getElementById('filterCategory')
-    const parentSelect = document.getElementById('parentCategorySelect')
-    
-    const options = categories.map(cat => 
-        `<option value="${cat.id}">${cat.name}</option>`
-    ).join('')
-    
-    uploadSelect.innerHTML = `<option value="">选择分类（可选）</option>${options}`
-    filterSelect.innerHTML = `<option value="all">全部分类</option>${options}`
-    parentSelect.innerHTML = `<option value="">作为顶级分类</option>${options}`
-    
-    if (currentCategory !== 'all') {
-        filterSelect.value = currentCategory
-    }
 }
 
 window.createCategory = async function() {
