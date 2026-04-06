@@ -184,7 +184,7 @@ async function handleUpload(e) {
         
         // 上传文件到 Storage
         const { error: uploadError } = await supabase.storage
-            .from('photos')
+            .from('photo')
             .upload(storagePath, file, {
                 cacheControl: '3600',
                 upsert: false
@@ -194,7 +194,7 @@ async function handleUpload(e) {
         
         // 获取公开 URL
         const { data: urlData } = supabase.storage
-            .from('photos')
+            .from('photo')
             .getPublicUrl(storagePath)
         
         // 保存照片信息到数据库
@@ -232,7 +232,7 @@ async function handleUpload(e) {
 // 获取照片公开URL
 function getPhotoUrl(storagePath) {
     const { data } = supabase.storage
-        .from('photos')
+        .from('photo')
         .getPublicUrl(storagePath)
     return data.publicUrl
 }
@@ -281,7 +281,7 @@ async function deletePhoto(id, storagePath) {
     try {
         // 删除 Storage 中的文件
         const { error: storageError } = await supabase.storage
-            .from('photos')
+            .from('photo')
             .remove([storagePath])
         
         if (storageError) throw storageError
