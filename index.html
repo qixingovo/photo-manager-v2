@@ -60,6 +60,8 @@
                         <option value="all">全部分类</option>
                     </select>
                     <button id="selectModeBtn" onclick="toggleSelectMode()" class="btn btn-secondary">☑️ 多选</button>
+                    <button id="selectAllBtn" onclick="selectAllPhotos()" class="btn btn-secondary" style="display:none;">全选</button>
+                    <button id="batchCategoryBtn" onclick="openBatchCategoryModal()" class="btn btn-secondary" style="display:none;">📁 批量改分类</button>
                     <button id="batchDeleteBtn" onclick="batchDeletePhotos()" class="btn btn-danger" style="display:none;">🗑️ 删除 (<span id="selectedCount">0</span>)</button>
                     <button id="favoritesFilterBtn" onclick="toggleFavoritesFilter()" class="btn btn-secondary">❤️ 收藏</button>
                 </div>
@@ -156,6 +158,26 @@
                 </div>
                 <button type="submit" class="btn btn-primary">保存</button>
             </form>
+        </div>
+    </div>
+
+    <!-- 批量改分类弹窗 -->
+    <div id="batchCategoryModal" class="modal">
+        <div class="modal-content modal-small">
+            <span class="modal-close" onclick="closeBatchCategoryModal()">&times;</span>
+            <h3>批量更改分类</h3>
+            <p style="font-size:12px;color:#666;margin-bottom:10px;">为选中的 <span id="batchPhotoCount">0</span> 张照片设置分类</p>
+            <div class="category-select-list">
+                <label class="category-option">
+                    <input type="checkbox" id="batchNoCategory">
+                    <span>设为未分类</span>
+                </label>
+                <div id="batchCategoryList"></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+                <button onclick="batchAddCategories()" class="btn btn-primary" style="flex:1;">添加分类</button>
+                <button onclick="batchRemoveCategories()" class="btn btn-danger" style="flex:1;">移除选中分类</button>
+            </div>
         </div>
     </div>
 

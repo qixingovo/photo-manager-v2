@@ -176,15 +176,21 @@ window.toggleSelectMode = function() {
     selectedPhotos.clear()
     
     const selectBtn = document.getElementById('selectModeBtn')
+    const selectAllBtn = document.getElementById('selectAllBtn')
+    const batchCategoryBtn = document.getElementById('batchCategoryBtn')
     const batchBtn = document.getElementById('batchDeleteBtn')
     
     if (selectMode) {
         selectBtn.classList.add('active')
         selectBtn.textContent = '❌ 取消'
+        selectAllBtn.style.display = 'inline-block'
+        batchCategoryBtn.style.display = 'inline-block'
         batchBtn.style.display = 'inline-block'
     } else {
         selectBtn.classList.remove('active')
         selectBtn.textContent = '☑️ 多选'
+        selectAllBtn.style.display = 'none'
+        batchCategoryBtn.style.display = 'none'
         batchBtn.style.display = 'none'
     }
     
@@ -258,6 +264,128 @@ window.batchDeletePhotos = async function() {
     } else {
         alert(`删除完成：${successCount}张成功，${failCount}张失败`)
     }
+}
+
+window.selectAllPhotos = function() {
+    if (selectedPhotos.size === photos.length) {
+        // 取消全选
+        selectedPhotos.clear()
+    } else {
+        // 全选
+        photos.forEach(p => selectedPhotos.add(p.id))
+    }
+    document.getElementById('selectedCount').textContent = selectedPhotos.size
+    renderPhotos()
+}
+
+window.openBatchCategoryModal = function() {
+    if (selectedPhotos.size === 0) {
+        alert('请先选择要操作的照片')
+        return
+    }
+    
+    document.getElementById('batchPhotoCount').textContent = selectedPhotos.size
+    
+    // 加载分类列表
+    const container = document.getElementById('batchCategoryList')
+    container.innerHTML = categories.map(cat => `
+        <label class="category-option">
+            <input type="checkbox" name="batchCategory" value="${cat.id}">
+            <span>${cat.name}</span>
+        </label>
+    `).join('')
+    
+    document.getElementById('batchCategoryModal').classList.add('active')
+}
+
+window.closeBatchCategoryModal = function() {
+    document.getElementById('batchCategoryModal').classList.remove('active')
+}
+
+window.batchAddCategories = async function() {
+    const checkboxes = document.querySelectorAll('input[name="batchCategory"]:checked')
+    const selectedCategories = Array.from(checkboxes).map(cb => cb.value)
+    
+    if (selectedCategories.length === 0) {
+        alert('请选择要添加的分类')
+        return
+    }
+    
+    let successCount = 0
+    
+    for (const photoId of selectedPhotos) {
+        try {
+            // 获取当前分类
+            const currentCats = photoCategories[photoId] || []
+            
+            // 添加新分类
+            const newCats = [...new Set([...currentCats, ...selectedCategories])]
+            
+            // 删除旧的关联
+            await supabase
+                .from('photo_categories')
+                .delete()
+                .eq('photo_id', photoId)
+            
+            // 添加新的关联
+            if (newCats.length > 0) {
+                const inserts = newCats.map(cid => ({
+                    photo_id: photoId,
+                    category_id: cid
+                }))
+                await supabase
+                    .from('photo_categories')
+                    .insert(inserts)
+            }
+            
+            successCount++
+        } catch (err) {
+            console.error('添加分类失败:', photoId, err)
+        }
+    }
+    
+    closeBatchCategoryModal()
+    await loadAllPhotoCategories()
+    await loadPhotos()
+    await loadCategories()
+    
+    alert(`成功为 ${successCount} 张照片添加分类`)
+}
+
+window.batchRemoveCategories = async function() {
+    const checkboxes = document.querySelectorAll('input[name="batchCategory"]:checked')
+    const selectedCategories = Array.from(checkboxes).map(cb => cb.value)
+    
+    if (selectedCategories.length === 0) {
+        alert('请选择要移除的分类')
+        return
+    }
+    
+    let successCount = 0
+    
+    for (const photoId of selectedPhotos) {
+        try {
+            // 移除选中的分类
+            for (const catId of selectedCategories) {
+                await supabase
+                    .from('photo_categories')
+                    .delete()
+                    .eq('photo_id', photoId)
+                    .eq('category_id', catId)
+            }
+            
+            successCount++
+        } catch (err) {
+            console.error('移除分类失败:', photoId, err)
+        }
+    }
+    
+    closeBatchCategoryModal()
+    await loadAllPhotoCategories()
+    await loadPhotos()
+    await loadCategories()
+    
+    alert(`成功从 ${successCount} 张照片移除分类`)
 }
 
 function updateFavoriteButton() {
@@ -1005,4 +1133,8 @@ document.getElementById('categoryModal').addEventListener('click', (e) => {
 
 document.getElementById('editCategoryModal').addEventListener('click', (e) => {
     if (e.target.id === 'editCategoryModal') closeEditCategoryModal()
+})
+
+document.getElementById('batchCategoryModal').addEventListener('click', (e) => {
+    if (e.target.id === 'batchCategoryModal') closeBatchCategoryModal()
 })
