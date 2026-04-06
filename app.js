@@ -389,6 +389,13 @@ function updateEmptyState() {
             empty.style.display = 'none'
             photoGrid.style.display = 'none'
             
+            // 鲜艳颜色数组
+            const colors = [
+                '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', 
+                '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F',
+                '#BB8FCE', '#85C1E9', '#F8B500', '#FF6F61'
+            ]
+            
             // 创建或更新子分类提示区域
             let subcatsEl = document.getElementById('subcategoriesHint')
             if (!subcatsEl) {
@@ -398,17 +405,20 @@ function updateEmptyState() {
                 empty.parentNode.insertBefore(subcatsEl, empty)
             }
             
-            const cat = categories.find(c => c.id === currentCategory)
             subcatsEl.innerHTML = `
-                <div style="text-align:center;padding:20px;">
-                    <p style="color:#666;margin-bottom:15px;">该分类暂无照片，但有子分类：</p>
-                    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;">
-                        ${children.map(child => {
+                <div style="text-align:center;padding:30px;">
+                    <div style="display:flex;flex-wrap:wrap;gap:15px;justify-content:center;">
+                        ${children.map((child, i) => {
                             const count = photos.filter(p => {
                                 const photoCats = photoCategories[p.id] || []
                                 return photoCats.includes(child.id)
                             }).length
-                            return `<span class="category-tag" onclick="window.filterByCategory('${child.id}')" style="cursor:pointer;">${child.name} (${count})</span>`
+                            const color = colors[i % colors.length]
+                            return `<span class="category-tag" onclick="window.filterByCategory('${child.id}')" 
+                                style="cursor:pointer;background:${color};color:white;padding:12px 24px;border-radius:25px;font-size:16px;box-shadow:0 3px 10px rgba(0,0,0,0.2);transition:transform 0.2s;"
+                                onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                ${child.name} (${count})
+                            </span>`
                         }).join('')}
                     </div>
                 </div>
