@@ -679,12 +679,11 @@ input[type="file"] {
     min-height: 20px;
 }
 
-/* 左侧竖版导航栏 */
+/* 左侧竖版导航栏 - 黄金分割位置 */
 .top-nav {
     position: fixed;
     left: 0;
-    top: 50%;
-    transform: translateY(-50%);
+    top: 38.2%;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border-radius: 0 20px 20px 0;
     padding: 15px 0;
@@ -754,12 +753,12 @@ input[type="file"] {
     border-right-color: white;
 }
 
-/* 右侧标记分类浮窗 */
+/* 右侧标记分类浮窗 - 黄金分割位置 */
 .marked-widget {
     position: fixed;
     right: 0;
-    top: 50%;
-    transform: translateY(-50%) translateX(calc(100% - 40px));
+    top: 38.2%;
+    transform: translateX(calc(100% - 40px));
     z-index: 999;
     background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
     border-radius: 20px 0 0 20px;
@@ -771,11 +770,11 @@ input[type="file"] {
 }
 
 .marked-widget:hover {
-    transform: translateY(-50%) translateX(calc(100% - 50px));
+    transform: translateX(calc(100% - 50px));
 }
 
 .marked-widget.expanded {
-    transform: translateY(-50%) translateX(0);
+    transform: translateX(0);
     cursor: default;
     border-radius: 20px 0 0 20px;
 }
