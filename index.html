@@ -18,16 +18,22 @@
             <h2>上传照片</h2>
             <form id="uploadForm" class="upload-form">
                 <div class="form-row">
-                    <input type="file" id="photoInput" accept="image/*" required>
+                    <input type="file" id="photoInput" accept="image/*" multiple required>
                     <select id="categorySelect" class="category-select">
                         <option value="">选择分类（可选）</option>
                     </select>
                 </div>
                 <div class="form-row">
-                    <input type="text" id="photoName" placeholder="照片名称（可选）">
+                    <input type="text" id="photoName" placeholder="照片名称前缀（可选，用于批量命名）">
                     <input type="text" id="photoDesc" placeholder="照片描述（可选）">
                 </div>
                 <button type="submit" class="btn btn-primary">上传</button>
+                <div id="uploadProgress" class="upload-progress" style="display:none;">
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <span id="progressText">0%</span>
+                </div>
             </form>
         </section>
 
@@ -36,7 +42,7 @@
             <h2>分类管理</h2>
             <div class="category-controls">
                 <input type="text" id="newCategory" placeholder="新分类名称">
-                <button onclick="createCategory()" class="btn btn-secondary">添加分类</button>
+                <button onclick="window.createCategory()" class="btn btn-secondary">添加分类</button>
             </div>
             <div id="categoryList" class="category-list"></div>
         </section>
@@ -44,10 +50,10 @@
         <!-- 照片浏览 -->
         <section class="photos-section">
             <div class="photos-header">
-                <h2>照片浏览</h2>
+                <h2 id="photosTitle">照片浏览</h2>
                 <div class="photos-controls">
                     <input type="text" id="searchInput" placeholder="🔍 搜索照片...">
-                    <select id="filterCategory" onchange="loadPhotos()">
+                    <select id="filterCategory" onchange="onCategoryFilterChange()">
                         <option value="all">全部分类</option>
                     </select>
                 </div>
@@ -58,6 +64,67 @@
                 <small>上传一些照片开始管理吧</small>
             </div>
         </section>
+    </div>
+
+    <!-- 照片详情弹窗 -->
+    <div id="photoModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <div class="modal-body">
+                <div class="modal-image-container">
+                    <img id="modalImage" src="" alt="">
+                </div>
+                <div class="modal-info">
+                    <h3 id="modalPhotoName"></h3>
+                    <p id="modalPhotoDesc"></p>
+                    <div class="modal-meta">
+                        <span id="modalPhotoCategory" class="photo-category"></span>
+                        <small id="modalPhotoSize"></small>
+                    </div>
+                    <div class="modal-actions">
+                        <a id="modalDownloadBtn" href="" download class="btn btn-primary">⬇️ 下载</a>
+                        <button onclick="openEditModal()" class="btn btn-secondary">✏️ 编辑</button>
+                        <button onclick="openCategoryModal()" class="btn btn-secondary">📁 改分类</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑弹窗 -->
+    <div id="editModal" class="modal">
+        <div class="modal-content modal-small">
+            <span class="modal-close" onclick="closeEditModal()">&times;</span>
+            <h3>编辑照片信息</h3>
+            <form id="editForm" class="edit-form">
+                <input type="hidden" id="editPhotoId">
+                <div class="form-group">
+                    <label>名称</label>
+                    <input type="text" id="editName" required>
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea id="editDesc" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 改分类弹窗 -->
+    <div id="categoryModal" class="modal">
+        <div class="modal-content modal-small">
+            <span class="modal-close" onclick="closeCategoryModal()">&times;</span>
+            <h3>更改分类</h3>
+            <div class="category-select-list">
+                <label class="category-option">
+                    <input type="radio" name="newCategory" value="">
+                    <span>未分类</span>
+                </label>
+                <div id="categoryRadioList"></div>
+            </div>
+            <button onclick="saveCategoryChange()" class="btn btn-primary">保存</button>
+        </div>
     </div>
 
     <script type="module" src="app.js"></script>
