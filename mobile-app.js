@@ -249,11 +249,11 @@ const mobile = {
 
         feed.innerHTML = pagePhotos.map((photo, index) => `
             <div class="photo-card ${this.selectMode ? 'select-mode' : ''} ${this.selectedPhotos.has(photo.id) ? 'selected' : ''}" 
-                 onclick="${this.selectMode ? "mobile.togglePhotoSelect(" + photo.id + ")" : "mobile.openDetail(" + photo.id + ")"}" 
+                 onclick="${this.selectMode ? "mobile.togglePhotoSelect('" + photo.id + "')" : "mobile.openDetail('" + photo.id + "')"}" 
                  style="animation-delay: ${index * 50}ms">
                 ${this.selectMode ? `
                     <div class="photo-checkbox">
-                        <input type="checkbox" ${this.selectedPhotos.has(photo.id) ? 'checked' : ''} onclick="event.stopPropagation(); mobile.togglePhotoSelect(${photo.id})">
+                        <input type="checkbox" ${this.selectedPhotos.has(photo.id) ? 'checked' : ''} onclick="event.stopPropagation(); mobile.togglePhotoSelect('${photo.id}')">
                     </div>
                 ` : ''}
                 <img src="${this.getPhotoUrl(photo.storage_path) || 'https://picsum.photos/400/400?random=' + photo.id}" alt="${photo.name}">
@@ -657,7 +657,7 @@ const mobile = {
 
         return `
             <div class="category-item" id="cat-${cat.id}" style="padding-left:${indent}px;">
-                <div class="category-header" onclick="mobile.toggleCategory(${cat.id})">
+                <div class="category-header" onclick="mobile.toggleCategory('${cat.id}')">
                     <div class="category-name">
                         <span>${icon}</span>
                         <span>${cat.name}</span>
@@ -670,10 +670,10 @@ const mobile = {
                     </div>
                 ` : ''}
                 <div class="category-actions" id="actions-${cat.id}" style="display:none;">
-                    <button class="btn-secondary" onclick="mobile.markCategory(${cat.id})">
+                    <button class="btn-secondary" onclick="mobile.markCategory('${cat.id}')">
                         ${isMarked ? '⭐ 已标记' : '☆ 标记'}
                     </button>
-                    <button class="btn-secondary" onclick="mobile.deleteCategory(${cat.id})">
+                    <button class="btn-secondary" onclick="mobile.deleteCategory('${cat.id}')">
                         🗑️ 删除
                     </button>
                 </div>
@@ -878,9 +878,9 @@ const mobile = {
             const cat = this.categories.find(c => c.id === id);
             if (!cat) return '';
             return `
-                <div class="marked-item" onclick="mobile.selectCategory(${id})">
+                <div class="marked-item" onclick="mobile.selectCategory('${id}')">
                     <span>📁 ${cat.name}</span>
-                    <span class="unmark" onclick="event.stopPropagation();mobile.unmarkCategory(${id})">✕</span>
+                    <span class="unmark" onclick="event.stopPropagation();mobile.unmarkCategory('${id}')">✕</span>
                 </div>
             `;
         }).join('');
