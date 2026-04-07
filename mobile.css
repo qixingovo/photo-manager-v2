@@ -52,6 +52,7 @@ body {
 .page.active {
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
 }
 
 /* ========================================
