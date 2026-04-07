@@ -1,7 +1,24 @@
+// 等待 Supabase CDN 加载完成
+function waitForSupabase(callback, retries = 0) {
+    if (typeof window.supabase !== 'undefined') {
+        callback();
+    } else if (retries < 50) {
+        setTimeout(() => waitForSupabase(callback, retries + 1), 100);
+    } else {
+        console.error('Supabase 加载超时');
+    }
+}
+
+// 初始化 Supabase（延迟到 CDN 加载完成后）
+let supabase = null;
+
+waitForSupabase(() => {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    initApp();
+});
+
 const SUPABASE_URL = 'https://hpwqtlxrfezpnxpgwlsx.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhwd3F0bHhyZmV6cG54cGd3bHN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDk2MzAsImV4cCI6MjA5MTAyNTYzMH0._yAiiFxsZbsOHf9ItMYU9ZRuNLjVDEbdZFwyh7U6C9w'
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 let categories = []
 let photos = []
@@ -247,24 +264,24 @@ window.toggleMarkedCategories = function(event) {
     widget.classList.toggle('expanded')
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    checkLogin()
+function initApp() {
+    checkLogin();
     
     // 重置筛选状态
-    currentCategory = 'all'
-    showFavoritesOnly = false
-    const filterSelect = document.getElementById('filterCategory')
-    if (filterSelect) filterSelect.value = 'all'
+    currentCategory = 'all';
+    showFavoritesOnly = false;
+    const filterSelect = document.getElementById('filterCategory');
+    if (filterSelect) filterSelect.value = 'all';
     
-    let searchTimeout
+    let searchTimeout;
     document.getElementById('searchInput').addEventListener('input', () => {
-        clearTimeout(searchTimeout)
-        searchTimeout = setTimeout(loadPhotos, 300)
-    })
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(loadPhotos, 300);
+    });
     
-    document.getElementById('uploadForm').addEventListener('submit', handleUpload)
-    document.getElementById('editForm').addEventListener('submit', window.handleEdit)
-})
+    document.getElementById('uploadForm').addEventListener('submit', handleUpload);
+    document.getElementById('editForm').addEventListener('submit', window.handleEdit);
+}
 
 async function loadCategories() {
     try {

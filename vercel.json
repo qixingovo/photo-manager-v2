@@ -1,6 +1,15 @@
 {
-  "buildCommand": null,
-  "outputDirectory": ".",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "installCommand": "npm install",
-  "framework": null
+  "framework": null,
+  "routes": [
+    { "src": "/", "dest": "/index.html" },
+    { "src": "/index.html", "dest": "/index.html" },
+    { "src": "/index-mobile.html", "dest": "/index-mobile.html" },
+    { "src": "/app.js", "dest": "/app.js" },
+    { "src": "/mobile-app.js", "dest": "/mobile-app.js" },
+    { "src": "/style.css", "dest": "/style.css" },
+    { "src": "/mobile.css", "dest": "/mobile.css" }
+  ]
 }
