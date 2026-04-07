@@ -17,7 +17,7 @@ const mobile = {
     
     // 分页状态
     currentPage: 1,
-    photosPerPage: 20,
+    photosPerPage: 6,
     
     // 多选状态
     selectMode: false,
