@@ -24,6 +24,11 @@ const mobile = {
     // 初始化 Supabase 客户端
     initSupabase() {
         if (!this.supabase) {
+            // 等待 window.supabase 可用
+            if (typeof window.supabase === 'undefined') {
+                console.error('Supabase CDN 未加载');
+                return null;
+            }
             this.supabase = window.supabase.createClient(this.SUPABASE_URL, this.SUPABASE_KEY);
         }
         return this.supabase;
