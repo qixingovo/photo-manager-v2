@@ -1,4 +1,4 @@
-// ========== 状态变量（必须在最前面声明，避免 TDZ 问题）==========
+// ========== 状态变量 ==========
 let categories = []
 let photos = []
 let photoCategories = [] // photo_id -> category_ids 映射
@@ -15,24 +15,12 @@ let expandedInManager = new Set() // 分类管理区域的展开状态
 // Supabase 配置
 const SUPABASE_URL = 'https://hpwqtlxrfezpnxpgwlsx.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhwd3F0bHhyZmV6cG54cGd3bHN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDk2MzAsImV4cCI6MjA5MTAyNTYzMH0._yAiiFxsZbsOHf9ItMYU9ZRuNLjVDEbdZFwyh7U6C9w'
-let supabase = null
 
-// ========== 工具函数 ==========
+// 直接初始化 Supabase（CDN 脚本是同步加载的）
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// 等待 Supabase CDN 加载完成
-function waitForSupabase(callback, retries = 0) {
-    if (typeof window.supabase !== 'undefined') {
-        callback();
-    } else if (retries < 50) {
-        setTimeout(() => waitForSupabase(callback, retries + 1), 100);
-    } else {
-        console.error('Supabase 加载超时');
-    }
-}
-
-// 初始化 Supabase（延迟到 CDN 加载完成后）
-waitForSupabase(() => {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ========== 初始化 ==========
+window.addEventListener('DOMContentLoaded', () => {
     initApp();
 });
 
