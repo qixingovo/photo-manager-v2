@@ -326,21 +326,37 @@ const mobile = {
 
     updateSelectModeUI() {
         const selectBtn = document.getElementById('selectModeBtn');
-        const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+        const batchActions = document.getElementById('batchActions');
         const selectedCount = document.getElementById('selectedCount');
         
         if (this.selectMode) {
-            selectBtn.textContent = '取消';
+            selectBtn.textContent = '❌ 取消';
             selectBtn.classList.add('active');
-            batchDeleteBtn.style.display = 'block';
+            batchActions.style.display = 'flex';
             selectedCount.textContent = this.selectedPhotos.size;
-            selectedCount.style.display = 'inline';
         } else {
-            selectBtn.textContent = '多选';
+            selectBtn.textContent = '☑️ 多选';
             selectBtn.classList.remove('active');
-            batchDeleteBtn.style.display = 'none';
-            selectedCount.style.display = 'none';
+            batchActions.style.display = 'none';
         }
+    },
+
+    selectAllPhotos() {
+        const currentPagePhotos = this.photos.slice(
+            (this.currentPage - 1) * this.photosPerPage,
+            this.currentPage * this.photosPerPage
+        );
+        
+        // 如果当前页已全选，则取消全选
+        if (this.selectedPhotos.size === currentPagePhotos.length) {
+            currentPagePhotos.forEach(p => this.selectedPhotos.delete(p.id));
+            this.showToast('已取消全选');
+        } else {
+            currentPagePhotos.forEach(p => this.selectedPhotos.add(p.id));
+            this.showToast(`已选中 ${currentPagePhotos.length} 张`);
+        }
+        this.renderPhotos();
+        this.updateSelectModeUI();
     },
 
     batchDeletePhotos() {
