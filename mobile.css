@@ -1077,3 +1077,121 @@ body {
 .hidden {
     display: none !important;
 }
+
+/* ========================================
+   照片操作栏
+   ======================================== */
+.photo-actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #eee;
+    gap: 10px;
+}
+
+.photo-actions-bar .btn-secondary,
+.photo-actions-bar .btn-danger {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+}
+
+.photo-actions-bar .btn-secondary {
+    background: #e9ecef;
+    color: #333;
+}
+
+.photo-actions-bar .btn-secondary.active {
+    background: #667eea;
+    color: white;
+}
+
+.photo-actions-bar .btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+/* ========================================
+   分页控件
+   ======================================== */
+.pagination-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-top: 1px solid #eee;
+}
+
+.pagination-info {
+    font-size: 14px;
+    color: #666;
+}
+
+.pagination-btn {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 20px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pagination-btn:active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+/* ========================================
+   多选模式
+   ======================================== */
+.photo-card.select-mode {
+    position: relative;
+}
+
+.photo-card.select-mode::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 24px;
+    height: 24px;
+    border: 2px solid #667eea;
+    border-radius: 50%;
+    background: white;
+    z-index: 2;
+}
+
+.photo-card.selected::before {
+    background: #667eea;
+}
+
+.photo-checkbox {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 24px;
+    height: 24px;
+    z-index: 3;
+}
+
+.photo-checkbox input {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    opacity: 0;
+    position: relative;
+    z-index: 4;
+}
+
+.photo-card.selected::before {
+    background: #667eea;
+}

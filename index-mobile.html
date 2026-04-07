@@ -51,10 +51,19 @@
             </select>
         </div>
 
+        <!-- 照片操作栏 -->
+        <div class="photo-actions-bar">
+            <button id="selectModeBtn" class="btn-secondary" onclick="mobile.toggleSelectMode()">☑️ 多选</button>
+            <button id="batchDeleteBtn" class="btn-danger" style="display:none;" onclick="mobile.batchDeletePhotos()">🗑️ 删除 (<span id="selectedCount" style="display:none;">0</span>)</button>
+        </div>
+
         <!-- 照片瀑布流 -->
         <main class="photo-feed" id="photoFeed">
             <!-- 照片卡片会动态插入 -->
         </main>
+
+        <!-- 分页控件 -->
+        <div id="paginationControls" class="pagination-controls"></div>
 
         <div id="emptyFeed" class="empty-state" style="display:none;">
             <span class="empty-icon">📭</span>

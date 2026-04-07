@@ -9,11 +9,18 @@ const mobile = {
     photos: [],
     categories: [],
     markedCategories: [],
-    selectedPhotos: [],
+    selectedPhotos: new Set(),
     currentPhotoId: null,
     previewFiles: [],
     pendingDeleteId: null,
     pendingDeleteType: null,
+    
+    // 分页状态
+    currentPage: 1,
+    photosPerPage: 20,
+    
+    // 多选状态
+    selectMode: false,
 
     // Supabase Storage 公开URL前缀（与桌面版一致）
     SUPABASE_URL: 'https://hpwqtlxrfezpnxpgwlsx.supabase.co',
@@ -233,9 +240,22 @@ const mobile = {
 
         feed.style.display = 'grid';
         empty.style.display = 'none';
+        
+        // 计算分页
+        const totalPages = Math.ceil(this.photos.length / this.photosPerPage);
+        const startIndex = (this.currentPage - 1) * this.photosPerPage;
+        const endIndex = startIndex + this.photosPerPage;
+        const pagePhotos = this.photos.slice(startIndex, endIndex);
 
-        feed.innerHTML = this.photos.map((photo, index) => `
-            <div class="photo-card" onclick="mobile.openDetail(${photo.id})" style="animation-delay: ${index * 50}ms">
+        feed.innerHTML = pagePhotos.map((photo, index) => `
+            <div class="photo-card ${this.selectMode ? 'select-mode' : ''} ${this.selectedPhotos.has(photo.id) ? 'selected' : ''}" 
+                 onclick="${this.selectMode ? "mobile.togglePhotoSelect(" + photo.id + ")" : "mobile.openDetail(" + photo.id + ")"}" 
+                 style="animation-delay: ${index * 50}ms">
+                ${this.selectMode ? `
+                    <div class="photo-checkbox">
+                        <input type="checkbox" ${this.selectedPhotos.has(photo.id) ? 'checked' : ''} onclick="event.stopPropagation(); mobile.togglePhotoSelect(${photo.id})">
+                    </div>
+                ` : ''}
                 <img src="${this.getPhotoUrl(photo.storage_path) || 'https://picsum.photos/400/400?random=' + photo.id}" alt="${photo.name}">
                 <div class="photo-card-info">
                     <h4>${photo.name || '未命名'}</h4>
@@ -244,6 +264,118 @@ const mobile = {
                 ${photo.is_favorite ? '<span class="photo-card-fav">❤️</span>' : ''}
             </div>
         `).join('');
+        
+        // 渲染分页控件
+        this.renderPagination(totalPages);
+    },
+
+    renderPagination(totalPages) {
+        const pagination = document.getElementById('paginationControls');
+        if (!pagination) return;
+        
+        if (totalPages <= 1) {
+            pagination.innerHTML = '';
+            return;
+        }
+        
+        let html = `<div class="pagination-info">第 ${this.currentPage} / ${totalPages} 页</div>`;
+        
+        if (this.currentPage > 1) {
+            html += `<button class="pagination-btn" onclick="mobile.prevPage()">上一页</button>`;
+        }
+        if (this.currentPage < totalPages) {
+            html += `<button class="pagination-btn" onclick="mobile.nextPage()">下一页</button>`;
+        }
+        
+        pagination.innerHTML = html;
+    },
+
+    prevPage() {
+        if (this.currentPage > 1) {
+            this.currentPage--;
+            this.renderPhotos();
+        }
+    },
+
+    nextPage() {
+        const totalPages = Math.ceil(this.photos.length / this.photosPerPage);
+        if (this.currentPage < totalPages) {
+            this.currentPage++;
+            this.renderPhotos();
+        }
+    },
+
+    toggleSelectMode() {
+        this.selectMode = !this.selectMode;
+        if (!this.selectMode) {
+            this.selectedPhotos.clear();
+        }
+        this.renderPhotos();
+        this.updateSelectModeUI();
+    },
+
+    togglePhotoSelect(photoId) {
+        if (this.selectedPhotos.has(photoId)) {
+            this.selectedPhotos.delete(photoId);
+        } else {
+            this.selectedPhotos.add(photoId);
+        }
+        this.renderPhotos();
+        this.updateSelectModeUI();
+    },
+
+    updateSelectModeUI() {
+        const selectBtn = document.getElementById('selectModeBtn');
+        const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+        const selectedCount = document.getElementById('selectedCount');
+        
+        if (this.selectMode) {
+            selectBtn.textContent = '取消';
+            selectBtn.classList.add('active');
+            batchDeleteBtn.style.display = 'block';
+            selectedCount.textContent = this.selectedPhotos.size;
+            selectedCount.style.display = 'inline';
+        } else {
+            selectBtn.textContent = '多选';
+            selectBtn.classList.remove('active');
+            batchDeleteBtn.style.display = 'none';
+            selectedCount.style.display = 'none';
+        }
+    },
+
+    batchDeletePhotos() {
+        if (this.selectedPhotos.size === 0) {
+            this.showToast('请先选择要删除的照片');
+            return;
+        }
+        
+        this.pendingDeleteType = 'batch-photo';
+        document.getElementById('confirmTitle').textContent = '批量删除';
+        document.getElementById('confirmMessage').textContent = `确定删除选中的 ${this.selectedPhotos.size} 张照片？`;
+        document.getElementById('confirmModal').style.display = 'flex';
+    },
+
+    confirmBatchDelete() {
+        const supabase = this.initSupabase();
+        let deletedCount = 0;
+        
+        this.selectedPhotos.forEach(async (photoId) => {
+            try {
+                await supabase.from('photos').delete().eq('id', photoId);
+                deletedCount++;
+            } catch (err) {
+                console.error('删除失败:', err);
+            }
+        });
+        
+        this.selectedPhotos.clear();
+        this.selectMode = false;
+        this.updateSelectModeUI();
+        this.closeConfirmModal();
+        this.showToast(`已删除 ${deletedCount} 张照片`);
+        
+        // 重新加载
+        this.loadPhotos();
     },
 
     openDetail(photoId) {
@@ -618,6 +750,24 @@ const mobile = {
             this.photos = this.photos.filter(p => p.id !== this.pendingDeleteId);
             this.renderPhotos();
             this.showToast('照片已删除');
+        } else if (this.pendingDeleteType === 'batch-photo') {
+            // 批量删除
+            const supabase = this.initSupabase();
+            let deletedCount = 0;
+            for (const photoId of this.selectedPhotos) {
+                try {
+                    await supabase.from('photos').delete().eq('id', photoId);
+                    this.photos = this.photos.filter(p => p.id !== photoId);
+                    deletedCount++;
+                } catch (err) {
+                    console.error('删除失败:', err);
+                }
+            }
+            this.selectedPhotos.clear();
+            this.selectMode = false;
+            this.updateSelectModeUI();
+            this.renderPhotos();
+            this.showToast(`已删除 ${deletedCount} 张照片`);
         }
         this.closeConfirmModal();
     },
