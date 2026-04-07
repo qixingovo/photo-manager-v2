@@ -894,3 +894,31 @@ input[type="file"] {
 .marked-item .unmark-btn:hover {
     color: #fff;
 }
+
+/* ========================================
+   级联分类选择器
+   ======================================== */
+.cascade-container {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.cascade-level {
+    margin-bottom: 8px;
+}
+
+.category-option-sub {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.category-option-sub:hover {
+    background: #f5f5f5;
+}
+
+.category-option-sub input {
+    margin-right: 6px;
+}
