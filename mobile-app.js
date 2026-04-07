@@ -12,6 +12,8 @@ const mobile = {
     selectedPhotos: [],
     currentPhotoId: null,
     previewFiles: [],
+    pendingDeleteId: null,
+    pendingDeleteType: null,
 
     // Supabase 配置（与桌面版一致）
     SUPABASE_URL: 'https://hpwqtlxrfezpnxpgwlsx.supabase.co',
@@ -436,11 +438,31 @@ const mobile = {
     },
 
     async deleteCategory(id) {
-        if (!confirm('确定要删除这个分类吗？')) return;
-        this.categories = this.categories.filter(c => c.id !== id);
-        this.updateCategorySelects();
-        this.renderCategories();
-        this.showToast('分类已删除');
+        this.pendingDeleteId = id;
+        this.pendingDeleteType = 'category';
+        document.getElementById('confirmTitle').textContent = '删除分类';
+        document.getElementById('confirmMessage').textContent = '确定要删除这个分类吗？';
+        document.getElementById('confirmModal').style.display = 'flex';
+    },
+
+    closeConfirmModal() {
+        document.getElementById('confirmModal').style.display = 'none';
+        this.pendingDeleteId = null;
+        this.pendingDeleteType = null;
+    },
+
+    async confirmDelete() {
+        if (this.pendingDeleteType === 'category') {
+            this.categories = this.categories.filter(c => c.id !== this.pendingDeleteId);
+            this.updateCategorySelects();
+            this.renderCategories();
+            this.showToast('分类已删除');
+        } else if (this.pendingDeleteType === 'photo') {
+            this.photos = this.photos.filter(p => p.id !== this.pendingDeleteId);
+            this.renderPhotos();
+            this.showToast('照片已删除');
+        }
+        this.closeConfirmModal();
     },
 
     // ========================================
@@ -650,12 +672,11 @@ const mobile = {
     // 删除照片
     // ========================================
     deletePhoto() {
-        if (!confirm('确定要删除这张照片吗？')) return;
-        
-        this.photos = this.photos.filter(p => p.id !== this.currentPhotoId);
-        this.closeDetail();
-        this.renderPhotos();
-        this.showToast('照片已删除');
+        this.pendingDeleteId = this.currentPhotoId;
+        this.pendingDeleteType = 'photo';
+        document.getElementById('confirmTitle').textContent = '删除照片';
+        document.getElementById('confirmMessage').textContent = '确定要删除这张照片吗？';
+        document.getElementById('confirmModal').style.display = 'flex';
     },
 
     // ========================================

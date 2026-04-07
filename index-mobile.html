@@ -273,6 +273,18 @@
         </div>
     </div>
 
+    <!-- ========== 确认删除弹窗 ========== -->
+    <div id="confirmModal" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <h3 id="confirmTitle">确认删除</h3>
+            <p id="confirmMessage" style="text-align:center;color:#666;margin-bottom:20px;"></p>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="mobile.closeConfirmModal()">取消</button>
+                <button class="btn-danger" onclick="mobile.confirmDelete()">删除</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ========== 已标记分类面板 ========== -->
     <div id="markedPanel" class="bottom-sheet" style="display:none;">
         <div class="sheet-header">
