@@ -200,6 +200,10 @@ window.toggleSection = function(section) {
         const categorySection = document.getElementById('categorySection')
         categorySection.style.display = categorySection.style.display === 'none' ? 'block' : 'none'
         uploadSection.style.display = 'none'
+        // 显示分类管理时，重新渲染父分类选择器
+        if (categorySection.style.display === 'block') {
+            renderParentCategorySelect()
+        }
     }
 }
 
