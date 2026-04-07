@@ -1115,14 +1115,15 @@ window.createCategory = async function() {
     try {
         const { data, error } = await supabase
             .from('categories')
-            .insert([{ name, parent_id: parentId }])
+            .insert([{ name, parent_id: parentId || null }])
             .select()
             .single()
         
         if (error) throw error
         
         input.value = ''
-        if (parentSelect) parentSelect.value = ''
+        // 重置父分类选择器
+        renderParentCategorySelect()
         await loadCategories()
     } catch (err) {
         alert('创建分类失败: ' + err.message)
