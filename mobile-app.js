@@ -18,6 +18,13 @@ const mobile = {
     // Supabase 配置（与桌面版一致）
     SUPABASE_URL: 'https://hpwqtlxrfezpnxpgwlsx.supabase.co',
     SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhwd3F0bHhyZmV6cG54cGd3bHN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDk2MzAsImV4cCI6MjA5MTAyNTYzMH0._yAiiFxsZbsOHf9ItMYU9ZRuNLjVDEbdZFwyh7U6C9w',
+    
+    // 获取照片公开URL
+    getPhotoUrl(storagePath) {
+        // 使用与桌面版相同的方式获取公开URL
+        const bucketUrl = 'https://hpwqtlxrfezpnxpgwlsx.supabase.co/storage/v1/object/public/photo/';
+        return bucketUrl + storagePath;
+    },
 
     // 初始化
     init() {
@@ -200,7 +207,7 @@ const mobile = {
 
         feed.innerHTML = this.photos.map((photo, index) => `
             <div class="photo-card" onclick="mobile.openDetail(${photo.id})" style="animation-delay: ${index * 50}ms">
-                <img src="${photo.storage_path || 'https://picsum.photos/400/400?random=' + photo.id}" alt="${photo.name}">
+                <img src="${this.getPhotoUrl(photo.storage_path) || 'https://picsum.photos/400/400?random=' + photo.id}" alt="${photo.name}">
                 <div class="photo-card-info">
                     <h4>${photo.name || '未命名'}</h4>
                     <p>${photo.description || ''}</p>
@@ -215,7 +222,7 @@ const mobile = {
         const photo = this.photos.find(p => p.id === photoId);
         if (!photo) return;
 
-        document.getElementById('detailImage').src = photo.storage_path || 'https://picsum.photos/800/600';
+        document.getElementById('detailImage').src = this.getPhotoUrl(photo.storage_path) || 'https://picsum.photos/800/600';
         document.getElementById('detailName').textContent = photo.name || '未命名';
         document.getElementById('detailDesc').textContent = photo.description || '';
         document.getElementById('detailCategory').textContent = photo.category_name || '未分类';
@@ -663,7 +670,7 @@ const mobile = {
         if (!photo) return;
 
         const link = document.createElement('a');
-        link.href = photo.storage_path || 'https://picsum.photos/800/600';
+        link.href = this.getPhotoUrl(photo.storage_path) || 'https://picsum.photos/800/600';
         link.download = photo.name || 'photo';
         link.click();
     },
