@@ -70,6 +70,14 @@ const mobile = {
     // 页面导航
     // ========================================
     showPage(page) {
+        // 未登录只能访问 login 页面
+        if (page !== 'login' && page !== 'detail') {
+            if (!localStorage.getItem('photoUser')) {
+                this.showPage('login');
+                return;
+            }
+        }
+
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(page + 'Page').classList.add('active');
 
@@ -78,9 +86,13 @@ const mobile = {
             item.classList.toggle('active', item.dataset.page === page);
         });
 
-        // 隐藏底部导航在详情页
+        // 隐藏底部导航在详情页和登录页
         const bottomNav = document.getElementById('bottomNav');
-        bottomNav.style.display = page === 'detail' ? 'none' : 'flex';
+        if (page === 'detail' || page === 'login') {
+            bottomNav.style.display = 'none';
+        } else {
+            bottomNav.style.display = 'flex';
+        }
     },
 
     switchTab(tab) {
