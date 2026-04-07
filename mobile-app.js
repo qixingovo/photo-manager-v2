@@ -42,18 +42,31 @@ const mobile = {
         const username = document.getElementById('loginUsername').value.trim();
         const password = document.getElementById('loginPassword').value;
 
-        // 简单验证（实际项目中应该请求后端）
+        // 简单验证
         if ((username === 'laoda' || username === 'xiaodi') && password === 'lxyajwr06225') {
             this.currentUser = { username, role: username === 'laoda' ? '老大' : '小弟' };
-            localStorage.setItem('photoUser', JSON.stringify(this.currentUser));
+            
+            try {
+                localStorage.setItem('photoUser', JSON.stringify(this.currentUser));
+            } catch (e) {
+                console.error('localStorage 写入失败:', e);
+                this.showToast('存储失败，请关闭无痕模式');
+                return;
+            }
             
             // 老大欢迎页
             if (username === 'laoda') {
                 this.showToast('🎉 老大生日快乐！');
             }
             
+            // 先跳转页面
             this.showPage('home');
-            await this.loadData();
+            
+            // 再加载数据（不阻塞页面显示）
+            this.loadData().catch(err => {
+                console.error('加载数据失败:', err);
+                this.showToast('数据加载失败，请刷新重试');
+            });
         } else {
             document.getElementById('loginError').textContent = '账号或密码错误';
         }
@@ -129,8 +142,6 @@ const mobile = {
     },
 
     async loadCategories() {
-        // 模拟从 Supabase 加载分类
-        // 实际项目中替换为真实的 API 调用
         try {
             const response = await fetch(`${this.SUPABASE_URL}/rest/v1/categories?select=*&order=id.asc`, {
                 headers: {
@@ -142,13 +153,8 @@ const mobile = {
                 this.categories = await response.json();
             }
         } catch (error) {
-            console.log('Using mock categories');
-            this.categories = [
-                { id: 1, name: '老大小弟之家', parent_id: null },
-                { id: 2, name: '日常', parent_id: null },
-                { id: 3, name: '游戏', parent_id: null },
-                { id: 4, name: '回忆', parent_id: 1 }
-            ];
+            console.warn('加载分类失败，使用空列表:', error);
+            this.categories = [];
         }
     },
 
@@ -164,7 +170,7 @@ const mobile = {
                 this.photos = await response.json();
             }
         } catch (error) {
-            console.log('Using mock photos');
+            console.warn('加载照片失败，使用空列表:', error);
             this.photos = [];
         }
     },
