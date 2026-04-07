@@ -279,6 +279,35 @@ input[type="file"] {
     box-shadow: 0 0 0 3px #dc3545;
 }
 
+/* 子分类卡片 */
+.photo-card.category-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 20px;
+    min-height: 180px;
+}
+
+.photo-card.category-card .category-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.photo-card.category-card .category-info {
+    text-align: center;
+}
+
+.photo-card.category-card .category-info h3 {
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.photo-card.category-card .category-info p {
+    font-size: 13px;
+    color: #666;
+}
+
 .photo-checkbox {
     position: absolute;
     top: 8px;

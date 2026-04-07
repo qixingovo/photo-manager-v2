@@ -739,21 +739,121 @@ function renderCategories() {
 
 // 渲染照片浏览的分类下拉（扁平列表）
 function renderCategorySelect() {
-    const select = document.getElementById('filterCategory')
-    if (!select) return
+    const container = document.getElementById('filterCategoryCascade')
+    if (!container) return
+    container.innerHTML = ''
     
-    const options = categories.map(cat => {
+    const topLevel = categories.filter(c => !c.parent_id)
+    if (topLevel.length === 0) {
+        container.innerHTML = '<p style="color:#999;font-size:12px;">暂无分类</p>'
+        return
+    }
+    
+    // 创建第一级选择器
+    const select = document.createElement('select')
+    select.id = 'filterCatLevel0'
+    select.style.cssText = 'padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;'
+    select.onchange = () => onFilterCatLevelChange(0)
+    select.innerHTML = `<option value="all">全部分类</option>${topLevel.map(cat => {
         const count = photos.filter(p => {
             const photoCats = photoCategories[p.id] || []
             return photoCats.includes(cat.id)
         }).length
         return `<option value="${cat.id}">${cat.name} (${count})</option>`
-    }).join('')
+    }).join('')}`
+    container.appendChild(select)
     
-    select.innerHTML = `<option value="all">全部分类</option>${options}`
-    
+    // 如果之前已选择了某个分类，需要重建选择器层级
     if (currentCategory && currentCategory !== 'all') {
-        select.value = currentCategory
+        rebuildFilterCascade(currentCategory)
+    }
+}
+
+function rebuildFilterCascade(categoryId) {
+    // 找到该分类的父路径
+    const path = getCategoryPath(categoryId)
+    const container = document.getElementById('filterCategoryCascade')
+    if (!container) return
+    container.innerHTML = ''
+    
+    let parentId = null
+    path.forEach((catId, index) => {
+        const level = index
+        const cats = index === 0 
+            ? categories.filter(c => !c.parent_id)
+            : categories.filter(c => c.parent_id === parentId)
+        
+        const select = document.createElement('select')
+        select.id = `filterCatLevel${level}`
+        select.style.cssText = 'padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;'
+        select.onchange = () => onFilterCatLevelChange(level)
+        
+        const selectedValue = index === path.length - 1 ? catId : ''
+        select.innerHTML = `<option value="">选择分类</option>${cats.map(cat => {
+            const count = photos.filter(p => {
+                const photoCats = photoCategories[p.id] || []
+                return photoCats.includes(cat.id)
+            }).length
+            const selected = cat.id === catId ? 'selected' : ''
+            return `<option value="${cat.id}" ${selected}>${cat.name} (${count})</option>`
+        }).join('')}`
+        container.appendChild(select)
+        parentId = catId
+    })
+}
+
+function getCategoryPath(categoryId) {
+    const path = []
+    let current = categories.find(c => c.id === categoryId)
+    while (current) {
+        path.unshift(current.id)
+        current = current.parent_id ? categories.find(c => c.id === current.parent_id) : null
+    }
+    return path
+}
+
+function onFilterCatLevelChange(level) {
+    const container = document.getElementById('filterCategoryCascade')
+    if (!container) return
+    
+    const select = document.getElementById(`filterCatLevel${level}`)
+    if (!select) return
+    
+    const selectedValue = select.value
+    
+    // 删除高于当前级别的选择器
+    const selects = container.querySelectorAll('select')
+    selects.forEach((s, i) => {
+        if (i > level) s.remove()
+    })
+    
+    // 如果选择了"全部分类"，重置为 all
+    if (selectedValue === 'all') {
+        currentCategory = 'all'
+        renderPhotos()
+        return
+    }
+    
+    // 如果选中了某个分类，显示其子分类作为下一级
+    if (selectedValue) {
+        currentCategory = selectedValue
+        const children = categories.filter(c => c.parent_id === selectedValue)
+        if (children.length > 0) {
+            const nextLevel = level + 1
+            const nextSelect = document.createElement('select')
+            nextSelect.id = `filterCatLevel${nextLevel}`
+            nextSelect.style.cssText = 'padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;'
+            nextSelect.onchange = () => onFilterCatLevelChange(nextLevel)
+            nextSelect.innerHTML = `<option value="">选择子分类</option>${children.map(cat => {
+                const count = photos.filter(p => {
+                    const photoCats = photoCategories[p.id] || []
+                    return photoCats.includes(cat.id)
+                }).length
+                return `<option value="${cat.id}">${cat.name} (${count})</option>`
+            }).join('')}`
+            container.appendChild(nextSelect)
+        }
+        renderPhotos()
     }
 }
 
@@ -1372,7 +1472,50 @@ function renderPhotos() {
         loadAllPhotoCategories()
     }
     
-    grid.innerHTML = photos.map(photo => {
+    // 根据当前分类过滤照片
+    let filteredPhotos = photos
+    if (currentCategory && currentCategory !== 'all') {
+        filteredPhotos = photos.filter(photo => {
+            const photoCats = photoCategories[photo.id] || []
+            return photoCats.includes(parseInt(currentCategory))
+        })
+    }
+    
+    // 如果当前分类下没有照片，但有子分类，显示子分类卡片
+    if (filteredPhotos.length === 0 && currentCategory && currentCategory !== 'all') {
+        const currentCat = categories.find(c => c.id === parseInt(currentCategory))
+        const childCategories = categories.filter(c => c.parent_id === parseInt(currentCategory))
+        
+        if (childCategories.length > 0) {
+            grid.innerHTML = childCategories.map(cat => {
+                const catPhotos = photos.filter(photo => {
+                    const photoCats = photoCategories[photo.id] || []
+                    return photoCats.includes(cat.id)
+                })
+                const photoCount = catPhotos.length
+                return `
+                    <div class="photo-card category-card" onclick="selectCategory(${cat.id})">
+                        <div class="category-icon">📁</div>
+                        <div class="category-info">
+                            <h3>${cat.name}</h3>
+                            <p>${photoCount} 张照片</p>
+                        </div>
+                    </div>
+                `
+            }).join('')
+            empty.style.display = 'none'
+            return
+        }
+    }
+    
+    // 如果过滤后没有照片
+    if (filteredPhotos.length === 0) {
+        grid.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">该分类下暂无照片</p>'
+        empty.style.display = 'none'
+        return
+    }
+    
+    grid.innerHTML = filteredPhotos.map(photo => {
         const photoUrl = getPhotoUrl(photo.storage_path)
         const favoriteIcon = photo.is_favorite ? '❤️' : '🤍'
         const isSelected = selectedPhotos.has(photo.id)

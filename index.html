@@ -113,9 +113,7 @@
                 <h2 id="photosTitle">照片浏览</h2>
                 <div class="photos-controls">
                     <input type="text" id="searchInput" placeholder="🔍 搜索照片...">
-                    <select id="filterCategory" onchange="onCategoryFilterChange()">
-                        <option value="all">全部分类</option>
-                    </select>
+                    <div id="filterCategoryCascade" class="filter-cascade"></div>
                     <button id="selectModeBtn" onclick="window.toggleSelectMode()" class="btn btn-secondary">☑️ 多选</button>
                     <button id="selectAllBtn" onclick="window.selectAllPhotos()" class="btn btn-secondary" style="display:none;">全选</button>
                     <button id="batchCategoryBtn" onclick="window.openBatchCategoryModal()" class="btn btn-secondary" style="display:none;">📁 批量改分类</button>
