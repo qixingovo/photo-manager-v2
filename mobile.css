@@ -311,9 +311,10 @@ body {
 
 .photo-card img {
     width: 100%;
-    aspect-ratio: 1;
-    object-fit: cover;
+    height: auto;
+    object-fit: contain;
     display: block;
+    background: #f0f0f0;
 }
 
 .photo-card-info {
