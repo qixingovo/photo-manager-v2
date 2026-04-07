@@ -30,6 +30,7 @@
 html, body {
     height: 100%;
     overflow: hidden;
+    touch-action: pan-y;
 }
 
 body {
@@ -47,12 +48,15 @@ body {
     display: none;
     height: 100%;
     overflow: hidden;
+    flex: 1;
 }
 
 .page.active {
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    overflow-y: auto !important;
+    height: 100%;
+    flex: 1;
 }
 
 /* ========================================
