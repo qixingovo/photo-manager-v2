@@ -159,12 +159,8 @@
                     <input type="text" id="newCategoryName" placeholder="分类名称">
                 </div>
                 <div class="form-item">
-                    <div class="select-wrapper">
-                        <select id="parentCategorySelect">
-                            <option value="">无父分类</option>
-                        </select>
-                        <span class="select-arrow">▼</span>
-                    </div>
+                    <label style="font-size:13px;color:#666;margin-bottom:6px;display:block;">父分类（可选）</label>
+                    <div id="parentCategoryCascade" class="cascade-container"></div>
                 </div>
                 <div class="modal-actions">
                     <button class="btn-secondary" onclick="mobile.closeAddCategory()">取消</button>

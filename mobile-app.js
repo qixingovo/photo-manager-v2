@@ -606,17 +606,11 @@ const mobile = {
             });
         }
         
-        // 更新父分类选择器（扁平列表）
-        const parentSelect = document.getElementById('parentCategorySelect');
-        if (parentSelect) {
-            parentSelect.innerHTML = '<option value="">无父分类</option>';
-            this.categories.forEach(cat => {
-                parentSelect.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
-            });
-        }
-        
         // 渲染上传页面的级联分类选择器
         this.renderUploadCategoryCascade();
+        
+        // 渲染添加分类的父分类级联选择器
+        this.renderParentCategoryCascade();
     },
 
     // 渲染上传页面的级联分类选择器
@@ -670,6 +664,65 @@ const mobile = {
 
     getSelectedUploadCategoryId() {
         const container = document.getElementById('mobileUploadCategoryCascade');
+        if (!container) return null;
+        const selects = container.querySelectorAll('select');
+        for (let i = selects.length - 1; i >= 0; i--) {
+            if (selects[i].value) return selects[i].value;
+        }
+        return null;
+    },
+
+    // 渲染添加分类的父分类级联选择器
+    renderParentCategoryCascade() {
+        const container = document.getElementById('parentCategoryCascade');
+        if (!container) return;
+        container.innerHTML = '';
+        
+        const topLevel = this.categories.filter(c => !c.parent_id);
+        if (topLevel.length === 0) {
+            container.innerHTML = '<p style="color:#999;font-size:13px;">暂无父分类可选</p>';
+            return;
+        }
+        
+        const select = document.createElement('select');
+        select.id = 'parentCatLevel0';
+        select.style.cssText = 'width:100%;padding:12px 16px;border:1px solid #e9ecef;border-radius:10px;font-size:15px;background:white;';
+        select.onchange = () => this.onParentCatLevelChange(0);
+        select.innerHTML = `<option value="">无父分类</option>${topLevel.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
+        container.appendChild(select);
+    },
+
+    onParentCatLevelChange(level) {
+        const container = document.getElementById('parentCategoryCascade');
+        if (!container) return;
+        const select = document.getElementById(`parentCatLevel${level}`);
+        if (!select) return;
+        
+        const selectedValue = select.value;
+        
+        // 删除高于当前级别的选择器
+        const selects = container.querySelectorAll('select');
+        selects.forEach((s, i) => {
+            if (i > level) s.remove();
+        });
+        
+        // 如果选中了某个分类，显示其子分类作为下一级
+        if (selectedValue) {
+            const children = this.categories.filter(c => c.parent_id === selectedValue);
+            if (children.length > 0) {
+                const nextLevel = level + 1;
+                const nextSelect = document.createElement('select');
+                nextSelect.id = `parentCatLevel${nextLevel}`;
+                nextSelect.style.cssText = 'width:100%;padding:12px 16px;border:1px solid #e9ecef;border-radius:10px;font-size:15px;background:white;margin-top:8px;';
+                nextSelect.onchange = () => this.onParentCatLevelChange(nextLevel);
+                nextSelect.innerHTML = `<option value="">选择子分类</option>${children.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
+                container.appendChild(nextSelect);
+            }
+        }
+    },
+
+    getSelectedParentCategoryId() {
+        const container = document.getElementById('parentCategoryCascade');
         if (!container) return null;
         const selects = container.querySelectorAll('select');
         for (let i = selects.length - 1; i >= 0; i--) {
@@ -739,17 +792,19 @@ const mobile = {
 
     showAddCategory() {
         document.getElementById('addCategoryModal').style.display = 'flex';
+        this.renderParentCategoryCascade();
     },
 
     closeAddCategory() {
         document.getElementById('addCategoryModal').style.display = 'none';
         document.getElementById('newCategoryName').value = '';
-        document.getElementById('parentCategorySelect').value = '';
+        // 重置父分类选择器
+        this.renderParentCategoryCascade();
     },
 
     async createCategory() {
         const name = document.getElementById('newCategoryName').value.trim();
-        const parentId = document.getElementById('parentCategorySelect').value;
+        const parentId = this.getSelectedParentCategoryId();
 
         if (!name) {
             this.showToast('请输入分类名称');
