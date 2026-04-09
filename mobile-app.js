@@ -979,9 +979,18 @@ const mobile = {
             return this.photos;
         }
         
+        // 如果 photoCategories 还没加载（空对象），返回所有照片
+        const photoCatsKeys = Object.keys(this.photoCategories);
+        if (photoCatsKeys.length === 0) {
+            console.log('photoCategories not loaded yet, returning all photos');
+            return this.photos;
+        }
+        
         return this.photos.filter(photo => {
             const photoCats = this.photoCategories[String(photo.id)] || [];
-            return photoCats.includes(String(this.currentCategory));
+            // 尝试同时匹配字符串和数字类型的 categoryId
+            return photoCats.includes(String(this.currentCategory)) || 
+                   photoCats.includes(Number(this.currentCategory));
         });
     },
 
