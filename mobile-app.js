@@ -1009,12 +1009,22 @@ const mobile = {
             return this.photos;
         }
         
-        return this.photos.filter(photo => {
+        // 调试：查看 photoCategories 的内容
+        console.log('photoCategories keys count:', photoCatsKeys.length);
+        if (photoCatsKeys.length > 0) {
+            console.log('photoCategories sample:', JSON.stringify(this.photoCategories).slice(0, 500));
+        }
+        console.log('currentCategory:', this.currentCategory, 'type:', typeof this.currentCategory);
+        
+        const filtered = this.photos.filter(photo => {
             const photoCats = this.photoCategories[String(photo.id)] || [];
             // 尝试同时匹配字符串和数字类型的 categoryId
             return photoCats.includes(String(this.currentCategory)) || 
                    photoCats.includes(Number(this.currentCategory));
         });
+        
+        console.log('filtered result:', filtered.length, 'photos out of', this.photos.length);
+        return filtered;
     },
 
     // ========================================
