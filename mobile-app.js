@@ -746,19 +746,20 @@ const mobile = {
         const children = this.categories.filter(c => c.parent_id === cat.id);
         const isMarked = this.markedCategories.includes(cat.id);
         const indent = level * 16;
-        const arrow = children.length > 0 ? '<span class="category-arrow">›</span>' : '';
+        const hasChildren = children.length > 0;
+        const arrow = hasChildren ? '<span class="category-arrow" onclick="event.stopPropagation(); mobile.toggleChildren(\'' + cat.id + '\')">›</span>' : '';
         const icon = level === 0 ? (isMarked ? '⭐' : '📁') : '📄';
 
         return `
             <div class="category-item" id="cat-${cat.id}" style="padding-left:${indent}px;">
-                <div class="category-header" onclick="mobile.toggleCategory('${cat.id}')">
+                <div class="category-header" onclick="mobile.toggleCategoryActions('${cat.id}')">
                     <div class="category-name">
                         <span>${icon}</span>
-                        <span>${cat.name}</span>
+                        <span class="category-name-text">${cat.name}</span>
                         ${arrow}
                     </div>
                 </div>
-                ${children.length > 0 ? `
+                ${hasChildren ? `
                     <div class="category-children" id="children-${cat.id}">
                         ${children.map(child => this.renderCategoryItem(child, level + 1)).join('')}
                     </div>
@@ -775,19 +776,52 @@ const mobile = {
         `;
     },
 
-    toggleCategory(id) {
-        const item = document.getElementById(`cat-${id}`);
-        const children = document.getElementById(`children-${id}`);
+    toggleCategoryActions(id) {
         const actions = document.getElementById(`actions-${id}`);
+        const isActionsVisible = actions && actions.style.display !== 'none';
         
-        // 切换子分类显示
-        if (children) {
-            children.style.display = children.style.display === 'none' ? 'block' : 'none';
+        // 如果操作栏当前显示，点击后跳转到首页筛选
+        if (isActionsVisible) {
+            this.switchToHomeAndFilter(id);
+            return;
         }
-        // 切换操作按钮显示
+        
+        // 否则显示操作栏（标记/删除）
+        // 先隐藏所有其他操作栏
+        document.querySelectorAll('.category-actions').forEach(el => {
+            el.style.display = 'none';
+        });
+        
         if (actions) {
-            actions.style.display = actions.style.display === 'none' ? 'flex' : 'none';
+            actions.style.display = 'flex';
         }
+    },
+
+    toggleChildren(id) {
+        const children = document.getElementById(`children-${id}`);
+        const item = document.getElementById(`cat-${id}`);
+        
+        if (children) {
+            const isHidden = children.style.display === 'none';
+            children.style.display = isHidden ? 'block' : 'none';
+            if (item) {
+                item.classList.toggle('expanded', isHidden);
+            }
+        }
+    },
+
+    switchToHomeAndFilter(categoryId) {
+        // 切换到首页
+        this.switchTab('home');
+        
+        // 设置筛选器并筛选
+        const filterSelect = document.getElementById('mobileFilterCategory');
+        if (filterSelect) {
+            filterSelect.value = categoryId;
+        }
+        this.currentCategory = categoryId;
+        this.currentPage = 1;
+        this.loadPhotos();
     },
 
     showAddCategory() {

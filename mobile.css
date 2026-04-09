@@ -579,13 +579,34 @@ body {
 }
 
 .category-arrow {
-    font-size: 12px;
+    font-size: 20px;
     color: var(--text-muted);
     transition: transform 0.2s;
+    padding: 8px 12px;
+    cursor: pointer;
+    line-height: 1;
+    margin-left: auto;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .category-item.expanded .category-arrow {
     transform: rotate(90deg);
+}
+
+.category-name {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-height: 44px;
+}
+
+.category-name-text {
+    flex: 1;
+    padding: 12px 0;
 }
 
 .category-children {
