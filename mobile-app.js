@@ -335,7 +335,7 @@ const mobile = {
                 html += `<button class="pagination-btn" onclick="mobile.prevPage()">上一页</button>`;
             }
             if (this.currentPage < totalPages) {
-                html += `<button class="pagination-btn" onclick="mobile.nextPage()">下一页</button>`;
+                html += `<button class="pagination-btn" id="testNextBtn" onclick="alert(\"nextPage onclick fired!\"); mobile.nextPage();">下一页</button>`;
             }
         }
         
