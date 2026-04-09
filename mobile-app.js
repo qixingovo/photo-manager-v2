@@ -267,6 +267,9 @@ const mobile = {
         
         // 渲染分页控件
         this.renderPagination(totalPages);
+        
+        // 渲染加载更多按钮
+        this.renderLoadMoreButton(totalPages);
     },
 
     renderPagination(totalPages) {
@@ -292,6 +295,7 @@ const mobile = {
         if (this.currentPage > 1) {
             this.currentPage--;
             this.renderPhotos();
+            this.scrollToTop();
         }
     },
 
@@ -300,7 +304,36 @@ const mobile = {
         if (this.currentPage < totalPages) {
             this.currentPage++;
             this.renderPhotos();
+            this.scrollToTop();
         }
+    },
+
+    scrollToTop() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
+    renderLoadMoreButton(totalPages) {
+        const loadMoreContainer = document.getElementById('loadMoreContainer');
+        if (!loadMoreContainer) return;
+        
+        const hasMore = this.currentPage < totalPages;
+        const displayedCount = Math.min(this.currentPage * this.photosPerPage, this.photos.length);
+        
+        let html = '';
+        if (this.photos.length > 0) {
+            html += `<div class="load-more-info">显示了 ${displayedCount} / ${this.photos.length} 张照片</div>`;
+        }
+        
+        if (hasMore) {
+            html += `<button class="load-more-btn" onclick="mobile.nextPage()">
+                <span>加载更多</span>
+                <span class="load-more-arrow">↓</span>
+            </button>`;
+        } else if (this.photos.length > this.photosPerPage) {
+            html += `<div class="load-more-end">没有更多照片了</div>`;
+        }
+        
+        loadMoreContainer.innerHTML = html;
     },
 
     toggleSelectMode() {
