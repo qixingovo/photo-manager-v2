@@ -1041,7 +1041,10 @@ const mobile = {
             totalPhotos: this.photos.length,
             photoCategoriesKeysCount: photoCatsKeys.length,
             categoryPhotoCount: catCount[categoryId] || 0,
-            top5Categories: Object.entries(catCount).slice(0, 5)
+            // 显示前5个有照片的分类（格式化显示）
+            top5Categories: Object.entries(catCount).sort((a,b) => b[1]-a[1]).slice(0, 5).map(x => ({catId: x[0], count: x[1]})),
+            // 显示 categories 列表里的分类名（用于对照）
+            categoriesList: this.categories.map(c => ({id: c.id, name: c.name})).slice(0, 10)
         });
         
         const filtered = this.photos.filter(photo => {
