@@ -217,17 +217,17 @@ const mobile = {
 
     async loadAllPhotoCategories() {
         try {
-            console.log('loadAllPhotoCategories: fetching...');
+
             const response = await fetch(`${this.SUPABASE_URL}/rest/v1/photo_categories?select=*`, {
                 headers: {
                     'apikey': this.SUPABASE_KEY,
                     'Authorization': `Bearer ${this.SUPABASE_KEY}`
                 }
             });
-            console.log('loadAllPhotoCategories: status', response.status);
+
             if (response.ok) {
                 const relations = await response.json();
-                console.log('loadAllPhotoCategories: got', relations.length, 'relations');
+
                 this.photoCategories = {};
                 relations.forEach(rel => {
                     const pid = String(rel.photo_id);
@@ -236,7 +236,7 @@ const mobile = {
                     }
                     this.photoCategories[pid].push(String(rel.category_id));
                 });
-                console.log('loadAllPhotoCategories: built map with', Object.keys(this.photoCategories).length, 'unique photos');
+
             } else {
                 console.error('loadAllPhotoCategories: failed with status', response.status);
             }
@@ -273,13 +273,7 @@ const mobile = {
         const filteredPhotos = this.getFilteredPhotos();
         
         // 调试日志
-        console.log('renderPhotos:', {
-            currentPage: this.currentPage,
-            currentCategory: this.currentCategory,
-            photosLen: this.photos.length,
-            filteredLen: filteredPhotos.length,
-            photosPerPage: this.photosPerPage
-        });
+
         
         if (filteredPhotos.length === 0) {
             feed.style.display = 'none';
@@ -302,7 +296,7 @@ const mobile = {
         const endIndex = Math.min(startIndex + this.photosPerPage, filteredPhotos.length);
         const pagePhotos = filteredPhotos.slice(startIndex, endIndex);
         
-        console.log('pagination:', { totalPages, startIndex, endIndex, pagePhotosLen: pagePhotos.length });
+
 
         feed.innerHTML = pagePhotos.map((photo, index) => `
             <div class="photo-card ${this.selectMode ? 'select-mode' : ''} ${this.selectedPhotos.has(photo.id) ? 'selected' : ''}" 
@@ -322,9 +316,6 @@ const mobile = {
             </div>
         `).join('');
         
-        // 渲染分页控件
-        this.renderPagination(totalPages);
-        
         // 渲染加载更多按钮
         this.renderLoadMoreButton(totalPages);
     },
@@ -341,7 +332,7 @@ const mobile = {
                 html += `<button class="pagination-btn" onclick="mobile.prevPage()">上一页</button>`;
             }
             if (this.currentPage < totalPages) {
-                html += `<button class="pagination-btn" id="testNextBtn" onclick="alert(\"nextPage onclick fired!\"); mobile.nextPage();">下一页</button>`;
+                html += `<button class="pagination-btn" onclick="mobile.nextPage()">下一页</button>`;
             }
         }
         
@@ -357,18 +348,9 @@ const mobile = {
     },
 
     nextPage() {
-        console.log('nextPage clicked, currentPage before:', this.currentPage);
         this.currentPage++;
         this.renderPhotos();
         this.scrollToTop();
-    },
-
-    prevPage() {
-        if (this.currentPage > 1) {
-            this.currentPage--;
-            this.renderPhotos();
-            this.scrollToTop();
-        }
     },
 
     scrollToTop() {
@@ -998,8 +980,8 @@ const mobile = {
 
     filterByCategory() {
         const categoryId = document.getElementById('mobileFilterCategory').value;
-        console.log('filterByCategory called, selected value:', categoryId);
-        console.log('this.categories ids sample:', this.categories.slice(0,3).map(c => c.id));
+
+
         this.currentCategory = categoryId;
         this.currentPage = 1;
         this.renderPhotos();
@@ -1013,16 +995,8 @@ const mobile = {
         // 如果 photoCategories 还没加载（空对象），返回所有照片
         const photoCatsKeys = Object.keys(this.photoCategories);
         if (photoCatsKeys.length === 0) {
-            console.log('photoCategories not loaded yet, returning all photos');
             return this.photos;
         }
-        
-        // 调试：查看 photoCategories 的内容
-        console.log('photoCategories keys count:', photoCatsKeys.length);
-        if (photoCatsKeys.length > 0) {
-            console.log('photoCategories sample:', JSON.stringify(this.photoCategories).slice(0, 500));
-        }
-        console.log('currentCategory:', this.currentCategory, 'type:', typeof this.currentCategory);
         
         const filtered = this.photos.filter(photo => {
             const photoCats = this.photoCategories[String(photo.id)] || [];
@@ -1031,7 +1005,6 @@ const mobile = {
                    photoCats.includes(Number(this.currentCategory));
         });
         
-        console.log('filtered result:', filtered.length, 'photos out of', this.photos.length);
         return filtered;
     },
 
