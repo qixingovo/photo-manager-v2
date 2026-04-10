@@ -876,8 +876,15 @@ const mobile = {
         }
         this.currentCategory = categoryId;
         this.currentPage = 1;
-        // 重新渲染照片（使用已有的 photos 数据，只做筛选）
-        this.renderPhotos();
+        
+        // 如果 photoCategories 还没加载，先等待加载完成再筛选
+        if (Object.keys(this.photoCategories).length === 0 && this.photos.length > 0) {
+            this.loadAllPhotoCategories().then(() => {
+                this.renderPhotos();
+            });
+        } else {
+            this.renderPhotos();
+        }
     },
 
     showAddCategory() {
@@ -995,7 +1002,15 @@ const mobile = {
 
         this.currentCategory = categoryId;
         this.currentPage = 1;
-        this.renderPhotos();
+        
+        // 如果 photoCategories 还没加载，先等待加载完成再筛选
+        if (Object.keys(this.photoCategories).length === 0 && this.photos.length > 0) {
+            this.loadAllPhotoCategories().then(() => {
+                this.renderPhotos();
+            });
+        } else {
+            this.renderPhotos();
+        }
     },
 
     getFilteredPhotos() {
