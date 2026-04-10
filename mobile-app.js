@@ -1038,10 +1038,22 @@ const mobile = {
         
         console.log('[DEBUG] 筛选照片:', {
             currentCategory: categoryId,
+            currentCategoryType: typeof categoryId,
             totalPhotos: this.photos.length,
             photoCategoriesKeysCount: photoCatsKeys.length,
             categoryPhotoCount: catCount[categoryId] || 0
         });
+        
+        // 打印 photoCategories 里实际的 key 和 value 类型
+        const firstEntry = Object.entries(this.photoCategories)[0];
+        if (firstEntry) {
+            console.log('[DEBUG] photoCategories sample:', {
+                photoId: firstEntry[0],
+                photoIdType: typeof firstEntry[0],
+                catIdSample: firstEntry[1][0],
+                catIdType: typeof firstEntry[1][0]
+            });
+        }
         
         // 打印有照片的前5个分类
         const sortedCats = Object.entries(catCount).sort((a,b) => b[1]-a[1]).slice(0, 5);
