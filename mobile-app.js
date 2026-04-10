@@ -933,6 +933,16 @@ const mobile = {
         this.renderCategories();
     },
 
+    // 获取分类及其所有子分类的 ID（递归）
+    getCategoryAndChildrenIds(categoryId) {
+        const ids = [categoryId];
+        const children = this.categories.filter(c => c.parent_id === categoryId);
+        for (const child of children) {
+            ids.push(...this.getCategoryAndChildrenIds(child.id));
+        }
+        return ids;
+    },
+
     async deleteCategory(id) {
         this.pendingDeleteId = id;
         this.pendingDeleteType = 'category';
@@ -1055,6 +1065,10 @@ const mobile = {
             });
         }
         
+        // 获取当前分类及其所有子分类的 ID
+        const categoryIds = this.getCategoryAndChildrenIds(categoryId);
+        console.log('[DEBUG] 分类及其子分类IDs:', categoryIds);
+        
         // 打印有照片的前5个分类
         const sortedCats = Object.entries(catCount).sort((a,b) => b[1]-a[1]).slice(0, 5);
         console.log('[DEBUG] 有照片的前5个分类:', JSON.stringify(sortedCats));
@@ -1063,14 +1077,18 @@ const mobile = {
         const catsWithNames = this.categories.slice(0, 10).map(c => ({id: c.id, name: c.name}));
         console.log('[DEBUG] categories表前10个:', JSON.stringify(catsWithNames));
         
+        // 筛选照片：匹配当前分类及其所有子分类
         const filtered = this.photos.filter(photo => {
             const photoCats = this.photoCategories[String(photo.id)] || [];
-            return photoCats.includes(categoryId) || 
-                   photoCats.includes(Number(categoryId)) ||
-                   photoCats.includes(String(categoryId));
+            // 检查照片是否属于当前分类或其任一子分类
+            return categoryIds.some(catId => 
+                photoCats.includes(catId) || 
+                photoCats.includes(String(catId)) ||
+                photoCats.includes(Number(catId))
+            );
         });
         
-        console.log('[DEBUG] 筛选结果:', filtered.length, '张');
+        console.log('[DEBUG] 筛选结果:', filtered.length, '张 (包含子分类)');
         return filtered;
     },
 
