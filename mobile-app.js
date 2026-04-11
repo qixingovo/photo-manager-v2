@@ -1167,10 +1167,21 @@ const mobile = {
     },
 
     async deleteCategory(id) {
+        const category = this.categories.find(c => c.id === id);
+        if (!category) return;
+        
+        // 获取这个分类及其子分类的照片数量
+        const categoryIds = this.getCategoryAndChildrenIds(id);
+        const photoCount = this.photos.filter(photo => {
+            const photoCats = this.photoCategories[photo.id] || [];
+            return categoryIds.some(catId => photoCats.includes(catId));
+        }).length;
+        
         this.pendingDeleteId = id;
         this.pendingDeleteType = 'category';
         document.getElementById('confirmTitle').textContent = '删除分类';
-        document.getElementById('confirmMessage').textContent = '确定要删除这个分类吗？';
+        const photoMsg = photoCount > 0 ? `该分类下有 ${photoCount} 张照片，删除分类将同时删除这些照片。` : '';
+        document.getElementById('confirmMessage').textContent = `确定要删除分类「${category.name}」吗？${photoMsg}`;
         document.getElementById('confirmModal').style.display = 'flex';
     },
 
@@ -1182,10 +1193,50 @@ const mobile = {
 
     async confirmDelete() {
         if (this.pendingDeleteType === 'category') {
-            this.categories = this.categories.filter(c => c.id !== this.pendingDeleteId);
+            const categoryId = this.pendingDeleteId;
+            const supabase = this.initSupabase();
+            
+            // 获取分类及其所有子分类的ID
+            const categoryIds = this.getCategoryAndChildrenIds(categoryId);
+            
+            // 找出属于这些分类的所有照片
+            const photosToDelete = this.photos.filter(photo => {
+                const photoCats = this.photoCategories[photo.id] || [];
+                return categoryIds.some(catId => photoCats.includes(catId));
+            });
+            
+            let deletedPhotoCount = 0;
+            
+            // 先删除这些照片（会级联删除关联和留言）
+            for (const photo of photosToDelete) {
+                try {
+                    await supabase.from('photos').delete().eq('id', photo.id);
+                    deletedPhotoCount++;
+                } catch (err) {
+                    console.error('删除照片失败:', photo.id, err);
+                }
+            }
+            
+            // 删除分类本身
+            try {
+                await supabase.from('categories').delete().eq('id', categoryId);
+            } catch (err) {
+                console.error('删除分类失败:', err);
+            }
+            
+            // 更新本地状态
+            this.photos = this.photos.filter(p => !photosToDelete.includes(p));
+            this.categories = this.categories.filter(c => c.id !== categoryId);
+            
+            // 更新markedCategories
+            this.markedCategories = this.markedCategories.filter(id => id !== categoryId);
+            localStorage.setItem('markedCategories', JSON.stringify(this.markedCategories));
+            
             this.updateCategorySelects();
             this.renderCategories();
-            this.showToast('分类已删除');
+            this.renderPhotos();
+            this.showToast(`分类及关联的 ${deletedPhotoCount} 张照片已删除`);
+            
         } else if (this.pendingDeleteType === 'photo') {
             this.photos = this.photos.filter(p => p.id !== this.pendingDeleteId);
             this.renderPhotos();
