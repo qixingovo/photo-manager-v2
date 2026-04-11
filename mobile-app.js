@@ -513,15 +513,62 @@ const mobile = {
         this.showPage('home');
     },
 
-    toggleFavorite() {
+    async toggleFavorite() {
         const photo = this.photos.find(p => p.id === this.currentPhotoId);
         if (photo) {
-            photo.is_favorite = !photo.is_favorite;
-            const favBtn = document.getElementById('detailFavoriteBtn');
-            favBtn.textContent = photo.is_favorite ? '❤️' : '🤍';
-            this.showToast(photo.is_favorite ? '已收藏' : '已取消收藏');
-            this.renderPhotos();
+            const newFavorite = !photo.is_favorite;
+            try {
+                const supabase = this.initSupabase();
+                const { error } = await supabase
+                    .from('photos')
+                    .update({ is_favorite: newFavorite })
+                    .eq('id', this.currentPhotoId);
+                if (error) throw error;
+                photo.is_favorite = newFavorite;
+                const favBtn = document.getElementById('detailFavoriteBtn');
+                favBtn.textContent = photo.is_favorite ? '❤️' : '🤍';
+                this.showToast(photo.is_favorite ? '已收藏' : '已取消收藏');
+                this.renderPhotos();
+            } catch (err) {
+                console.error('收藏操作失败:', err);
+                this.showToast('操作失败，请重试');
+            }
         }
+    },
+
+    async batchToggleFavorite() {
+        if (this.selectedPhotos.size === 0) {
+            this.showToast('请先选择照片');
+            return;
+        }
+        
+        const supabase = this.initSupabase();
+        let updatedCount = 0;
+        
+        for (const photoId of this.selectedPhotos) {
+            const photo = this.photos.find(p => p.id === photoId);
+            if (photo) {
+                const newFavorite = !photo.is_favorite;
+                try {
+                    const { error } = await supabase
+                        .from('photos')
+                        .update({ is_favorite: newFavorite })
+                        .eq('id', photoId);
+                    if (!error) {
+                        photo.is_favorite = newFavorite;
+                        updatedCount++;
+                    }
+                } catch (err) {
+                    console.error('收藏操作失败:', err);
+                }
+            }
+        }
+        
+        this.selectedPhotos.clear();
+        this.selectMode = false;
+        this.updateSelectModeUI();
+        this.renderPhotos();
+        this.showToast(`已更新 ${updatedCount} 张照片的收藏状态`);
     },
 
     // ========================================

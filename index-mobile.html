@@ -56,7 +56,8 @@
             <button id="selectModeBtn" class="btn-secondary" onclick="mobile.toggleSelectMode()">☑️ 多选</button>
             <div id="batchActions" class="batch-actions" style="display:none;">
                 <button id="selectAllBtn" class="btn-secondary" onclick="mobile.selectAllPhotos()">全选</button>
-                <button id="batchDeleteBtn" class="btn-danger" onclick="mobile.batchDeletePhotos()">🗑️ 删除 (<span id="selectedCount">0</span>)</button>
+                <button id="batchFavoriteBtn" class="btn-secondary" onclick="mobile.batchToggleFavorite()">❤️ 收藏 (<span id="selectedCount">0</span>)</button>
+                <button id="batchDeleteBtn" class="btn-danger" onclick="mobile.batchDeletePhotos()">🗑️ 删除</button>
             </div>
         </div>
 
