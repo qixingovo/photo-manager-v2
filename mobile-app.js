@@ -28,6 +28,9 @@ const mobile = {
     // 多选状态
     selectMode: false,
 
+    // 主题状态
+    isDarkMode: false,
+
     // Supabase Storage 公开URL前缀（与桌面版一致）
     SUPABASE_URL: 'https://hpwqtlxrfezpnxpgwlsx.supabase.co',
     SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhwd3F0bHhyZmV6cG54cGd3bHN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDk2MzAsImV4cCI6MjA5MTAyNTYzMH0._yAiiFxsZbsOHf9ItMYU9ZRuNLjVDEbdZFwyh7U6C9w',
@@ -67,11 +70,76 @@ const mobile = {
     
     // 初始化
     init() {
+        // 初始化主题
+        this.initTheme();
+        
         // 等待 Supabase CDN 加载完成后再初始化
         this.waitForSupabase(() => {
             this.checkLogin();
             this.loadMarkedCategories();
         });
+    },
+
+    // ========================================
+    // 主题相关
+    // ========================================
+    initTheme() {
+        const savedTheme = localStorage.getItem('photoTheme');
+        this.isDarkMode = savedTheme === 'dark';
+        this.applyTheme();
+    },
+
+    applyTheme() {
+        if (this.isDarkMode) {
+            document.body.classList.add('dark');
+        } else {
+            document.body.classList.remove('dark');
+        }
+    },
+
+    toggleTheme() {
+        this.isDarkMode = !this.isDarkMode;
+        localStorage.setItem('photoTheme', this.isDarkMode ? 'dark' : 'light');
+        this.applyTheme();
+        this.showToast(this.isDarkMode ? '🌙 夜间模式' : '☀️ 日间模式');
+    },
+
+    showSettings() {
+        // 创建设置弹窗
+        const modal = document.createElement('div');
+        modal.id = 'settingsModal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-card">
+                <h3>⚙️ 设置</h3>
+                <div class="settings-item">
+                    <span class="settings-label">🌙 夜间模式</span>
+                    <label class="switch">
+                        <input type="checkbox" id="themeToggle" ${this.isDarkMode ? 'checked' : ''} onchange="mobile.toggleTheme()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-primary" onclick="mobile.closeSettings()">关闭</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.style.display = 'flex';
+        
+        // 点击背景关闭
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.closeSettings();
+            }
+        });
+    },
+
+    closeSettings() {
+        const modal = document.getElementById('settingsModal');
+        if (modal) {
+            modal.remove();
+        }
     },
 
     // ========================================
