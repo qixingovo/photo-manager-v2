@@ -263,6 +263,7 @@ const mobile = {
             this.loadAllPhotoCategories()
         ]);
         this.updateCategorySelects();
+        this.updateCategoryPathDisplay();
         this.renderPhotos();
     },
 
@@ -1023,6 +1024,9 @@ const mobile = {
         this.currentCategory = categoryId;
         this.currentPage = 1;
         
+        // 更新分类路径显示
+        this.updateCategoryPathDisplay();
+        
         // 如果 photoCategories 还没加载，先等待加载完成再筛选
         if (Object.keys(this.photoCategories).length === 0 && this.photos.length > 0) {
             this.loadAllPhotoCategories().then(() => {
@@ -1350,6 +1354,48 @@ const mobile = {
         return ids;
     },
 
+    // 获取分类的完整路径（从顶级父类到当前分类）
+    getCategoryPath(categoryId) {
+        if (!categoryId || categoryId === 'all') return [];
+        
+        const path = [];
+        let currentId = categoryId;
+        
+        // 不断向上查找父类，直到找不到为止
+        while (currentId) {
+            const cat = this.categories.find(c => c.id === currentId);
+            if (!cat) break;
+            path.unshift(cat.name); // 每次都插入到数组开头，保证顺序是从父到子
+            currentId = cat.parent_id;
+        }
+        
+        return path;
+    },
+
+    // 更新分类路径显示
+    updateCategoryPathDisplay() {
+        const pathDisplay = document.getElementById('categoryPathDisplay');
+        if (!pathDisplay) return;
+        
+        const categoryId = this.currentCategory;
+        
+        if (!categoryId || categoryId === 'all') {
+            pathDisplay.textContent = '';
+            pathDisplay.style.display = 'none';
+            return;
+        }
+        
+        const path = this.getCategoryPath(categoryId);
+        if (path.length === 0) {
+            pathDisplay.textContent = '';
+            pathDisplay.style.display = 'none';
+            return;
+        }
+        
+        pathDisplay.textContent = path.join(' › ');
+        pathDisplay.style.display = 'block';
+    },
+
     async deleteCategory(id) {
         const category = this.categories.find(c => c.id === id);
         if (!category) return;
@@ -1652,6 +1698,9 @@ const mobile = {
 
         this.currentCategory = categoryId;
         this.currentPage = 1;
+        
+        // 更新分类路径显示
+        this.updateCategoryPathDisplay();
         
         // 如果 photoCategories 还没加载，先等待加载完成再筛选
         if (Object.keys(this.photoCategories).length === 0 && this.photos.length > 0) {

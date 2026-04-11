@@ -273,6 +273,15 @@ body {
 /* ========================================
    搜索栏
    ======================================== */
+.category-path-display {
+    padding: 8px 16px;
+    background: var(--bg);
+    font-size: 14px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+}
+
 .search-bar {
     padding: 12px 16px;
     background: var(--card);
