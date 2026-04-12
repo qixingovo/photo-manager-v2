@@ -736,7 +736,7 @@ const mobile = {
                 if (uploadError) throw uploadError;
                 
                 // 保存到 photos 表
-                const { error: insertError } = await supabase
+                const { data: photoData, error: insertError } = await supabase
                     .from('photos')
                     .insert([{
                         name: fileName,
@@ -744,11 +744,23 @@ const mobile = {
                         storage_path: uniqueName,
                         original_name: file.name,
                         size: file.size,
-                        is_favorite: false
-                    }]);
-                
+                        is_favorite: false,
+                        category_id: categoryId || null
+                    }])
+                    .select()
+                    .single();
+
                 if (insertError) throw insertError;
                 successCount++;
+
+                // 写入 photo_categories 关联表
+                if (categoryId) {
+                    const photoId = photoData.id;
+                    await supabase.from('photo_categories').insert([{
+                        photo_id: photoId,
+                        category_id: categoryId
+                    }]);
+                }
             } catch (err) {
                 console.error('上传失败:', err);
             }
