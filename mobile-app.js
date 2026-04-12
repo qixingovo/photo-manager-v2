@@ -769,6 +769,11 @@ const mobile = {
         document.getElementById('mobilePhotoDesc').value = '';
         this.renderUploadCategoryCascade();
         this.showToast(`成功上传 ${successCount} 张照片`);
+
+        // 记住本次使用的分类
+        if (categoryId) {
+            localStorage.setItem('lastUploadCategoryId', categoryId);
+        }
         
         // 重新加载照片
         await this.loadPhotos();
@@ -798,21 +803,64 @@ const mobile = {
     // 渲染上传页面的级联分类选择器
     renderUploadCategoryCascade() {
         const container = document.getElementById('mobileUploadCategoryCascade');
+        const lastBtn = document.getElementById('useLastCategoryBtn');
         if (!container) return;
         container.innerHTML = '';
-        
+
         const topLevel = this.categories.filter(c => !c.parent_id);
         if (topLevel.length === 0) {
             container.innerHTML = '<p style="color:#999;font-size:13px;">暂无分类</p>';
             return;
         }
-        
+
+        // 检查是否有上次使用的分类
+        const lastCatId = localStorage.getItem('lastUploadCategoryId');
+        const lastCat = lastCatId ? this.categories.find(c => String(c.id) === lastCatId) : null;
+        if (lastBtn) {
+            if (lastCat) {
+                lastBtn.textContent = `📂 上次: ${lastCat.name}`;
+                lastBtn.style.display = 'block';
+            } else {
+                lastBtn.style.display = 'none';
+            }
+        }
+
         const select = document.createElement('select');
         select.id = 'mobileUploadCatLevel0';
         select.style.cssText = 'width:100%;padding:12px 16px;border:1px solid #e9ecef;border-radius:10px;font-size:15px;background:white;';
         select.onchange = () => this.onUploadCatLevelChange(0);
         select.innerHTML = `<option value="">选择分类（可选）</option>${topLevel.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
         container.appendChild(select);
+    },
+
+    useLastUploadCategory() {
+        const lastCatId = localStorage.getItem('lastUploadCategoryId');
+        if (!lastCatId) return;
+        const lastCat = this.categories.find(c => String(c.id) === lastCatId);
+        if (!lastCat) return;
+
+        const container = document.getElementById('mobileUploadCategoryCascade');
+        if (!container) return;
+        container.innerHTML = '';
+
+        const select = document.createElement('select');
+        select.id = 'mobileUploadCatLevel0';
+        select.style.cssText = 'width:100%;padding:12px 16px;border:1px solid #e9ecef;border-radius:10px;font-size:15px;background:white;';
+        select.innerHTML = `<option value="">选择分类（可选）</option>${this.categories.filter(c => !c.parent_id).map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
+        select.value = lastCatId;
+        container.appendChild(select);
+
+        // 如果有子分类也要补上
+        const children = this.categories.filter(c => String(c.parent_id) === String(lastCatId));
+        if (children.length > 0) {
+            const childSelect = document.createElement('select');
+            childSelect.id = 'mobileUploadCatLevel1';
+            childSelect.style.cssText = 'width:100%;padding:12px 16px;border:1px solid #e9ecef;border-radius:10px;font-size:15px;background:white;margin-top:8px;';
+            childSelect.innerHTML = `<option value="">选择子分类</option>${children.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
+            container.appendChild(childSelect);
+        }
+
+        this.showToast(`已选择: ${lastCat.name}`);
     },
 
     onUploadCatLevelChange(level) {
