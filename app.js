@@ -84,6 +84,11 @@ window.handleLogin = async function(e) {
     const password = document.getElementById('loginPassword').value
     const errorEl = document.getElementById('loginError')
 
+    if (!account || !password) {
+        errorEl.textContent = '请输入账号和密码'
+        return
+    }
+
     const { data, error } = await supabase.rpc('authenticate_user', {
         p_username: account,
         p_password: password

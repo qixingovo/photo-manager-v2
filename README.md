@@ -121,6 +121,7 @@ GRANT EXECUTE ON FUNCTION authenticate_user(TEXT, TEXT) TO anon, authenticated;
 
 -- 只保留两个账号（示例）
 -- ⚠️ 两个账号必须使用不同的高强度密码
+-- ⚠️ 部署前必须替换下方占位密码，禁止直接使用示例值
 INSERT INTO app_users (username, password_hash, role)
 VALUES
 ('laoda', crypt('YOUR_SECURE_PASSWORD_1', gen_salt('bf')), 'laoda'),

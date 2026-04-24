@@ -56,9 +56,14 @@ const mobile = {
 
     getUserFromSession(session) {
         const username = session?.username || '用户';
-        const metadataRole = session?.role || '';
+        const metadataRole = session?.role || 'user';
         const isLaoda = metadataRole === 'laoda';
-        return { username, role: isLaoda ? '老大' : '用户', isLaoda };
+        return {
+            username,
+            role: metadataRole,
+            displayRole: isLaoda ? '老大' : '用户',
+            isLaoda
+        };
     },
 
     getStoredSession() {
@@ -212,6 +217,11 @@ const mobile = {
         const password = document.getElementById('loginPassword').value;
         const errorEl = document.getElementById('loginError');
         const client = this.initSupabase();
+
+        if (!account || !password) {
+            errorEl.textContent = '请输入账号和密码';
+            return;
+        }
 
         if (!client) {
             errorEl.textContent = '登录服务不可用，请稍后重试';
@@ -1998,7 +2008,7 @@ const mobile = {
     updateProfile() {
         if (this.currentUser) {
             document.getElementById('userName').textContent = this.currentUser.username;
-            document.getElementById('userRole').textContent = this.currentUser.role;
+            document.getElementById('userRole').textContent = this.currentUser.displayRole || this.currentUser.role;
         }
     },
 
