@@ -52,6 +52,12 @@ const mobile = {
         }
         return this.supabase;
     },
+
+    getUserFromSession(session) {
+        const email = session?.user?.email || '';
+        const username = email.split('@')[0] || '用户';
+        return { username, role: username === 'laoda' ? '老大' : '小弟' };
+    },
     
     // 获取照片公开URL
     getPhotoUrl(storagePath) {
@@ -156,54 +162,87 @@ const mobile = {
     // ========================================
     // 登录相关
     // ========================================
-    checkLogin() {
-        const savedUser = localStorage.getItem('photoUser');
-        if (savedUser) {
-            this.currentUser = JSON.parse(savedUser);
-            this.showPage('home');
-            this.loadData();
-        } else {
+    async checkLogin() {
+        const client = this.initSupabase();
+        if (!client) {
             this.showPage('login');
+            return;
         }
-    },
 
-    async handleLogin(e) {
-        e.preventDefault();
-        const username = document.getElementById('loginUsername').value.trim();
-        const password = document.getElementById('loginPassword').value;
+        const { data, error } = await client.auth.getSession();
+        if (error) {
+            console.error('检查登录状态失败:', error);
+            this.showPage('login');
+            return;
+        }
 
-        // 简单验证
-        if ((username === 'laoda' || username === 'xiaodi') && password === 'lxyajwr06225') {
-            this.currentUser = { username, role: username === 'laoda' ? '老大' : '小弟' };
-            
-            try {
-                localStorage.setItem('photoUser', JSON.stringify(this.currentUser));
-            } catch (e) {
-                console.error('localStorage 写入失败:', e);
-                this.showToast('存储失败，请关闭无痕模式');
-                return;
-            }
-            
-            // 老大欢迎页
-            if (username === 'laoda') {
-                this.showToast('🎉 老大生日快乐！');
-            }
-            
-            // 先跳转页面
+        if (data.session) {
+            this.currentUser = this.getUserFromSession(data.session);
             this.showPage('home');
-            
-            // 再加载数据（不阻塞页面显示）
             this.loadData().catch(err => {
                 console.error('加载数据失败:', err);
                 this.showToast('数据加载失败，请刷新重试');
             });
-        } else {
-            document.getElementById('loginError').textContent = '账号或密码错误';
+            return;
         }
+
+        this.currentUser = null;
+        this.showPage('login');
     },
 
-    handleLogout() {
-        localStorage.removeItem('photoUser');
+    async handleLogin(e) {
+        e.preventDefault();
+        const account = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const errorEl = document.getElementById('loginError');
+        const client = this.initSupabase();
+
+        if (!client) {
+            errorEl.textContent = '登录服务不可用，请稍后重试';
+            return;
+        }
+
+        if (!account.includes('@')) {
+            errorEl.textContent = '请输入邮箱账号';
+            return;
+        }
+
+        const { data, error } = await client.auth.signInWithPassword({
+            email: account,
+            password
+        });
+
+        if (error) {
+            errorEl.textContent = '登录失败，请检查邮箱或密码';
+            return;
+        }
+
+        this.currentUser = this.getUserFromSession(data.session);
+        errorEl.textContent = '';
+        
+        // 老大欢迎页
+        if (this.currentUser.username === 'laoda') {
+            this.showToast('🎉 老大生日快乐！');
+        }
+        
+        // 先跳转页面
+        this.showPage('home');
+        
+        // 再加载数据（不阻塞页面显示）
+        this.loadData().catch(err => {
+            console.error('加载数据失败:', err);
+            this.showToast('数据加载失败，请刷新重试');
+        });
+    },
+
+    async handleLogout() {
+        const client = this.initSupabase();
+        if (client) {
+            const { error } = await client.auth.signOut();
+            if (error) {
+                console.error('退出登录失败:', error);
+            }
+        }
         this.currentUser = null;
         this.showPage('login');
         this.showToast('已退出登录');
@@ -215,7 +254,7 @@ const mobile = {
     showPage(page) {
         // 未登录只能访问 login 页面
         if (page !== 'login' && page !== 'detail') {
-            if (!localStorage.getItem('photoUser')) {
+            if (!this.currentUser) {
                 this.showPage('login');
                 return;
             }

@@ -24,17 +24,23 @@ window.addEventListener('DOMContentLoaded', () => {
     initApp();
 });
 
-// 固定用户账号
-const USERS = [
-    { username: 'laoda', password: 'lxyajwr06225' },
-    { username: 'xiaodi', password: 'lxyajwr06225' }
-]
+function getUserAliasFromSession(session) {
+    const email = session?.user?.email || ''
+    return email.split('@')[0] || ''
+}
 
 // 检查登录状态
-function checkLogin() {
-    const loggedInUser = localStorage.getItem('photo_manager_user')
-    if (loggedInUser) {
+async function checkLogin() {
+    const { data, error } = await supabase.auth.getSession()
+    if (error) {
+        console.error('检查登录状态失败:', error)
+        showLoginPage()
+        return
+    }
+
+    if (data.session) {
         showMainApp()
+        await Promise.all([loadCategories(), loadPhotos()])
     } else {
         showLoginPage()
     }
@@ -56,29 +62,37 @@ function showMainApp() {
     }, 50)
 }
 
-window.handleLogin = function(e) {
+window.handleLogin = async function(e) {
     e.preventDefault()
     
-    const username = document.getElementById('loginUsername').value.trim()
+    const account = document.getElementById('loginUsername').value.trim()
     const password = document.getElementById('loginPassword').value
     const errorEl = document.getElementById('loginError')
+
+    if (!account.includes('@')) {
+        errorEl.textContent = '请输入邮箱账号'
+        return
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email: account,
+        password
+    })
+
+    if (error) {
+        errorEl.textContent = '登录失败，请检查邮箱或密码'
+        return
+    }
+
+    errorEl.textContent = ''
+    const username = getUserAliasFromSession(data.session)
     
-    const user = USERS.find(u => u.username === username && u.password === password)
-    
-    if (user) {
-        localStorage.setItem('photo_manager_user', username)
-        errorEl.textContent = ''
-        
-        // 如果是老大，显示生日快乐欢迎界面
-        if (username === 'laoda') {
-            showBirthdayWelcome()
-        } else {
-            showMainApp()
-            loadCategories()
-            loadPhotos()
-        }
+    // 如果是老大，显示生日快乐欢迎界面
+    if (username === 'laoda') {
+        showBirthdayWelcome()
     } else {
-        errorEl.textContent = '账号或密码错误'
+        showMainApp()
+        await Promise.all([loadCategories(), loadPhotos()])
     }
 }
 
@@ -184,8 +198,11 @@ window.enterMainApp = function() {
     }
 }
 
-window.handleLogout = function() {
-    localStorage.removeItem('photo_manager_user')
+window.handleLogout = async function() {
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+        console.error('退出登录失败:', error)
+    }
     showLoginPage()
 }
 
@@ -259,8 +276,8 @@ window.toggleMarkedCategories = function(event) {
     widget.classList.toggle('expanded')
 }
 
-function initApp() {
-    checkLogin();
+async function initApp() {
+    await checkLogin();
     
     // 重置筛选状态
     currentCategory = 'all';
