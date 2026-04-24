@@ -56,7 +56,7 @@ const mobile = {
     getUserFromSession(session) {
         const email = session?.user?.email || '';
         const metadataRole = session?.user?.app_metadata?.role || session?.user?.user_metadata?.role || '';
-        const username = session?.user?.user_metadata?.display_name || email.split('@')[0] || '用户';
+        const username = session?.user?.user_metadata?.display_name || (email ? email.split('@')[0] : '') || '用户';
         const isLaoda = metadataRole === 'laoda';
         return { username, role: isLaoda ? '老大' : '用户', isLaoda };
     },
