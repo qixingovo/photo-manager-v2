@@ -3,6 +3,8 @@
    Typeform 风格移动端应用
    ======================================== */
 
+const APP_CONFIG = window.__APP_CONFIG__ || {};
+
 const mobile = {
     // 状态
     currentUser: null,
@@ -34,15 +36,27 @@ const mobile = {
     // 分类加锁状态 (categoryId -> password)
     lockedCategories: {},
 
-    // Supabase Storage 公开URL前缀（与桌面版一致）
-    SUPABASE_URL: 'https://hpwqtlxrfezpnxpgwlsx.supabase.co',
-    SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhwd3F0bHhyZmV6cG54cGd3bHN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDk2MzAsImV4cCI6MjA5MTAyNTYzMH0._yAiiFxsZbsOHf9ItMYU9ZRuNLjVDEbdZFwyh7U6C9w',
-    STORAGE_URL: 'https://hpwqtlxrfezpnxpgwlsx.supabase.co/storage/v1/object/public/photo/',
+    // Supabase 配置（从外部配置文件读取）
+    SUPABASE_URL: APP_CONFIG.SUPABASE_URL || '',
+    SUPABASE_KEY: APP_CONFIG.SUPABASE_ANON_KEY || '',
+    STORAGE_URL: APP_CONFIG.SUPABASE_STORAGE_URL || (APP_CONFIG.SUPABASE_URL ? `${APP_CONFIG.SUPABASE_URL}/storage/v1/object/public/photo/` : ''),
     AUTH_SESSION_KEY: 'photo_manager_session',
     supabase: null,
     
     // 初始化 Supabase 客户端
     initSupabase() {
+        if (!this.SUPABASE_URL || !this.SUPABASE_KEY) {
+            const config = window.__APP_CONFIG__ || {};
+            this.SUPABASE_URL = config.SUPABASE_URL || '';
+            this.SUPABASE_KEY = config.SUPABASE_ANON_KEY || '';
+            this.STORAGE_URL = config.SUPABASE_STORAGE_URL || (this.SUPABASE_URL ? `${this.SUPABASE_URL}/storage/v1/object/public/photo/` : '');
+        }
+
+        if (!this.SUPABASE_URL || !this.SUPABASE_KEY) {
+            console.error('缺少 Supabase 配置，请在 config.js 中设置 SUPABASE_URL 和 SUPABASE_ANON_KEY');
+            return null;
+        }
+
         if (!this.supabase) {
             // 等待 window.supabase 可用
             if (typeof window.supabase === 'undefined') {

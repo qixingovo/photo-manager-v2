@@ -12,9 +12,14 @@ let markedCategories = new Set(JSON.parse(localStorage.getItem('markedCategories
 let expandedCategories = new Set()
 let expandedInManager = new Set() // 分类管理区域的展开状态
 
-// Supabase 配置
-const SUPABASE_URL = 'https://hpwqtlxrfezpnxpgwlsx.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhwd3F0bHhyZmV6cG54cGd3bHN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDk2MzAsImV4cCI6MjA5MTAyNTYzMH0._yAiiFxsZbsOHf9ItMYU9ZRuNLjVDEbdZFwyh7U6C9w'
+// Supabase 配置（从外部配置文件读取）
+const APP_CONFIG = window.__APP_CONFIG__ || {}
+const SUPABASE_URL = APP_CONFIG.SUPABASE_URL || ''
+const SUPABASE_ANON_KEY = APP_CONFIG.SUPABASE_ANON_KEY || ''
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error('缺少 Supabase 配置，请在 config.js 中设置 SUPABASE_URL 和 SUPABASE_ANON_KEY')
+}
 
 // 直接初始化 Supabase（CDN 脚本是同步加载的）
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);

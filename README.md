@@ -31,12 +31,23 @@ npm run build
 
 ## 配置
 
-在 `app.js` 中修改 Supabase 配置：
+1. 复制配置模板：
+
+```bash
+cp config.example.js config.js
+```
+
+2. 在 `config.js` 中填写 Supabase 配置：
 
 ```javascript
-const SUPABASE_URL = 'https://your-project.supabase.co'
-const SUPABASE_ANON_KEY = 'your-anon-key'
+window.__APP_CONFIG__ = {
+  SUPABASE_URL: 'https://your-project.supabase.co',
+  SUPABASE_ANON_KEY: 'your-anon-key',
+  SUPABASE_STORAGE_URL: 'https://your-project.supabase.co/storage/v1/object/public/photo/'
+}
 ```
+
+> `config.js` 已加入 `.gitignore`，避免将真实 key 提交到仓库。
 
 ## 数据库设置
 
@@ -138,4 +149,4 @@ VALUES
 2. 在 Vercel 中导入项目
 3. 点击 Deploy
 
-无需配置环境变量，因为使用的是公开的 anon key。
+请确保部署平台注入或提供 `config.js`，不要把真实 key 硬编码到源码并提交到仓库。
