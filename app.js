@@ -95,6 +95,7 @@ window.handleLogin = async function(e) {
     })
 
     if (error || !data?.success) {
+        if (error) console.error('账号登录 RPC 失败:', error)
         errorEl.textContent = '登录失败，请检查账号或密码'
         return
     }

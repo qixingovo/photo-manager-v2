@@ -124,8 +124,8 @@ GRANT EXECUTE ON FUNCTION authenticate_user(TEXT, TEXT) TO anon, authenticated;
 -- ⚠️ 部署前必须替换下方占位密码，禁止直接使用示例值
 INSERT INTO app_users (username, password_hash, role)
 VALUES
-('laoda', crypt('YOUR_SECURE_PASSWORD_1', gen_salt('bf')), 'laoda'),
-('xiaodi', crypt('YOUR_SECURE_PASSWORD_2', gen_salt('bf')), 'user');
+('laoda', crypt('REPLACE_ME_BEFORE_DEPLOY_1', gen_salt('bf')), 'laoda'),
+('xiaodi', crypt('REPLACE_ME_BEFORE_DEPLOY_2', gen_salt('bf')), 'user');
 ```
 
 ## Storage Bucket
