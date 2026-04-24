@@ -2212,7 +2212,6 @@ const mobile = {
             document.getElementById('detailDesc').textContent = desc;
 
             this.closeEditModal();
-            await this.loadPhotos();
             this.renderPhotos();
             this.showToast('已保存');
         } catch (err) {
