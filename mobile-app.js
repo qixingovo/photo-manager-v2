@@ -3,6 +3,8 @@
    Typeform 风格移动端应用
    ======================================== */
 
+const APP_CONFIG = window.__APP_CONFIG__ || {};
+
 const mobile = {
     // 状态
     currentUser: null,
@@ -34,14 +36,20 @@ const mobile = {
     // 分类加锁状态 (categoryId -> password)
     lockedCategories: {},
 
-    // Supabase Storage 公开URL前缀（与桌面版一致）
-    SUPABASE_URL: 'https://hpwqtlxrfezpnxpgwlsx.supabase.co',
-    SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhwd3F0bHhyZmV6cG54cGd3bHN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDk2MzAsImV4cCI6MjA5MTAyNTYzMH0._yAiiFxsZbsOHf9ItMYU9ZRuNLjVDEbdZFwyh7U6C9w',
-    STORAGE_URL: 'https://hpwqtlxrfezpnxpgwlsx.supabase.co/storage/v1/object/public/photo/',
+    // Supabase 配置（从外部配置文件读取）
+    SUPABASE_URL: APP_CONFIG.SUPABASE_URL || '',
+    SUPABASE_KEY: APP_CONFIG.SUPABASE_ANON_KEY || '',
+    STORAGE_URL: APP_CONFIG.SUPABASE_STORAGE_URL || (APP_CONFIG.SUPABASE_URL ? `${APP_CONFIG.SUPABASE_URL}/storage/v1/object/public/photo/` : ''),
+    AUTH_SESSION_KEY: 'photo_manager_session',
     supabase: null,
     
     // 初始化 Supabase 客户端
     initSupabase() {
+        if (!this.SUPABASE_URL || !this.SUPABASE_KEY) {
+            console.error('缺少 Supabase 配置，请在 config.js 中设置 SUPABASE_URL 和 SUPABASE_ANON_KEY');
+            return null;
+        }
+
         if (!this.supabase) {
             // 等待 window.supabase 可用
             if (typeof window.supabase === 'undefined') {
@@ -51,6 +59,39 @@ const mobile = {
             this.supabase = window.supabase.createClient(this.SUPABASE_URL, this.SUPABASE_KEY);
         }
         return this.supabase;
+    },
+
+    getUserFromSession(session) {
+        const username = session?.username || '用户';
+        const metadataRole = session?.role || 'user';
+        const isLaoda = metadataRole === 'laoda';
+        return {
+            username,
+            role: metadataRole,
+            displayRole: isLaoda ? '老大' : '用户',
+            isLaoda
+        };
+    },
+
+    getStoredSession() {
+        try {
+            const raw = localStorage.getItem(this.AUTH_SESSION_KEY);
+            if (!raw) return null;
+            const session = JSON.parse(raw);
+            if (!session?.username || !session?.role) return null;
+            return session;
+        } catch (error) {
+            console.warn('读取本地登录态失败:', error);
+            return null;
+        }
+    },
+
+    saveSession(session) {
+        localStorage.setItem(this.AUTH_SESSION_KEY, JSON.stringify(session));
+    },
+
+    clearSession() {
+        localStorage.removeItem(this.AUTH_SESSION_KEY);
     },
     
     // 获取照片公开URL
@@ -156,54 +197,81 @@ const mobile = {
     // ========================================
     // 登录相关
     // ========================================
-    checkLogin() {
-        const savedUser = localStorage.getItem('photoUser');
-        if (savedUser) {
-            this.currentUser = JSON.parse(savedUser);
-            this.showPage('home');
-            this.loadData();
-        } else {
+    async checkLogin() {
+        const client = this.initSupabase();
+        if (!client) {
             this.showPage('login');
+            return;
         }
-    },
 
-    async handleLogin(e) {
-        e.preventDefault();
-        const username = document.getElementById('loginUsername').value.trim();
-        const password = document.getElementById('loginPassword').value;
-
-        // 简单验证
-        if ((username === 'laoda' || username === 'xiaodi') && password === 'lxyajwr06225') {
-            this.currentUser = { username, role: username === 'laoda' ? '老大' : '小弟' };
-            
-            try {
-                localStorage.setItem('photoUser', JSON.stringify(this.currentUser));
-            } catch (e) {
-                console.error('localStorage 写入失败:', e);
-                this.showToast('存储失败，请关闭无痕模式');
-                return;
-            }
-            
-            // 老大欢迎页
-            if (username === 'laoda') {
-                this.showToast('🎉 老大生日快乐！');
-            }
-            
-            // 先跳转页面
+        const session = this.getStoredSession();
+        if (session) {
+            this.currentUser = this.getUserFromSession(session);
             this.showPage('home');
-            
-            // 再加载数据（不阻塞页面显示）
             this.loadData().catch(err => {
                 console.error('加载数据失败:', err);
                 this.showToast('数据加载失败，请刷新重试');
             });
-        } else {
-            document.getElementById('loginError').textContent = '账号或密码错误';
+            return;
         }
+
+        this.currentUser = null;
+        this.showPage('login');
+    },
+
+    async handleLogin(e) {
+        e.preventDefault();
+        const account = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const errorEl = document.getElementById('loginError');
+        const client = this.initSupabase();
+
+        if (!account || !password) {
+            errorEl.textContent = '请输入账号和密码';
+            return;
+        }
+
+        if (!client) {
+            errorEl.textContent = '登录服务不可用，请稍后重试';
+            return;
+        }
+
+        const { data, error } = await client.rpc('authenticate_user', {
+            p_username: account,
+            p_password: password
+        });
+
+        if (error || !data?.success) {
+            if (error) console.error('账号登录 RPC 失败:', error);
+            errorEl.textContent = '登录失败，请检查账号或密码';
+            return;
+        }
+
+        const session = {
+            username: data.username || account,
+            role: data.role || 'user'
+        };
+        this.saveSession(session);
+        this.currentUser = this.getUserFromSession(session);
+        errorEl.textContent = '';
+        
+        // 老大欢迎页
+        if (this.currentUser.isLaoda) {
+            this.showToast('🎉 老大生日快乐！');
+        }
+        
+        // 先跳转页面
+        this.showPage('home');
+        
+        // 再加载数据（不阻塞页面显示）
+        this.loadData().catch(err => {
+            console.error('加载数据失败:', err);
+            this.showToast('数据加载失败，请刷新重试');
+        });
     },
 
     handleLogout() {
-        localStorage.removeItem('photoUser');
+        this.clearSession();
         this.currentUser = null;
         this.showPage('login');
         this.showToast('已退出登录');
@@ -215,7 +283,7 @@ const mobile = {
     showPage(page) {
         // 未登录只能访问 login 页面
         if (page !== 'login' && page !== 'detail') {
-            if (!localStorage.getItem('photoUser')) {
+            if (!this.currentUser) {
                 this.showPage('login');
                 return;
             }
@@ -376,7 +444,11 @@ const mobile = {
         const endIndex = Math.min(startIndex + this.photosPerPage, filteredPhotos.length);
         const pagePhotos = filteredPhotos.slice(startIndex, endIndex);
         
-        feed.innerHTML = pagePhotos.map((photo, index) => `
+        feed.innerHTML = pagePhotos.map((photo, index) => {
+            const safeName = this.escapeHtml(photo.name || '未命名');
+            const safeDesc = this.escapeHtml(photo.description || '');
+            const safeImg = this.escapeHtml(this.getPhotoUrl(photo.storage_path) || ('https://picsum.photos/400/400?random=' + photo.id));
+            return `
             <div class="photo-card ${this.selectMode ? 'select-mode' : ''} ${this.selectedPhotos.has(photo.id) ? 'selected' : ''}" 
                  onclick="${this.selectMode ? "mobile.togglePhotoSelect('" + photo.id + "')" : "mobile.openDetail('" + photo.id + "')"}" 
                  style="animation-delay: ${index * 50}ms">
@@ -385,14 +457,14 @@ const mobile = {
                         <input type="checkbox" ${this.selectedPhotos.has(photo.id) ? 'checked' : ''} onclick="event.stopPropagation(); mobile.togglePhotoSelect('${photo.id}')">
                     </div>
                 ` : ''}
-                <img src="${this.getPhotoUrl(photo.storage_path) || 'https://picsum.photos/400/400?random=' + photo.id}" alt="${photo.name}">
+                <img src="${safeImg}" alt="${safeName}">
                 <div class="photo-card-info">
-                    <h4>${photo.name || '未命名'}</h4>
-                    <p>${photo.description || ''}</p>
+                    <h4>${safeName}</h4>
+                    <p>${safeDesc}</p>
                 </div>
                 ${photo.is_favorite ? '<span class="photo-card-fav">❤️</span>' : ''}
             </div>
-        `).join('');
+        `}).join('');
         
         // 渲染分页控制
         this.renderLoadMoreButton(totalPages, filteredPhotos.length);
@@ -1171,14 +1243,14 @@ const mobile = {
         const originalName = category.name;
         
         // 替换为输入框
-        nameEl.innerHTML = `<input type="text" id="edit-cat-name-${id}" value="${originalName}" class="category-name-input" />`;
+        nameEl.innerHTML = `<input type="text" id="edit-cat-name-${id}" value="${this.escapeHtml(originalName)}" class="category-name-input" />`;
         
         // 添加保存/取消按钮
         const headerEl = document.querySelector(`#cat-${id} .category-header`);
         headerEl.innerHTML += `
             <div class="category-edit-actions">
                 <button class="btn-save" onclick="mobile.saveCategoryName('${id}')">✓ 保存</button>
-                <button class="btn-cancel" onclick="mobile.cancelEditCategory('${id}', '${originalName.replace(/'/g, "\\'")}')">✕ 取消</button>
+                <button class="btn-cancel" onclick="mobile.cancelEditCategory('${id}')">✕ 取消</button>
             </div>
         `;
         
@@ -1192,7 +1264,7 @@ const mobile = {
                 if (e.key === 'Enter') {
                     this.saveCategoryName(id);
                 } else if (e.key === 'Escape') {
-                    this.cancelEditCategory(id, originalName);
+                    this.cancelEditCategory(id);
                 }
             });
         }
@@ -1253,11 +1325,12 @@ const mobile = {
         }
     },
 
-    cancelEditCategory(id, originalName) {
+    cancelEditCategory(id) {
         // 恢复原始显示
         const nameEl = document.querySelector(`#cat-${id} .category-name-text`);
+        const category = this.categories.find(c => String(c.id) === String(id));
         if (nameEl) {
-            nameEl.textContent = originalName;
+            nameEl.textContent = category?.name || '';
         }
         
         // 移除保存/取消按钮
@@ -1407,16 +1480,12 @@ const mobile = {
                 return categoryIds.some(catId => photoCats.includes(catId));
             }).length;
             
-            const category = this.categories.find(c => c.id === this.pendingDeleteId);
-            document.getElementById('confirmTitle').textContent = '删除分类';
-            const photoMsg = photoCount > 0 ? `该分类下有 ${photoCount} 张照片，删除分类将同时删除这些照片。` : '';
-            document.getElementById('confirmMessage').textContent = `确定要删除分类「${category.name}」吗？${photoMsg}`;
-            document.getElementById('confirmModal').style.display = 'flex';
+            const category = this.categories.find(c => String(c.id) === String(this.pendingDeleteId));
+            this.pendingCategoryName = category?.name || '未命名分类';
+            this.pendingPhotoCount = photoCount;
+            this.showCategoryDeleteOptions(photoCount);
             return;
         }
-        
-        this.closeLockPasswordModal();
-        this.renderCategories();
         
         this.closeLockPasswordModal();
         this.renderCategories();
@@ -1495,7 +1564,7 @@ const mobile = {
             return categoryIds.some(catId => photoCats.includes(catId));
         }).length;
         
-        this.pendingDeleteId = id;
+        this.pendingDeleteId = strId;
         this.pendingCategoryName = category.name;
         this.pendingPhotoCount = photoCount;
         
@@ -1505,13 +1574,14 @@ const mobile = {
 
     showCategoryDeleteOptions(photoCount) {
         const photoMsg = photoCount > 0 ? `该分类下有 ${photoCount} 张照片` : '该分类下暂无照片';
+        const safeCategoryName = this.escapeHtml(this.pendingCategoryName || '');
         
         const modal = document.createElement('div');
         modal.id = 'categoryDeleteModal';
         modal.className = 'modal-overlay';
         modal.innerHTML = `
             <div class="modal-card">
-                <h3>🗑️ 删除「${this.pendingCategoryName}」</h3>
+                <h3>🗑️ 删除「${safeCategoryName}」</h3>
                 <p class="modal-hint" style="color:var(--text-muted);font-size:13px;margin:8px 0 16px;">${photoMsg}</p>
                 <div class="delete-options">
                     <button class="delete-option-btn" onclick="mobile.confirmDeleteCategoryOnly()">
@@ -1553,15 +1623,18 @@ const mobile = {
     async confirmDeleteCategoryOnly() {
         const categoryId = this.pendingDeleteId;
         const supabase = this.initSupabase();
+        if (!supabase) return;
         
         this.closeCategoryDeleteModal();
         
         try {
             // 删除分类与照片的关联（照片保留）
-            await supabase.from('photo_categories').delete().eq('category_id', categoryId);
+            const { error: relDeleteError } = await supabase.from('photo_categories').delete().eq('category_id', categoryId);
+            if (relDeleteError) throw relDeleteError;
             
             // 删除分类
-            await supabase.from('categories').delete().eq('id', categoryId);
+            const { error: categoryDeleteError } = await supabase.from('categories').delete().eq('id', categoryId);
+            if (categoryDeleteError) throw categoryDeleteError;
             
             // 更新本地状态
             this.categories = this.categories.filter(c => c.id !== categoryId);
@@ -1590,6 +1663,7 @@ const mobile = {
         const categoryId = this.pendingDeleteId;
         const categoryIds = this.getCategoryAndChildrenIds(categoryId);
         const supabase = this.initSupabase();
+        if (!supabase) return;
         
         this.closeCategoryDeleteModal();
         
@@ -1604,7 +1678,8 @@ const mobile = {
         // 删除照片
         for (const photo of photosToDelete) {
             try {
-                await supabase.from('photos').delete().eq('id', photo.id);
+                const { error: photoDeleteError } = await supabase.from('photos').delete().eq('id', photo.id);
+                if (photoDeleteError) throw photoDeleteError;
                 deletedPhotoCount++;
             } catch (err) {
                 console.error('删除照片失败:', photo.id, err);
@@ -1613,9 +1688,12 @@ const mobile = {
         
         // 删除分类
         try {
-            await supabase.from('categories').delete().eq('id', categoryId);
+            const { error: categoryDeleteError } = await supabase.from('categories').delete().eq('id', categoryId);
+            if (categoryDeleteError) throw categoryDeleteError;
         } catch (err) {
             console.error('删除分类失败:', err);
+            this.showToast('删除分类失败，请重试');
+            return;
         }
         
         // 更新本地状态
@@ -1643,6 +1721,7 @@ const mobile = {
         const categoryId = this.pendingDeleteId;
         const categoryIds = this.getCategoryAndChildrenIds(categoryId);
         const supabase = this.initSupabase();
+        if (!supabase) return;
         
         this.closeCategoryDeleteModal();
         
@@ -1657,7 +1736,8 @@ const mobile = {
         // 删除照片
         for (const photo of photosToDelete) {
             try {
-                await supabase.from('photos').delete().eq('id', photo.id);
+                const { error: photoDeleteError } = await supabase.from('photos').delete().eq('id', photo.id);
+                if (photoDeleteError) throw photoDeleteError;
                 deletedPhotoCount++;
             } catch (err) {
                 console.error('删除照片失败:', photo.id, err);
@@ -1681,6 +1761,7 @@ const mobile = {
         if (this.pendingDeleteType === 'category') {
             const categoryId = this.pendingDeleteId;
             const supabase = this.initSupabase();
+            if (!supabase) return;
             
             // 获取分类及其所有子分类的ID
             const categoryIds = this.getCategoryAndChildrenIds(categoryId);
@@ -1696,7 +1777,8 @@ const mobile = {
             // 先删除这些照片（会级联删除关联和留言）
             for (const photo of photosToDelete) {
                 try {
-                    await supabase.from('photos').delete().eq('id', photo.id);
+                    const { error: photoDeleteError } = await supabase.from('photos').delete().eq('id', photo.id);
+                    if (photoDeleteError) throw photoDeleteError;
                     deletedPhotoCount++;
                 } catch (err) {
                     console.error('删除照片失败:', photo.id, err);
@@ -1705,9 +1787,12 @@ const mobile = {
             
             // 删除分类本身
             try {
-                await supabase.from('categories').delete().eq('id', categoryId);
+                const { error: categoryDeleteError } = await supabase.from('categories').delete().eq('id', categoryId);
+                if (categoryDeleteError) throw categoryDeleteError;
             } catch (err) {
                 console.error('删除分类失败:', err);
+                this.showToast('删除分类失败，请重试');
+                return;
             }
             
             // 更新本地状态
@@ -1730,16 +1815,46 @@ const mobile = {
             this.showToast(`分类及关联的 ${deletedPhotoCount} 张照片已删除`);
             
         } else if (this.pendingDeleteType === 'photo') {
-            this.photos = this.photos.filter(p => p.id !== this.pendingDeleteId);
-            this.renderPhotos();
-            this.showToast('照片已删除');
+            const photoId = this.pendingDeleteId;
+            const supabase = this.initSupabase();
+            if (!supabase) return;
+            try {
+                const { error: relationDeleteError } = await supabase
+                    .from('photo_categories')
+                    .delete()
+                    .eq('photo_id', photoId);
+                if (relationDeleteError) throw relationDeleteError;
+
+                const { error: commentDeleteError } = await supabase
+                    .from('comments')
+                    .delete()
+                    .eq('photo_id', photoId);
+                if (commentDeleteError) throw commentDeleteError;
+
+                const { error: photoDeleteError } = await supabase
+                    .from('photos')
+                    .delete()
+                    .eq('id', photoId);
+                if (photoDeleteError) throw photoDeleteError;
+
+                this.photos = this.photos.filter(p => p.id !== photoId);
+                this.renderPhotos();
+                this.closeDetail();
+                this.showToast('照片已删除');
+            } catch (err) {
+                console.error('删除照片失败:', err);
+                this.showToast('删除失败，请重试');
+                return;
+            }
         } else if (this.pendingDeleteType === 'batch-photo') {
             // 批量删除
             const supabase = this.initSupabase();
+            if (!supabase) return;
             let deletedCount = 0;
             for (const photoId of this.selectedPhotos) {
                 try {
-                    await supabase.from('photos').delete().eq('id', photoId);
+                    const { error: photoDeleteError } = await supabase.from('photos').delete().eq('id', photoId);
+                    if (photoDeleteError) throw photoDeleteError;
                     this.photos = this.photos.filter(p => p.id !== photoId);
                     deletedCount++;
                 } catch (err) {
@@ -1949,7 +2064,7 @@ const mobile = {
     updateProfile() {
         if (this.currentUser) {
             document.getElementById('userName').textContent = this.currentUser.username;
-            document.getElementById('userRole').textContent = this.currentUser.role;
+            document.getElementById('userRole').textContent = this.currentUser.displayRole || this.currentUser.role;
         }
     },
 
@@ -2130,9 +2245,11 @@ const mobile = {
         
         try {
             const supabase = this.initSupabase();
+            if (!supabase) throw new Error('Supabase 未初始化');
             
             // 删除旧关联
-            await supabase.from('photo_categories').delete().eq('photo_id', photoId);
+            const { error: relationDeleteError } = await supabase.from('photo_categories').delete().eq('photo_id', photoId);
+            if (relationDeleteError) throw relationDeleteError;
             
             // 添加新关联
             if (selectedIds.length > 0) {
@@ -2140,7 +2257,8 @@ const mobile = {
                     photo_id: photoId,
                     category_id: catId
                 }));
-                await supabase.from('photo_categories').insert(inserts);
+                const { error: relationInsertError } = await supabase.from('photo_categories').insert(inserts);
+                if (relationInsertError) throw relationInsertError;
             }
             
             // 更新本地状态
@@ -2188,21 +2306,36 @@ const mobile = {
         document.getElementById('editModal').style.display = 'none';
     },
 
-    saveEdit() {
+    async saveEdit() {
         const name = document.getElementById('editPhotoName').value.trim();
         const desc = document.getElementById('editPhotoDesc').value.trim();
 
         const photo = this.photos.find(p => p.id === this.currentPhotoId);
-        if (photo) {
+        if (!photo) return;
+
+        try {
+            const supabase = this.initSupabase();
+            if (!supabase) throw new Error('Supabase 未初始化');
+
+            const { error } = await supabase
+                .from('photos')
+                .update({ name, description: desc })
+                .eq('id', this.currentPhotoId);
+
+            if (error) throw error;
+
             photo.name = name;
             photo.description = desc;
             document.getElementById('detailName').textContent = name;
             document.getElementById('detailDesc').textContent = desc;
-        }
 
-        this.closeEditModal();
-        this.renderPhotos();
-        this.showToast('已保存');
+            this.closeEditModal();
+            this.renderPhotos();
+            this.showToast('已保存');
+        } catch (err) {
+            console.error('保存编辑失败:', err);
+            this.showToast('保存失败，请重试');
+        }
     },
 
     // ========================================

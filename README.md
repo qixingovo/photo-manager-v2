@@ -31,12 +31,23 @@ npm run build
 
 ## 配置
 
-在 `app.js` 中修改 Supabase 配置：
+1. 复制配置模板：
+
+```bash
+cp config.example.js config.js
+```
+
+2. 在 `config.js` 中填写 Supabase 配置：
 
 ```javascript
-const SUPABASE_URL = 'https://your-project.supabase.co'
-const SUPABASE_ANON_KEY = 'your-anon-key'
+window.__APP_CONFIG__ = {
+  SUPABASE_URL: 'https://your-project.supabase.co',
+  SUPABASE_ANON_KEY: 'your-anon-key',
+  SUPABASE_STORAGE_URL: 'https://your-project.supabase.co/storage/v1/object/public/photo/'
+}
 ```
+
+> `config.js` 已加入 `.gitignore`，避免将真实 key 提交到仓库。
 
 ## 数据库设置
 
@@ -66,9 +77,108 @@ CREATE TABLE photos (
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE photos ENABLE ROW LEVEL SECURITY;
 
--- 设置权限
-CREATE POLICY "Allow all access to categories" ON categories FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access to photos" ON photos FOR ALL USING (true) WITH CHECK (true);
+-- ⚠️ 不要使用 FOR ALL + true 的全开放策略
+-- 下面是更安全的最小策略示例：
+-- 1) 匿名仅可读
+CREATE POLICY "categories_read_anon"
+ON categories FOR SELECT
+TO anon
+USING (true);
+
+CREATE POLICY "photos_read_anon"
+ON photos FOR SELECT
+TO anon
+USING (true);
+
+-- 2) 写入仅允许 authenticated（生产建议走登录态或后端服务）
+CREATE POLICY "categories_write_authenticated"
+ON categories FOR INSERT
+TO authenticated
+WITH CHECK (true);
+
+CREATE POLICY "categories_update_authenticated"
+ON categories FOR UPDATE
+TO authenticated
+USING (true)
+WITH CHECK (true);
+
+CREATE POLICY "categories_delete_authenticated"
+ON categories FOR DELETE
+TO authenticated
+USING (true);
+
+CREATE POLICY "photos_write_authenticated"
+ON photos FOR INSERT
+TO authenticated
+WITH CHECK (true);
+
+CREATE POLICY "photos_update_authenticated"
+ON photos FOR UPDATE
+TO authenticated
+USING (true)
+WITH CHECK (true);
+
+CREATE POLICY "photos_delete_authenticated"
+ON photos FOR DELETE
+TO authenticated
+USING (true);
+```
+
+### 账号密码登录（不用邮箱）
+
+前端会调用 `authenticate_user` 函数校验账号密码。可用以下 SQL 创建仅账号登录所需表与函数：
+
+```sql
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE app_users (
+    username TEXT PRIMARY KEY,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('laoda', 'user')),
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE OR REPLACE FUNCTION authenticate_user(p_username TEXT, p_password TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_user app_users%ROWTYPE;
+BEGIN
+    SELECT * INTO v_user
+    FROM app_users
+    WHERE username = p_username
+      AND is_active = true;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false);
+    END IF;
+
+    IF crypt(p_password, v_user.password_hash) <> v_user.password_hash THEN
+        RETURN jsonb_build_object('success', false);
+    END IF;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'username', v_user.username,
+        'role', v_user.role
+    );
+END;
+$$;
+
+REVOKE ALL ON TABLE app_users FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION authenticate_user(TEXT, TEXT) TO anon, authenticated;
+
+-- 只保留两个账号（示例）
+-- ⚠️ 两个账号必须使用不同的高强度密码
+-- ⚠️ 部署前必须替换下方占位密码，禁止直接使用示例值
+INSERT INTO app_users (username, password_hash, role)
+VALUES
+('laoda', crypt('CHANGE_THIS_TO_UNIQUE_STRONG_PASSWORD_MIN_16_CHARS_1', gen_salt('bf')), 'laoda'),
+('xiaodi', crypt('CHANGE_THIS_TO_UNIQUE_STRONG_PASSWORD_MIN_16_CHARS_2', gen_salt('bf')), 'user');
 ```
 
 ## Storage Bucket
@@ -79,6 +189,8 @@ CREATE POLICY "Allow all access to photos" ON photos FOR ALL USING (true) WITH C
 
 1. Fork 此仓库
 2. 在 Vercel 中导入项目
-3. 点击 Deploy
+3. 在 Vercel 项目设置中，使用环境变量保存配置值（如 `SUPABASE_URL`、`SUPABASE_ANON_KEY`）
+4. 在构建阶段生成 `config.js`（内容结构与 `config.example.js` 一致），并确保部署产物可访问该文件
+5. 点击 Deploy
 
-无需配置环境变量，因为使用的是公开的 anon key。
+请确保部署平台注入或提供 `config.js`，不要把真实 key 硬编码到源码并提交到仓库。

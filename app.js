@@ -12,29 +12,64 @@ let markedCategories = new Set(JSON.parse(localStorage.getItem('markedCategories
 let expandedCategories = new Set()
 let expandedInManager = new Set() // 分类管理区域的展开状态
 
-// Supabase 配置
-const SUPABASE_URL = 'https://hpwqtlxrfezpnxpgwlsx.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhwd3F0bHhyZmV6cG54cGd3bHN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDk2MzAsImV4cCI6MjA5MTAyNTYzMH0._yAiiFxsZbsOHf9ItMYU9ZRuNLjVDEbdZFwyh7U6C9w'
+// Supabase 配置（从外部配置文件读取）
+const APP_CONFIG = window.__APP_CONFIG__ || {}
+const SUPABASE_URL = APP_CONFIG.SUPABASE_URL || ''
+const SUPABASE_ANON_KEY = APP_CONFIG.SUPABASE_ANON_KEY || ''
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    document.body.innerHTML = `
+        <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:#f5f6f8;">
+            <div style="max-width:540px;width:100%;background:#fff;border:1px solid #eee;border-radius:12px;padding:20px;color:#333;line-height:1.6;">
+                <h2 style="margin:0 0 8px 0;">配置缺失</h2>
+                <p style="margin:0;">请先创建 <code>config.js</code> 并设置 <code>SUPABASE_URL</code> 与 <code>SUPABASE_ANON_KEY</code>，可参考 <code>config.example.js</code>。</p>
+            </div>
+        </div>
+    `
+    throw new Error('缺少 Supabase 配置，请在 config.js 中设置 SUPABASE_URL 和 SUPABASE_ANON_KEY')
+}
 
 // 直接初始化 Supabase（CDN 脚本是同步加载的）
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const AUTH_SESSION_KEY = 'photo_manager_session';
+
+function getStoredSession() {
+    try {
+        const raw = localStorage.getItem(AUTH_SESSION_KEY);
+        if (!raw) return null;
+        const session = JSON.parse(raw);
+        if (!session?.username || !session?.role) return null;
+        return session;
+    } catch (error) {
+        console.warn('读取本地登录态失败:', error)
+        return null;
+    }
+}
+
+function saveSession(session) {
+    localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+}
+
+function clearSession() {
+    localStorage.removeItem(AUTH_SESSION_KEY);
+}
 
 // ========== 初始化 ==========
 window.addEventListener('DOMContentLoaded', () => {
     initApp();
 });
 
-// 固定用户账号
-const USERS = [
-    { username: 'laoda', password: 'lxyajwr06225' },
-    { username: 'xiaodi', password: 'lxyajwr06225' }
-]
+function isLaodaFromSession(session) {
+    const role = session?.role;
+    return role === 'laoda';
+}
 
 // 检查登录状态
-function checkLogin() {
-    const loggedInUser = localStorage.getItem('photo_manager_user')
-    if (loggedInUser) {
+async function checkLogin() {
+    const session = getStoredSession()
+    if (session) {
         showMainApp()
+        await Promise.all([loadCategories(), loadPhotos()])
     } else {
         showLoginPage()
     }
@@ -56,29 +91,41 @@ function showMainApp() {
     }, 50)
 }
 
-window.handleLogin = function(e) {
+window.handleLogin = async function(e) {
     e.preventDefault()
     
-    const username = document.getElementById('loginUsername').value.trim()
+    const account = document.getElementById('loginUsername').value.trim()
     const password = document.getElementById('loginPassword').value
     const errorEl = document.getElementById('loginError')
-    
-    const user = USERS.find(u => u.username === username && u.password === password)
-    
-    if (user) {
-        localStorage.setItem('photo_manager_user', username)
-        errorEl.textContent = ''
-        
-        // 如果是老大，显示生日快乐欢迎界面
-        if (username === 'laoda') {
-            showBirthdayWelcome()
-        } else {
-            showMainApp()
-            loadCategories()
-            loadPhotos()
-        }
+
+    if (!account || !password) {
+        errorEl.textContent = '请输入账号和密码'
+        return
+    }
+
+    const { data, error } = await supabase.rpc('authenticate_user', {
+        p_username: account,
+        p_password: password
+    })
+
+    if (error || !data?.success) {
+        if (error) console.error('账号登录 RPC 失败:', error)
+        errorEl.textContent = '登录失败，请检查账号或密码'
+        return
+    }
+
+    const session = {
+        username: data.username || account,
+        role: data.role || 'user'
+    }
+    saveSession(session)
+    errorEl.textContent = ''
+    // 如果是老大，显示生日快乐欢迎界面
+    if (isLaodaFromSession(session)) {
+        showBirthdayWelcome()
     } else {
-        errorEl.textContent = '账号或密码错误'
+        showMainApp()
+        await Promise.all([loadCategories(), loadPhotos()])
     }
 }
 
@@ -185,7 +232,7 @@ window.enterMainApp = function() {
 }
 
 window.handleLogout = function() {
-    localStorage.removeItem('photo_manager_user')
+    clearSession()
     showLoginPage()
 }
 
@@ -259,8 +306,8 @@ window.toggleMarkedCategories = function(event) {
     widget.classList.toggle('expanded')
 }
 
-function initApp() {
-    checkLogin();
+async function initApp() {
+    await checkLogin();
     
     // 重置筛选状态
     currentCategory = 'all';
@@ -1446,10 +1493,16 @@ function renderComments() {
     
     container.innerHTML = currentComments.map(c => `
         <div class="comment-item">
-            <div>${c.content}</div>
+            <div>${escapeHtml(c.content || '')}</div>
             <div class="comment-time">${formatTime(c.created_at)}</div>
         </div>
     `).join('')
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div')
+    div.textContent = text
+    return div.innerHTML
 }
 
 window.addComment = async function(e) {
@@ -1773,10 +1826,11 @@ window.saveCategoryChange = async function() {
         const selectedCategories = Array.from(checkboxes).map(cb => cb.value)
         
         // 先删除旧的关联
-        await supabase
+        const { error: relationDeleteError } = await supabase
             .from('photo_categories')
             .delete()
             .eq('photo_id', currentPhoto.id)
+        if (relationDeleteError) throw relationDeleteError
         
         // 添加新的关联
         if (selectedCategories.length > 0) {
@@ -1785,9 +1839,10 @@ window.saveCategoryChange = async function() {
                 category_id: cid
             }))
             
-            await supabase
+            const { error: relationInsertError } = await supabase
                 .from('photo_categories')
                 .insert(inserts)
+            if (relationInsertError) throw relationInsertError
         }
         
         // 更新本地缓存
@@ -1829,16 +1884,18 @@ window.deletePhoto = async function(id, storagePath) {
         if (storageError) throw storageError
         
         // 删除关联
-        await supabase
+        const { error: relationDeleteError } = await supabase
             .from('photo_categories')
             .delete()
             .eq('photo_id', id)
+        if (relationDeleteError) throw relationDeleteError
         
         // 删除留言
-        await supabase
+        const { error: commentDeleteError } = await supabase
             .from('comments')
             .delete()
             .eq('photo_id', id)
+        if (commentDeleteError) throw commentDeleteError
         
         const { error: deleteError } = await supabase
             .from('photos')
