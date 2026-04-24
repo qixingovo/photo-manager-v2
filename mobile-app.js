@@ -73,7 +73,8 @@ const mobile = {
             const session = JSON.parse(raw);
             if (!session?.username || !session?.role) return null;
             return session;
-        } catch (_) {
+        } catch (error) {
+            console.warn('读取本地登录态失败:', error);
             return null;
         }
     },
@@ -262,7 +263,7 @@ const mobile = {
         });
     },
 
-    async handleLogout() {
+    handleLogout() {
         this.clearSession();
         this.currentUser = null;
         this.showPage('login');

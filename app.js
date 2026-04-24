@@ -27,7 +27,8 @@ function getStoredSession() {
         const session = JSON.parse(raw);
         if (!session?.username || !session?.role) return null;
         return session;
-    } catch (_) {
+    } catch (error) {
+        console.warn('读取本地登录态失败:', error)
         return null;
     }
 }
@@ -217,7 +218,7 @@ window.enterMainApp = function() {
     }
 }
 
-window.handleLogout = async function() {
+window.handleLogout = function() {
     clearSession()
     showLoginPage()
 }
