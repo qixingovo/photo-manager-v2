@@ -2188,21 +2188,37 @@ const mobile = {
         document.getElementById('editModal').style.display = 'none';
     },
 
-    saveEdit() {
+    async saveEdit() {
         const name = document.getElementById('editPhotoName').value.trim();
         const desc = document.getElementById('editPhotoDesc').value.trim();
 
         const photo = this.photos.find(p => p.id === this.currentPhotoId);
-        if (photo) {
+        if (!photo) return;
+
+        try {
+            const supabase = this.initSupabase();
+            if (!supabase) throw new Error('Supabase 未初始化');
+
+            const { error } = await supabase
+                .from('photos')
+                .update({ name, description: desc })
+                .eq('id', this.currentPhotoId);
+
+            if (error) throw error;
+
             photo.name = name;
             photo.description = desc;
             document.getElementById('detailName').textContent = name;
             document.getElementById('detailDesc').textContent = desc;
-        }
 
-        this.closeEditModal();
-        this.renderPhotos();
-        this.showToast('已保存');
+            this.closeEditModal();
+            await this.loadPhotos();
+            this.renderPhotos();
+            this.showToast('已保存');
+        } catch (err) {
+            console.error('保存编辑失败:', err);
+            this.showToast('保存失败，请重试');
+        }
     },
 
     // ========================================
