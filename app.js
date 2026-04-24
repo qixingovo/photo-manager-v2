@@ -18,6 +18,14 @@ const SUPABASE_URL = APP_CONFIG.SUPABASE_URL || ''
 const SUPABASE_ANON_KEY = APP_CONFIG.SUPABASE_ANON_KEY || ''
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    document.body.innerHTML = `
+        <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:#f5f6f8;">
+            <div style="max-width:540px;width:100%;background:#fff;border:1px solid #eee;border-radius:12px;padding:20px;color:#333;line-height:1.6;">
+                <h2 style="margin:0 0 8px 0;">配置缺失</h2>
+                <p style="margin:0;">请先创建 <code>config.js</code> 并设置 <code>SUPABASE_URL</code> 与 <code>SUPABASE_ANON_KEY</code>，可参考 <code>config.example.js</code>。</p>
+            </div>
+        </div>
+    `
     throw new Error('缺少 Supabase 配置，请在 config.js 中设置 SUPABASE_URL 和 SUPABASE_ANON_KEY')
 }
 

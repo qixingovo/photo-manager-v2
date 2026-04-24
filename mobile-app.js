@@ -46,13 +46,6 @@ const mobile = {
     // 初始化 Supabase 客户端
     initSupabase() {
         if (!this.SUPABASE_URL || !this.SUPABASE_KEY) {
-            const config = window.__APP_CONFIG__ || {};
-            this.SUPABASE_URL = config.SUPABASE_URL || '';
-            this.SUPABASE_KEY = config.SUPABASE_ANON_KEY || '';
-            this.STORAGE_URL = config.SUPABASE_STORAGE_URL || (this.SUPABASE_URL ? `${this.SUPABASE_URL}/storage/v1/object/public/photo/` : '');
-        }
-
-        if (!this.SUPABASE_URL || !this.SUPABASE_KEY) {
             console.error('缺少 Supabase 配置，请在 config.js 中设置 SUPABASE_URL 和 SUPABASE_ANON_KEY');
             return null;
         }

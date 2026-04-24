@@ -147,6 +147,8 @@ VALUES
 
 1. Fork 此仓库
 2. 在 Vercel 中导入项目
-3. 点击 Deploy
+3. 在 Vercel 项目设置中，使用环境变量保存配置值（如 `SUPABASE_URL`、`SUPABASE_ANON_KEY`）
+4. 在构建阶段生成 `config.js`（内容结构与 `config.example.js` 一致），并确保部署产物可访问该文件
+5. 点击 Deploy
 
 请确保部署平台注入或提供 `config.js`，不要把真实 key 硬编码到源码并提交到仓库。
