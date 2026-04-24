@@ -12,6 +12,13 @@ let markedCategories = new Set(JSON.parse(localStorage.getItem('markedCategories
 let expandedCategories = new Set()
 let expandedInManager = new Set() // 分类管理区域的展开状态
 
+// ========== 图片编辑器状态 ==========
+let editStateCanvas = null  // committed state as offscreen canvas
+let editCropMode = false
+let editCropStart = null
+let editCropEnd = null
+let editIsDragging = false
+
 // Supabase 配置（从外部配置文件读取）
 const APP_CONFIG = window.__APP_CONFIG__ || {}
 const SUPABASE_URL = APP_CONFIG.SUPABASE_URL || ''
@@ -1911,6 +1918,309 @@ window.deletePhoto = async function(id, storagePath) {
     }
 }
 
+// ========== 图片编辑器 ==========
+
+window.openImageEditModal = function() {
+    if (!currentPhoto) return
+
+    editStateCanvas = null
+    editCropMode = false
+    editCropStart = null
+    editCropEnd = null
+    editIsDragging = false
+
+    document.getElementById('cropModeBtn').textContent = '✂️ 裁剪'
+    document.getElementById('applyCropBtn').style.display = 'none'
+    document.getElementById('cancelCropBtn').style.display = 'none'
+    document.getElementById('imageEditorCanvasContainer').classList.remove('crop-mode')
+    document.getElementById('imageEditStatus').textContent = '加载中...'
+    document.getElementById('saveEditedImageBtn').disabled = true
+
+    document.getElementById('imageEditModal').classList.add('active')
+
+    const displayCanvas = document.getElementById('imageEditCanvas')
+    displayCanvas.width = 300
+    displayCanvas.height = 150
+    const dctx = displayCanvas.getContext('2d')
+    dctx.fillStyle = '#2a2a2a'
+    dctx.fillRect(0, 0, 300, 150)
+    dctx.fillStyle = '#888'
+    dctx.textAlign = 'center'
+    dctx.font = '14px sans-serif'
+    dctx.fillText('加载中...', 150, 75)
+
+    const photoUrl = getPhotoUrl(currentPhoto.storage_path)
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+        const sc = document.createElement('canvas')
+        sc.width = img.width
+        sc.height = img.height
+        sc.getContext('2d').drawImage(img, 0, 0)
+        editStateCanvas = sc
+
+        displayCanvas.width = img.width
+        displayCanvas.height = img.height
+        displayCanvas.getContext('2d').drawImage(img, 0, 0)
+
+        document.getElementById('editResizeW').value = img.width
+        document.getElementById('editResizeH').value = img.height
+        document.getElementById('imageEditStatus').textContent = `${img.width} × ${img.height} px`
+        document.getElementById('saveEditedImageBtn').disabled = false
+    }
+    img.onerror = () => {
+        document.getElementById('imageEditStatus').textContent = '图片加载失败'
+        const eCtx = displayCanvas.getContext('2d')
+        eCtx.fillStyle = '#2a2a2a'
+        eCtx.fillRect(0, 0, displayCanvas.width, displayCanvas.height)
+        eCtx.fillStyle = '#e57373'
+        eCtx.textAlign = 'center'
+        eCtx.font = '14px sans-serif'
+        eCtx.fillText('加载失败', displayCanvas.width / 2, displayCanvas.height / 2)
+    }
+    // Cache-bust to ensure the browser re-fetches with CORS headers
+    img.src = photoUrl + (photoUrl.includes('?') ? '&' : '?') + 'edit=' + Date.now()
+}
+
+window.closeImageEditModal = function() {
+    document.getElementById('imageEditModal').classList.remove('active')
+    editStateCanvas = null
+    editCropMode = false
+    editCropStart = null
+    editCropEnd = null
+    editIsDragging = false
+}
+
+window.rotateEditImage = function(degrees) {
+    if (!editStateCanvas) return
+    cancelCropModeInternal()
+
+    const sc = editStateCanvas
+    const radians = (degrees * Math.PI) / 180
+    const isOdd = Math.abs(degrees) % 180 !== 0
+
+    const newSc = document.createElement('canvas')
+    newSc.width = isOdd ? sc.height : sc.width
+    newSc.height = isOdd ? sc.width : sc.height
+
+    const ctx = newSc.getContext('2d')
+    ctx.save()
+    ctx.translate(newSc.width / 2, newSc.height / 2)
+    ctx.rotate(radians)
+    ctx.drawImage(sc, -sc.width / 2, -sc.height / 2)
+    ctx.restore()
+
+    editStateCanvas = newSc
+
+    const dc = document.getElementById('imageEditCanvas')
+    dc.width = newSc.width
+    dc.height = newSc.height
+    dc.getContext('2d').drawImage(newSc, 0, 0)
+
+    document.getElementById('editResizeW').value = newSc.width
+    document.getElementById('editResizeH').value = newSc.height
+    document.getElementById('imageEditStatus').textContent = `${newSc.width} × ${newSc.height} px`
+}
+
+window.toggleCropMode = function() {
+    if (editCropMode) {
+        cancelCropModeInternal()
+    } else {
+        if (!editStateCanvas) return
+        editCropMode = true
+        editCropStart = null
+        editCropEnd = null
+        document.getElementById('imageEditorCanvasContainer').classList.add('crop-mode')
+        document.getElementById('cropModeBtn').textContent = '✂️ 裁剪中'
+        document.getElementById('cancelCropBtn').style.display = 'inline-block'
+        document.getElementById('imageEditStatus').textContent = '在图片上拖拽以选择裁剪区域'
+    }
+}
+
+function cancelCropModeInternal() {
+    editCropMode = false
+    editIsDragging = false
+    editCropStart = null
+    editCropEnd = null
+    document.getElementById('imageEditorCanvasContainer').classList.remove('crop-mode')
+    document.getElementById('cropModeBtn').textContent = '✂️ 裁剪'
+    document.getElementById('applyCropBtn').style.display = 'none'
+    document.getElementById('cancelCropBtn').style.display = 'none'
+
+    if (editStateCanvas) {
+        const dc = document.getElementById('imageEditCanvas')
+        dc.width = editStateCanvas.width
+        dc.height = editStateCanvas.height
+        dc.getContext('2d').drawImage(editStateCanvas, 0, 0)
+        document.getElementById('imageEditStatus').textContent = `${dc.width} × ${dc.height} px`
+    }
+}
+
+window.cancelCropMode = function() {
+    cancelCropModeInternal()
+}
+
+function getEditCanvasCoords(e) {
+    const canvas = document.getElementById('imageEditCanvas')
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    return {
+        x: Math.round((e.clientX - rect.left) * scaleX),
+        y: Math.round((e.clientY - rect.top) * scaleY)
+    }
+}
+
+function drawCropOverlay() {
+    if (!editStateCanvas || !editCropStart || !editCropEnd) return
+    const dc = document.getElementById('imageEditCanvas')
+    const ctx = dc.getContext('2d')
+
+    const x = Math.min(editCropStart.x, editCropEnd.x)
+    const y = Math.min(editCropStart.y, editCropEnd.y)
+    const w = Math.abs(editCropEnd.x - editCropStart.x)
+    const h = Math.abs(editCropEnd.y - editCropStart.y)
+
+    // Redraw the committed state
+    ctx.drawImage(editStateCanvas, 0, 0)
+
+    // Dark overlay over the whole canvas
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'
+    ctx.fillRect(0, 0, dc.width, dc.height)
+
+    // Reveal the selected region at full brightness
+    if (w > 0 && h > 0) {
+        ctx.drawImage(editStateCanvas, x, y, w, h, x, y, w, h)
+    }
+
+    // Dashed border around selection
+    ctx.strokeStyle = '#fff'
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([6, 4])
+    ctx.strokeRect(x + 0.5, y + 0.5, w, h)
+    ctx.setLineDash([])
+
+    if (w > 0 && h > 0) {
+        document.getElementById('imageEditStatus').textContent = `选区: ${w} × ${h} px`
+    }
+}
+
+window.applyCrop = function() {
+    if (!editStateCanvas || !editCropStart || !editCropEnd) return
+
+    const x = Math.min(editCropStart.x, editCropEnd.x)
+    const y = Math.min(editCropStart.y, editCropEnd.y)
+    const w = Math.abs(editCropEnd.x - editCropStart.x)
+    const h = Math.abs(editCropEnd.y - editCropStart.y)
+
+    if (w < 5 || h < 5) {
+        alert('选区太小，请重新选择')
+        return
+    }
+
+    const newSc = document.createElement('canvas')
+    newSc.width = w
+    newSc.height = h
+    newSc.getContext('2d').drawImage(editStateCanvas, x, y, w, h, 0, 0, w, h)
+
+    editStateCanvas = newSc
+
+    document.getElementById('editResizeW').value = w
+    document.getElementById('editResizeH').value = h
+
+    cancelCropModeInternal()
+}
+
+window.applyResize = function() {
+    if (!editStateCanvas) return
+
+    const newW = parseInt(document.getElementById('editResizeW').value)
+    const newH = parseInt(document.getElementById('editResizeH').value)
+
+    if (!newW || !newH || newW < 1 || newH < 1 || newW > 8000 || newH > 8000) {
+        alert('请输入有效的宽度和高度（1 - 8000 像素）')
+        return
+    }
+
+    cancelCropModeInternal()
+
+    const newSc = document.createElement('canvas')
+    newSc.width = newW
+    newSc.height = newH
+    newSc.getContext('2d').drawImage(editStateCanvas, 0, 0, newW, newH)
+
+    editStateCanvas = newSc
+
+    const dc = document.getElementById('imageEditCanvas')
+    dc.width = newW
+    dc.height = newH
+    dc.getContext('2d').drawImage(newSc, 0, 0)
+
+    document.getElementById('imageEditStatus').textContent = `${newW} × ${newH} px`
+}
+
+window.saveEditedImage = async function() {
+    if (!currentPhoto || !editStateCanvas) return
+
+    const btn = document.getElementById('saveEditedImageBtn')
+    const statusEl = document.getElementById('imageEditStatus')
+    btn.disabled = true
+    btn.textContent = '保存中...'
+    statusEl.textContent = '上传中...'
+
+    try {
+        const blob = await new Promise((resolve, reject) => {
+            editStateCanvas.toBlob((b) => {
+                if (b) resolve(b)
+                else reject(new Error('导出图片失败'))
+            }, 'image/jpeg', 0.92)
+        })
+
+        const newStoragePath = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.jpg`
+
+        const { error: uploadError } = await supabase.storage
+            .from('photo')
+            .upload(newStoragePath, blob, {
+                cacheControl: '3600',
+                upsert: false,
+                contentType: 'image/jpeg'
+            })
+
+        if (uploadError) throw uploadError
+
+        await supabase.storage.from('photo').remove([currentPhoto.storage_path])
+
+        const { error: updateError } = await supabase
+            .from('photos')
+            .update({ storage_path: newStoragePath, size: blob.size })
+            .eq('id', currentPhoto.id)
+
+        if (updateError) throw updateError
+
+        currentPhoto.storage_path = newStoragePath
+        currentPhoto.size = blob.size
+
+        const newUrl = getPhotoUrl(newStoragePath)
+        document.getElementById('modalImage').src = newUrl
+        document.getElementById('modalPhotoSize').textContent = formatFileSize(blob.size)
+        const dlBtn = document.getElementById('modalDownloadBtn')
+        dlBtn.href = newUrl
+        dlBtn.download = currentPhoto.original_name || currentPhoto.name
+
+        window.closeImageEditModal()
+        await loadPhotos()
+
+        alert('图片已保存！')
+    } catch (err) {
+        alert('保存失败: ' + err.message)
+        btn.disabled = false
+        btn.textContent = '💾 保存'
+        if (editStateCanvas) {
+            statusEl.textContent = `${editStateCanvas.width} × ${editStateCanvas.height} px`
+        }
+    }
+}
+
 // 点击弹窗外部关闭
 document.getElementById('photoModal').addEventListener('click', (e) => {
     if (e.target.id === 'photoModal') closeModal()
@@ -1930,6 +2240,62 @@ document.getElementById('editCategoryModal').addEventListener('click', (e) => {
 
 document.getElementById('batchCategoryModal').addEventListener('click', (e) => {
     if (e.target.id === 'batchCategoryModal') closeBatchCategoryModal()
+})
+
+document.getElementById('imageEditModal').addEventListener('click', (e) => {
+    if (e.target.id === 'imageEditModal') window.closeImageEditModal()
+})
+
+// 裁剪 canvas 鼠标事件
+;(function setupImageEditCanvasEvents() {
+    const canvas = document.getElementById('imageEditCanvas')
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (!editCropMode) return
+        editIsDragging = true
+        editCropStart = getEditCanvasCoords(e)
+        editCropEnd = { ...editCropStart }
+        document.getElementById('applyCropBtn').style.display = 'none'
+    })
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!editCropMode || !editIsDragging) return
+        editCropEnd = getEditCanvasCoords(e)
+        drawCropOverlay()
+    })
+
+    canvas.addEventListener('mouseup', (e) => {
+        if (!editCropMode || !editIsDragging) return
+        editIsDragging = false
+        editCropEnd = getEditCanvasCoords(e)
+        drawCropOverlay()
+        const w = Math.abs((editCropEnd?.x ?? 0) - (editCropStart?.x ?? 0))
+        const h = Math.abs((editCropEnd?.y ?? 0) - (editCropStart?.y ?? 0))
+        if (w > 5 && h > 5) {
+            document.getElementById('applyCropBtn').style.display = 'inline-block'
+        }
+    })
+
+    canvas.addEventListener('mouseleave', () => {
+        if (editCropMode && editIsDragging) {
+            editIsDragging = false
+        }
+    })
+})()
+
+// 调整大小时锁定比例
+document.getElementById('editResizeW').addEventListener('input', function() {
+    if (!document.getElementById('editLockRatio').checked || !editStateCanvas) return
+    const ratio = editStateCanvas.height / editStateCanvas.width
+    const val = parseInt(this.value)
+    if (val > 0) document.getElementById('editResizeH').value = Math.round(val * ratio)
+})
+
+document.getElementById('editResizeH').addEventListener('input', function() {
+    if (!document.getElementById('editLockRatio').checked || !editStateCanvas) return
+    const ratio = editStateCanvas.width / editStateCanvas.height
+    const val = parseInt(this.value)
+    if (val > 0) document.getElementById('editResizeW').value = Math.round(val * ratio)
 })
 
 // 点击外部收起已标记浮窗

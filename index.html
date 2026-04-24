@@ -152,6 +152,7 @@
                         <a id="modalDownloadBtn" href="" download class="btn btn-primary">⬇️ 下载</a>
                         <button onclick="window.openEditModal()" class="btn btn-secondary">✏️ 编辑</button>
                         <button onclick="window.openCategoryModal()" class="btn btn-secondary">📁 改分类</button>
+                        <button onclick="window.openImageEditModal()" class="btn btn-secondary">✂️ 图片编辑</button>
                     </div>
                     <div class="modal-comments">
                         <h4>留言</h4>
@@ -238,6 +239,40 @@
             <div style="display:flex;gap:8px;margin-top:12px;">
                 <button onclick="batchAddCategories()" class="btn btn-primary" style="flex:1;">添加分类</button>
                 <button onclick="batchRemoveCategories()" class="btn btn-danger" style="flex:1;">移除选中分类</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片编辑弹窗 -->
+    <div id="imageEditModal" class="modal">
+        <div class="modal-content image-editor-content">
+            <span class="modal-close" onclick="window.closeImageEditModal()">&times;</span>
+            <h3>图片编辑</h3>
+            <div class="image-editor-toolbar">
+                <button onclick="window.rotateEditImage(-90)" class="btn btn-secondary">↺ 左转90°</button>
+                <button onclick="window.rotateEditImage(90)" class="btn btn-secondary">↻ 右转90°</button>
+                <button id="cropModeBtn" onclick="window.toggleCropMode()" class="btn btn-secondary">✂️ 裁剪</button>
+                <button id="applyCropBtn" onclick="window.applyCrop()" class="btn btn-primary" style="display:none;">✔ 应用裁剪</button>
+                <button id="cancelCropBtn" onclick="window.cancelCropMode()" class="btn btn-secondary" style="display:none;">✕ 取消裁剪</button>
+            </div>
+            <div class="image-editor-resize">
+                <label>宽度:</label>
+                <input type="number" id="editResizeW" min="1" max="8000">
+                <label>高度:</label>
+                <input type="number" id="editResizeH" min="1" max="8000">
+                <label class="resize-lock-label">
+                    <input type="checkbox" id="editLockRatio" checked>
+                    <span>锁定比例</span>
+                </label>
+                <button onclick="window.applyResize()" class="btn btn-secondary">↔ 调整大小</button>
+            </div>
+            <div class="image-editor-canvas-container" id="imageEditorCanvasContainer">
+                <canvas id="imageEditCanvas"></canvas>
+            </div>
+            <div class="image-editor-footer">
+                <span id="imageEditStatus" class="image-edit-status"></span>
+                <button onclick="window.saveEditedImage()" class="btn btn-primary" id="saveEditedImageBtn">💾 保存</button>
+                <button onclick="window.closeImageEditModal()" class="btn btn-secondary">取消</button>
             </div>
         </div>
     </div>
