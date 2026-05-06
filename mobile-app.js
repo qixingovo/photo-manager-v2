@@ -2976,9 +2976,29 @@ const mobile = {
                     description: m.description || '',
                     photoId: m.photo_id || null,
                     photoPath: m.photo_path || null,
-                    photoName: m.photo_name || null
+                    photoName: m.photo_name || null,
+                    categoryId: m.category_id || null,
+                    categoryName: m.category_name || null
                 }));
                 selectOk = true;
+                // 如果 localStorage 有数据（可能是之前 Supabase 保存失败留下的），合并后回写
+                const saved = localStorage.getItem('anniversary_milestones');
+                if (saved) {
+                    const localMilestones = JSON.parse(saved);
+                    localMilestones.forEach(lm => {
+                        const existing = this.anniversaryMilestones.find(m => m.id === lm.id);
+                        if (existing) {
+                            if (lm.categoryId) existing.categoryId = lm.categoryId;
+                            if (lm.categoryName) existing.categoryName = lm.categoryName;
+                            if (lm.photoId) existing.photoId = lm.photoId;
+                            if (lm.photoPath) existing.photoPath = lm.photoPath;
+                            if (lm.photoName) existing.photoName = lm.photoName;
+                        } else {
+                            this.anniversaryMilestones.push(lm);
+                        }
+                    });
+                    shouldMigrate = true;
+                }
             } else if (!error) {
                 selectOk = true;
                 const saved = localStorage.getItem('anniversary_milestones');
@@ -3031,7 +3051,9 @@ const mobile = {
                 description: m.description || '',
                 photo_id: m.photoId || null,
                 photo_path: m.photoPath || null,
-                photo_name: m.photoName || null
+                photo_name: m.photoName || null,
+                category_id: m.categoryId ? parseInt(m.categoryId) : null,
+                category_name: m.categoryName || null
             }));
             const { error } = await supabase.from('milestones').upsert(rows);
             if (error) { this._milestonesSupabaseFailed = true; return; }
@@ -3060,7 +3082,9 @@ const mobile = {
                 description: m.description || '',
                 photo_id: m.photoId || null,
                 photo_path: m.photoPath || null,
-                photo_name: m.photoName || null
+                photo_name: m.photoName || null,
+                category_id: m.categoryId ? parseInt(m.categoryId) : null,
+                category_name: m.categoryName || null
             }));
             const { error } = await supabase.from('milestones').upsert(rows);
             if (error) {

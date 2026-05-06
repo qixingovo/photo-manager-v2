@@ -2045,6 +2045,25 @@ async function loadMilestones() {
                 categoryName: m.category_name || null
             }));
             selectOk = true
+            // 如果 localStorage 有数据（可能是之前 Supabase 保存失败留下的），合并后回写
+            const saved = localStorage.getItem('anniversary_milestones');
+            if (saved) {
+                const localMilestones = JSON.parse(saved);
+                localMilestones.forEach(lm => {
+                    const existing = anniversaryMilestones.find(m => m.id === lm.id);
+                    if (existing) {
+                        // localStorage 可能有更新的 categoryId/categoryName 等字段
+                        if (lm.categoryId) existing.categoryId = lm.categoryId;
+                        if (lm.categoryName) existing.categoryName = lm.categoryName;
+                        if (lm.photoId) existing.photoId = lm.photoId;
+                        if (lm.photoPath) existing.photoPath = lm.photoPath;
+                        if (lm.photoName) existing.photoName = lm.photoName;
+                    } else {
+                        anniversaryMilestones.push(lm);
+                    }
+                });
+                shouldMigrate = true;
+            }
         } else if (!error) {
             // SELECT 成功但没有数据 — 尝试从 localStorage 迁移
             selectOk = true
