@@ -2020,32 +2020,101 @@ function getDefaultMilestones() {
     ];
 }
 
-function loadMilestones() {
+async function loadMilestones() {
+    // 先从 Supabase 加载
     try {
-        const saved = localStorage.getItem('anniversary_milestones');
-        if (saved) {
-            anniversaryMilestones = JSON.parse(saved);
+        const { data, error } = await supabase
+            .from('milestones')
+            .select('*')
+            .order('date', { ascending: false });
+
+        if (!error && data && data.length > 0) {
+            anniversaryMilestones = data.map(m => ({
+                id: String(m.id),
+                date: m.date,
+                title: m.title,
+                description: m.description || '',
+                photoId: m.photo_id || null
+            }));
         } else {
-            anniversaryMilestones = getDefaultMilestones();
-            saveMilestones();
+            // Supabase 无数据，尝试从 localStorage 迁移
+            const saved = localStorage.getItem('anniversary_milestones');
+            if (saved) {
+                anniversaryMilestones = JSON.parse(saved);
+            } else {
+                anniversaryMilestones = getDefaultMilestones();
+            }
+            await migrateMilestonesToSupabase();
         }
     } catch (e) {
-        anniversaryMilestones = getDefaultMilestones();
+        console.warn('Supabase 加载纪念日失败，回退到 localStorage:', e);
+        const saved = localStorage.getItem('anniversary_milestones');
+        anniversaryMilestones = saved ? JSON.parse(saved) : getDefaultMilestones();
     }
 
+    // 加载开始日期：优先 app_settings 表，其次 localStorage
     try {
-        anniversaryStartDate = localStorage.getItem('anniversary_start_date') || '2020-06-15';
+        const { data } = await supabase
+            .from('app_settings')
+            .select('value')
+            .eq('key', 'anniversary_start_date')
+            .single();
+        if (data) {
+            anniversaryStartDate = data.value;
+        } else {
+            anniversaryStartDate = localStorage.getItem('anniversary_start_date') || '2020-06-15';
+            await supabase.from('app_settings').upsert({ key: 'anniversary_start_date', value: anniversaryStartDate });
+        }
     } catch (e) {
-        anniversaryStartDate = '2020-06-15';
+        anniversaryStartDate = localStorage.getItem('anniversary_start_date') || '2020-06-15';
     }
 }
 
-function saveMilestones() {
-    localStorage.setItem('anniversary_milestones', JSON.stringify(anniversaryMilestones));
+async function migrateMilestonesToSupabase() {
+    try {
+        const rows = anniversaryMilestones.map(m => ({
+            id: parseInt(m.id) || Date.now() + Math.floor(Math.random() * 1000),
+            date: m.date,
+            title: m.title,
+            description: m.description || '',
+            photo_id: m.photoId || null
+        }));
+        const { error } = await supabase.from('milestones').upsert(rows);
+        if (!error) {
+            localStorage.removeItem('anniversary_milestones');
+        }
+    } catch (e) {
+        console.warn('迁移纪念日失败:', e);
+    }
 }
 
-function saveStartDate() {
-    localStorage.setItem('anniversary_start_date', anniversaryStartDate);
+async function saveMilestonesToSupabase() {
+    try {
+        const rows = anniversaryMilestones.map(m => ({
+            id: parseInt(m.id) || Date.now(),
+            date: m.date,
+            title: m.title,
+            description: m.description || '',
+            photo_id: m.photoId || null
+        }));
+        await supabase.from('milestones').upsert(rows);
+        // 同步清理 localStorage（如果还存在旧数据）
+        localStorage.removeItem('anniversary_milestones');
+    } catch (e) {
+        console.error('保存纪念日到 Supabase 失败:', e);
+        // 回退保存到 localStorage
+        localStorage.setItem('anniversary_milestones', JSON.stringify(anniversaryMilestones));
+    }
+}
+
+async function saveStartDateToSupabase() {
+    try {
+        await supabase.from('app_settings').upsert({ key: 'anniversary_start_date', value: anniversaryStartDate });
+        localStorage.removeItem('anniversary_start_date');
+    } catch (e) {
+        console.error('保存开始日期失败:', e);
+        localStorage.setItem('anniversary_start_date', anniversaryStartDate);
+    }
 }
 
 function updateDaysCounter() {
@@ -2059,19 +2128,19 @@ function updateDaysCounter() {
     el.textContent = diffDays;
 }
 
-function initTimeline() {
-    loadMilestones();
+async function initTimeline() {
+    await loadMilestones();
     const startInput = document.getElementById('startDateInput');
     if (startInput) startInput.value = anniversaryStartDate;
     updateDaysCounter();
     renderTimeline();
 }
 
-window.updateStartDate = function() {
+window.updateStartDate = async function() {
     const input = document.getElementById('startDateInput');
     if (!input) return;
     anniversaryStartDate = input.value;
-    saveStartDate();
+    await saveStartDateToSupabase();
     updateDaysCounter();
 };
 
@@ -2176,7 +2245,7 @@ window.saveMilestone = function() {
     };
 
     anniversaryMilestones.push(newMilestone);
-    saveMilestones();
+    saveMilestonesToSupabase();
     renderTimeline();
     document.getElementById('milestoneModal').remove();
 };
@@ -2223,7 +2292,7 @@ window.updateMilestone = function(id) {
     m.description = document.getElementById('milestoneDesc').value.trim();
     m.photoId = document.getElementById('milestonePhotoId').value.trim() || null;
 
-    saveMilestones();
+    saveMilestonesToSupabase();
     renderTimeline();
     document.getElementById('milestoneModal').remove();
 };
@@ -2231,7 +2300,7 @@ window.updateMilestone = function(id) {
 window.deleteMilestone = function(id) {
     if (!confirm('确定删除这个纪念日？')) return;
     anniversaryMilestones = anniversaryMilestones.filter(m => m.id !== id);
-    saveMilestones();
+    saveMilestonesToSupabase();
     renderTimeline();
 };
 
