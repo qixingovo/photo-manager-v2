@@ -1327,7 +1327,7 @@ function onFilterCatLevelChange(level) {
     if (selectedValue) {
         currentCategory = selectedValue
         currentPage = 1
-        const children = categories.filter(c => c.parent_id === selectedValue)
+        const children = categories.filter(c => c.parent_id === Number(selectedValue))
         if (children.length > 0) {
             const nextLevel = level + 1
             const nextSelect = document.createElement('select')
@@ -1487,7 +1487,7 @@ window.onParentLevelChange = function(level) {
     
     // 如果选中了某个分类，显示其子分类作为下一级
     if (selectedValue) {
-        const children = categories.filter(c => c.parent_id === selectedValue)
+        const children = categories.filter(c => c.parent_id === Number(selectedValue))
         if (children.length > 0) {
             const nextLevel = level + 1
             const nextSelect = document.createElement('select')
@@ -1547,7 +1547,7 @@ window.onUploadCatLevelChange = function(level) {
     
     // 如果选中了某个分类，显示其子分类作为下一级
     if (selectedValue) {
-        const children = categories.filter(c => c.parent_id === selectedValue)
+        const children = categories.filter(c => c.parent_id === Number(selectedValue))
         if (children.length > 0) {
             const nextLevel = level + 1
             const nextSelect = document.createElement('select')
@@ -2020,8 +2020,12 @@ function getDefaultMilestones() {
     ];
 }
 
+// 检测是否有 localStorage 数据（用于判断是否应从 localStorage 加载）
+let _milestonesSupabaseFailed = false
+
 async function loadMilestones() {
-    // 先从 Supabase 加载
+    let shouldMigrate = false
+    let selectOk = false
     try {
         const { data, error } = await supabase
             .from('milestones')
@@ -2036,41 +2040,54 @@ async function loadMilestones() {
                 description: m.description || '',
                 photoId: m.photo_id || null
             }));
-        } else {
-            // Supabase 无数据，尝试从 localStorage 迁移
+            selectOk = true
+        } else if (!error) {
+            // SELECT 成功但没有数据 — 尝试从 localStorage 迁移
+            selectOk = true
             const saved = localStorage.getItem('anniversary_milestones');
             if (saved) {
                 anniversaryMilestones = JSON.parse(saved);
+                shouldMigrate = true;
             } else {
                 anniversaryMilestones = getDefaultMilestones();
             }
-            await migrateMilestonesToSupabase();
         }
-    } catch (e) {
-        console.warn('Supabase 加载纪念日失败，回退到 localStorage:', e);
+    } catch (e) { /* 静默 */ }
+
+    if (anniversaryMilestones.length === 0) {
         const saved = localStorage.getItem('anniversary_milestones');
         anniversaryMilestones = saved ? JSON.parse(saved) : getDefaultMilestones();
     }
 
-    // 加载开始日期：优先 app_settings 表，其次 localStorage
+    if (shouldMigrate) {
+        await migrateMilestonesToSupabase();
+    }
+    // 仅当 SELECT 本身出错时才标记 Supabase 不可用
+    _milestonesSupabaseFailed = !selectOk
+
+    await loadStartDate()
+}
+
+async function loadStartDate() {
+    anniversaryStartDate = localStorage.getItem('anniversary_start_date') || '2020-06-15';
     try {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('app_settings')
             .select('value')
             .eq('key', 'anniversary_start_date')
             .single();
-        if (data) {
+        if (!error && data) {
             anniversaryStartDate = data.value;
-        } else {
-            anniversaryStartDate = localStorage.getItem('anniversary_start_date') || '2020-06-15';
+        } else if (!error) {
+            // 表存在但无该 key，保存当前值
             await supabase.from('app_settings').upsert({ key: 'anniversary_start_date', value: anniversaryStartDate });
         }
-    } catch (e) {
-        anniversaryStartDate = localStorage.getItem('anniversary_start_date') || '2020-06-15';
-    }
+        // 有任何 error 就保持 localStorage 值
+    } catch (e) { /* 静默 */ }
 }
 
 async function migrateMilestonesToSupabase() {
+    if (_milestonesSupabaseFailed) return;
     try {
         const rows = anniversaryMilestones.map(m => ({
             id: parseInt(m.id) || Date.now() + Math.floor(Math.random() * 1000),
@@ -2080,15 +2097,19 @@ async function migrateMilestonesToSupabase() {
             photo_id: m.photoId || null
         }));
         const { error } = await supabase.from('milestones').upsert(rows);
-        if (!error) {
-            localStorage.removeItem('anniversary_milestones');
-        }
+        if (error) { _milestonesSupabaseFailed = true; return; }
+        localStorage.removeItem('anniversary_milestones');
+        _milestonesSupabaseFailed = false;
     } catch (e) {
-        console.warn('迁移纪念日失败:', e);
+        _milestonesSupabaseFailed = true;
     }
 }
 
 async function saveMilestonesToSupabase() {
+    if (_milestonesSupabaseFailed) {
+        localStorage.setItem('anniversary_milestones', JSON.stringify(anniversaryMilestones));
+        return;
+    }
     try {
         const rows = anniversaryMilestones.map(m => ({
             id: parseInt(m.id) || Date.now(),
@@ -2097,24 +2118,32 @@ async function saveMilestonesToSupabase() {
             description: m.description || '',
             photo_id: m.photoId || null
         }));
-        await supabase.from('milestones').upsert(rows);
-        // 同步清理 localStorage（如果还存在旧数据）
+        const { error } = await supabase.from('milestones').upsert(rows);
+        if (error) {
+            _milestonesSupabaseFailed = true;
+            localStorage.setItem('anniversary_milestones', JSON.stringify(anniversaryMilestones));
+            return;
+        }
         localStorage.removeItem('anniversary_milestones');
     } catch (e) {
-        console.error('保存纪念日到 Supabase 失败:', e);
-        // 回退保存到 localStorage
+        _milestonesSupabaseFailed = true;
         localStorage.setItem('anniversary_milestones', JSON.stringify(anniversaryMilestones));
     }
 }
 
 async function saveStartDateToSupabase() {
-    try {
-        await supabase.from('app_settings').upsert({ key: 'anniversary_start_date', value: anniversaryStartDate });
-        localStorage.removeItem('anniversary_start_date');
-    } catch (e) {
-        console.error('保存开始日期失败:', e);
+    if (_milestonesSupabaseFailed) {
         localStorage.setItem('anniversary_start_date', anniversaryStartDate);
+        return;
     }
+    try {
+        const { error } = await supabase.from('app_settings').upsert({ key: 'anniversary_start_date', value: anniversaryStartDate });
+        if (!error) {
+            localStorage.removeItem('anniversary_start_date');
+            return;
+        }
+    } catch (e) { /* 静默 */ }
+    localStorage.setItem('anniversary_start_date', anniversaryStartDate);
 }
 
 function updateDaysCounter() {
@@ -2343,7 +2372,7 @@ window.onCollageCatLevelChange = function(level) {
 
     // 如果选中了某个分类，显示其子分类
     if (selectedValue) {
-        const children = categories.filter(c => c.parent_id === selectedValue);
+        const children = categories.filter(c => c.parent_id === Number(selectedValue));
         if (children.length > 0) {
             const nextLevel = level + 1;
             const nextSelect = document.createElement('select');
@@ -2377,22 +2406,23 @@ window.generateCollage = async function() {
     let collagePhotos;
     if (catId) {
         const categoryIds = getCategoryAndChildrenIds(catId);
-        const matchingIds = new Set();
-        Object.entries(photoCategories).forEach(([photoId, catIds]) => {
-            if (catIds.some(cid => categoryIds.includes(cid))) matchingIds.add(photoId);
-        });
-        // 从 Supabase 查询全量匹配照片（不依赖分页的 photos 数组）
-        if (matchingIds.size > 0) {
-            const { data } = await supabase
-                .from('photos')
-                .select('*')
-                .in('id', [...matchingIds])
-                .order('created_at', { ascending: false })
-                .limit(200);
-            collagePhotos = data || [];
-        } else {
-            collagePhotos = [];
+        // 直接查 photo_categories 表获取匹配的 photo_id，不依赖内存变量
+        const { data: pcData, error: pcError } = await supabase
+            .from('photo_categories')
+            .select('photo_id')
+            .in('category_id', categoryIds);
+        if (pcError || !pcData || pcData.length === 0) {
+            alert('所选分类下没有照片');
+            return;
         }
+        const matchingIds = [...new Set(pcData.map(r => r.photo_id))];
+        const { data } = await supabase
+            .from('photos')
+            .select('*')
+            .in('id', matchingIds)
+            .order('created_at', { ascending: false })
+            .limit(200);
+        collagePhotos = data || [];
     } else {
         // 未选分类：查全量照片（最多200张用于拼贴）
         const { data } = await supabase

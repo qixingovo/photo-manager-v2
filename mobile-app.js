@@ -51,6 +51,7 @@ const mobile = {
     // 纪念日时间线
     anniversaryMilestones: [],
     anniversaryStartDate: null,
+    _milestonesSupabaseFailed: false,
 
     // Supabase 配置（从外部配置文件读取）
     SUPABASE_URL: APP_CONFIG.SUPABASE_URL || '',
@@ -2949,12 +2950,18 @@ const mobile = {
     async loadMilestones() {
         const supabase = this.initSupabase();
         if (!supabase) {
-            const saved = localStorage.getItem('anniversary_milestones');
-            this.anniversaryMilestones = saved ? JSON.parse(saved) : this.getDefaultMilestones();
+            this.anniversaryMilestones = JSON.parse(localStorage.getItem('anniversary_milestones') || 'null') || this.getDefaultMilestones();
             this.anniversaryStartDate = localStorage.getItem('anniversary_start_date') || '2020-06-15';
             return;
         }
 
+        // 先确保有 localStorage 数据可回退
+        if (!localStorage.getItem('anniversary_milestones')) {
+            this.anniversaryMilestones = this.getDefaultMilestones();
+        }
+
+        let shouldMigrate = false;
+        let selectOk = false;
         try {
             const { data, error } = await supabase
                 .from('milestones')
@@ -2969,35 +2976,49 @@ const mobile = {
                     description: m.description || '',
                     photoId: m.photo_id || null
                 }));
-            } else {
+                selectOk = true;
+            } else if (!error) {
+                selectOk = true;
                 const saved = localStorage.getItem('anniversary_milestones');
-                this.anniversaryMilestones = saved ? JSON.parse(saved) : this.getDefaultMilestones();
-                await this.migrateMilestonesToSupabase();
+                if (saved) {
+                    this.anniversaryMilestones = JSON.parse(saved);
+                    shouldMigrate = true;
+                }
             }
-        } catch (e) {
-            console.warn('Supabase 加载纪念日失败:', e);
-            const saved = localStorage.getItem('anniversary_milestones');
-            this.anniversaryMilestones = saved ? JSON.parse(saved) : this.getDefaultMilestones();
+        } catch (e) { /* 静默 */ }
+
+        if (this.anniversaryMilestones.length === 0) {
+            this.anniversaryMilestones = JSON.parse(localStorage.getItem('anniversary_milestones') || 'null') || this.getDefaultMilestones();
         }
 
+        if (shouldMigrate) {
+            await this.migrateMilestonesToSupabase();
+        }
+        this._milestonesSupabaseFailed = !selectOk;
+
+        await this._loadStartDate();
+    },
+
+    async _loadStartDate() {
+        this.anniversaryStartDate = localStorage.getItem('anniversary_start_date') || '2020-06-15';
+        const supabase = this.initSupabase();
+        if (!supabase) return;
         try {
-            const { data } = await supabase
+            const { data, error } = await supabase
                 .from('app_settings')
                 .select('value')
                 .eq('key', 'anniversary_start_date')
                 .single();
-            if (data) {
+            if (!error && data) {
                 this.anniversaryStartDate = data.value;
-            } else {
-                this.anniversaryStartDate = localStorage.getItem('anniversary_start_date') || '2020-06-15';
+            } else if (!error) {
                 await supabase.from('app_settings').upsert({ key: 'anniversary_start_date', value: this.anniversaryStartDate });
             }
-        } catch (e) {
-            this.anniversaryStartDate = localStorage.getItem('anniversary_start_date') || '2020-06-15';
-        }
+        } catch (e) { /* 静默 */ }
     },
 
     async migrateMilestonesToSupabase() {
+        if (this._milestonesSupabaseFailed) return;
         const supabase = this.initSupabase();
         if (!supabase) return;
         try {
@@ -3009,11 +3030,19 @@ const mobile = {
                 photo_id: m.photoId || null
             }));
             const { error } = await supabase.from('milestones').upsert(rows);
-            if (!error) localStorage.removeItem('anniversary_milestones');
-        } catch (e) { console.warn('迁移纪念日失败:', e); }
+            if (error) { this._milestonesSupabaseFailed = true; return; }
+            localStorage.removeItem('anniversary_milestones');
+            this._milestonesSupabaseFailed = false;
+        } catch (e) {
+            this._milestonesSupabaseFailed = true;
+        }
     },
 
     async saveMilestonesToSupabase() {
+        if (this._milestonesSupabaseFailed) {
+            localStorage.setItem('anniversary_milestones', JSON.stringify(this.anniversaryMilestones));
+            return;
+        }
         const supabase = this.initSupabase();
         if (!supabase) {
             localStorage.setItem('anniversary_milestones', JSON.stringify(this.anniversaryMilestones));
@@ -3027,26 +3056,37 @@ const mobile = {
                 description: m.description || '',
                 photo_id: m.photoId || null
             }));
-            await supabase.from('milestones').upsert(rows);
+            const { error } = await supabase.from('milestones').upsert(rows);
+            if (error) {
+                this._milestonesSupabaseFailed = true;
+                localStorage.setItem('anniversary_milestones', JSON.stringify(this.anniversaryMilestones));
+                return;
+            }
             localStorage.removeItem('anniversary_milestones');
         } catch (e) {
-            console.error('保存纪念日失败:', e);
+            this._milestonesSupabaseFailed = true;
             localStorage.setItem('anniversary_milestones', JSON.stringify(this.anniversaryMilestones));
         }
     },
 
     async saveStartDateToSupabase() {
+        if (this._milestonesSupabaseFailed) {
+            localStorage.setItem('anniversary_start_date', this.anniversaryStartDate);
+            return;
+        }
         const supabase = this.initSupabase();
         if (!supabase) {
             localStorage.setItem('anniversary_start_date', this.anniversaryStartDate);
             return;
         }
         try {
-            await supabase.from('app_settings').upsert({ key: 'anniversary_start_date', value: this.anniversaryStartDate });
-            localStorage.removeItem('anniversary_start_date');
-        } catch (e) {
-            localStorage.setItem('anniversary_start_date', this.anniversaryStartDate);
-        }
+            const { error } = await supabase.from('app_settings').upsert({ key: 'anniversary_start_date', value: this.anniversaryStartDate });
+            if (!error) {
+                localStorage.removeItem('anniversary_start_date');
+                return;
+            }
+        } catch (e) { /* 静默 */ }
+        localStorage.setItem('anniversary_start_date', this.anniversaryStartDate);
     },
 
     async initTimeline() {
@@ -3274,7 +3314,7 @@ const mobile = {
         });
 
         if (selectedValue) {
-            const children = this.categories.filter(c => c.parent_id === selectedValue);
+            const children = this.categories.filter(c => c.parent_id === Number(selectedValue));
             if (children.length > 0) {
                 const nextLevel = level + 1;
                 const nextSelect = document.createElement('select');
@@ -3302,28 +3342,28 @@ const mobile = {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
 
+        const supabase = this.initSupabase();
         const catId = this.getMobileCollageSelectedCategoryId();
         let collagePhotos;
         if (catId) {
             const categoryIds = this.getCategoryAndChildrenIds(catId);
-            const matchingIds = new Set();
-            Object.entries(this.photoCategories).forEach(([photoId, catIds]) => {
-                if (catIds.some(cid => categoryIds.includes(cid))) matchingIds.add(photoId);
-            });
-            if (matchingIds.size > 0) {
-                const supabase = this.initSupabase();
-                const { data } = await supabase
-                    .from('photos')
-                    .select('*')
-                    .in('id', [...matchingIds])
-                    .order('created_at', { ascending: false })
-                    .limit(200);
-                collagePhotos = data || [];
-            } else {
-                collagePhotos = [];
+            const { data: pcData, error: pcError } = await supabase
+                .from('photo_categories')
+                .select('photo_id')
+                .in('category_id', categoryIds);
+            if (pcError || !pcData || pcData.length === 0) {
+                this.showToast('所选分类下没有照片');
+                return;
             }
+            const matchingIds = [...new Set(pcData.map(r => r.photo_id))];
+            const { data } = await supabase
+                .from('photos')
+                .select('*')
+                .in('id', matchingIds)
+                .order('created_at', { ascending: false })
+                .limit(200);
+            collagePhotos = data || [];
         } else {
-            const supabase = this.initSupabase();
             const { data } = await supabase
                 .from('photos')
                 .select('*')
