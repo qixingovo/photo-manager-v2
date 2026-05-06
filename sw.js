@@ -3,7 +3,7 @@
    缓存静态资源，支持离线访问
    ======================================== */
 
-const CACHE_NAME = 'photo-manager-v1';
+const CACHE_NAME = 'photo-manager-v2';
 
 // 需要预缓存的静态资源
 const STATIC_ASSETS = [
@@ -38,6 +38,10 @@ self.addEventListener('activate', (event) => {
         )
     );
     self.clients.claim();
+    // 通知所有页面刷新以使用新缓存
+    self.clients.matchAll().then(clients => {
+        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
+    });
 });
 
 // 请求拦截：区分静态资源与动态请求

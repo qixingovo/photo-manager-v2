@@ -20,15 +20,15 @@ CREATE TABLE IF NOT EXISTS app_settings (
 ALTER TABLE milestones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
 
--- 4. RLS 策略：允许已认证用户对所有操作放行
-CREATE POLICY "authenticated_all_milestones"
+-- 4. RLS 策略：允许所有角色操作（应用层自定义认证）
+CREATE POLICY "allow_all_milestones"
     ON milestones FOR ALL
-    TO authenticated
+    TO anon, authenticated
     USING (true)
     WITH CHECK (true);
 
-CREATE POLICY "authenticated_all_app_settings"
+CREATE POLICY "allow_all_app_settings"
     ON app_settings FOR ALL
-    TO authenticated
+    TO anon, authenticated
     USING (true)
     WITH CHECK (true);
