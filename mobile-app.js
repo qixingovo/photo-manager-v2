@@ -217,10 +217,10 @@ const mobile = {
         try {
             this.birthdayConfig = JSON.parse(localStorage.getItem('birthday_config') || 'null');
             if (!this.birthdayConfig) {
-                this.birthdayConfig = { month: 5, day: 15, name: '老大' };
+                this.birthdayConfig = { month: 6, day: 22, name: '老大' };
             }
         } catch (e) {
-            this.birthdayConfig = { month: 5, day: 15, name: '老大' };
+            this.birthdayConfig = { month: 6, day: 22, name: '老大' };
         }
     },
 
@@ -238,7 +238,7 @@ const mobile = {
 
     showBirthdayWelcomeOverlay() {
         this.loadBirthdayConfig();
-        const cfg = this.birthdayConfig || { month: 5, day: 15, name: '老大' };
+        const cfg = this.birthdayConfig || { month: 6, day: 22, name: '老大' };
         const monthOptions = [1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}" ${m === cfg.month ? 'selected' : ''}>${m}月</option>`).join('');
         const dayOptions = Array.from({length: 31}, (_, i) => i + 1).map(d => `<option value="${d}" ${d === cfg.day ? 'selected' : ''}>${d}日</option>`).join('');
 

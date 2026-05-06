@@ -24,11 +24,11 @@
             <p class="subtitle">回忆我们的从前</p>
             <form id="loginForm" onsubmit="window.handleLogin(event)">
                 <div class="form-group">
-                    <label>账号</label>
+                    <label for="loginUsername">账号</label>
                     <input type="text" id="loginUsername" required placeholder="请输入账号">
                 </div>
                 <div class="form-group">
-                    <label>密码</label>
+                    <label for="loginPassword">密码</label>
                     <input type="password" id="loginPassword" required placeholder="请输入密码">
                 </div>
                 <button type="submit" class="btn btn-primary btn-block">登录</button>
@@ -220,15 +220,15 @@
             <form id="editForm" class="edit-form">
                 <input type="hidden" id="editPhotoId">
                 <div class="form-group">
-                    <label>名称</label>
+                    <label for="editName">名称</label>
                     <input type="text" id="editName" required>
                 </div>
                 <div class="form-group">
-                    <label>描述</label>
+                    <label for="editDesc">描述</label>
                     <textarea id="editDesc" rows="3"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>地点名称</label>
+                    <label for="editLocationName">地点名称</label>
                     <input type="text" id="editLocationName">
                 </div>
                 <div class="form-row">
@@ -265,7 +265,7 @@
             <form id="editCategoryForm" onsubmit="window.saveCategoryName(event)">
                 <input type="hidden" id="editCategoryId">
                 <div class="form-group">
-                    <label>分类名称</label>
+                    <label for="editCategoryName">分类名称</label>
                     <input type="text" id="editCategoryName" required>
                 </div>
                 <div class="form-group">

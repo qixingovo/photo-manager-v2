@@ -120,20 +120,20 @@
             <div class="upload-form">
                 <!-- 级联分类选择器 -->
                 <div class="form-item">
-                    <label>分类</label>
+                    <span style="font-weight:500;font-size:14px;">分类</span>
                     <div id="mobileUploadCategoryCascade" class="cascade-container"></div>
                     <button class="btn-text" id="useLastCategoryBtn" style="display:none;" onclick="mobile.useLastUploadCategory()">📂 使用上次分类</button>
                 </div>
                 <div class="form-item">
-                    <label>名称前缀</label>
+                    <label for="mobilePhotoName">名称前缀</label>
                     <input type="text" id="mobilePhotoName" placeholder="可选，用于批量命名">
                 </div>
                 <div class="form-item">
-                    <label>描述</label>
+                    <label for="mobilePhotoDesc">描述</label>
                     <textarea id="mobilePhotoDesc" placeholder="optional" rows="2"></textarea>
                 </div>
                 <div class="form-item">
-                    <label>地点</label>
+                    <label for="mobilePhotoLocationName">地点</label>
                     <input type="text" id="mobilePhotoLocationName" placeholder="地点名称（如：北京故宫）">
                 </div>
                 <div class="form-item" style="display:flex;gap:8px;">
@@ -178,7 +178,7 @@
                     <input type="text" id="newCategoryName" placeholder="分类名称">
                 </div>
                 <div class="form-item">
-                    <label style="font-size:13px;color:#666;margin-bottom:6px;display:block;">父分类（可选）</label>
+                    <span style="font-size:13px;color:#666;margin-bottom:6px;display:block;">父分类（可选）</span>
                     <div id="parentCategoryCascade" class="cascade-container"></div>
                 </div>
                 <div class="modal-actions">
@@ -335,15 +335,15 @@
         <div class="modal-card">
             <h3>编辑照片</h3>
             <div class="form-item">
-                <label>名称</label>
+                <label for="editPhotoName">名称</label>
                 <input type="text" id="editPhotoName">
             </div>
             <div class="form-item">
-                <label>描述</label>
+                <label for="editPhotoDesc">描述</label>
                 <textarea id="editPhotoDesc" rows="3"></textarea>
             </div>
             <div class="form-item">
-                <label>地点名称</label>
+                <label for="editPhotoLocationName">地点名称</label>
                 <input type="text" id="editPhotoLocationName">
             </div>
             <div class="form-item" style="display:flex;gap:8px;">
