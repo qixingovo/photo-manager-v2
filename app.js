@@ -2239,10 +2239,63 @@ window.deleteMilestone = function(id) {
 // 照片拼贴墙
 // ========================================
 window.renderCollageCategorySelect = function() {
-    const select = document.getElementById('collageCategorySelect');
+    const container = document.getElementById('collageCategoryCascade');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const topLevel = categories.filter(c => !c.parent_id);
+    if (topLevel.length === 0) {
+        container.innerHTML = '<p style="color:#999;font-size:14px;">暂无分类</p>';
+        return;
+    }
+
+    const select = document.createElement('select');
+    select.id = 'collageCatLevel0';
+    select.className = 'category-select';
+    select.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:8px;';
+    select.onchange = () => window.onCollageCatLevelChange(0);
+    select.innerHTML = `<option value="">全部照片</option>${topLevel.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
+    container.appendChild(select);
+};
+
+window.onCollageCatLevelChange = function(level) {
+    const container = document.getElementById('collageCategoryCascade');
+    if (!container) return;
+    const select = document.getElementById(`collageCatLevel${level}`);
     if (!select) return;
-    select.innerHTML = '<option value="all">全部照片</option>' +
-        categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+    const selectedValue = select.value;
+
+    // 删除高于当前级别的选择器
+    const selects = container.querySelectorAll('select');
+    selects.forEach((s, i) => {
+        if (i > level) s.remove();
+    });
+
+    // 如果选中了某个分类，显示其子分类
+    if (selectedValue) {
+        const children = categories.filter(c => c.parent_id === selectedValue);
+        if (children.length > 0) {
+            const nextLevel = level + 1;
+            const nextSelect = document.createElement('select');
+            nextSelect.id = `collageCatLevel${nextLevel}`;
+            nextSelect.className = 'category-select';
+            nextSelect.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:8px;';
+            nextSelect.onchange = () => window.onCollageCatLevelChange(nextLevel);
+            nextSelect.innerHTML = `<option value="">选择子分类</option>${children.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
+            container.appendChild(nextSelect);
+        }
+    }
+};
+
+window.getCollageSelectedCategoryId = function() {
+    const container = document.getElementById('collageCategoryCascade');
+    if (!container) return null;
+    const selects = container.querySelectorAll('select');
+    for (let i = selects.length - 1; i >= 0; i--) {
+        if (selects[i].value) return selects[i].value;
+    }
+    return null;
 };
 
 window.generateCollage = async function() {
@@ -2250,10 +2303,10 @@ window.generateCollage = async function() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    // 获取按分类筛选的照片
-    const catId = document.getElementById('collageCategorySelect')?.value || 'all';
+    // 获取按分类筛选的照片（级联选择器：最深一级为所选分类）
+    const catId = window.getCollageSelectedCategoryId();
     let collagePhotos = photos;
-    if (catId !== 'all') {
+    if (catId) {
         const categoryIds = getCategoryAndChildrenIds(catId);
         const matchingIds = new Set();
         Object.entries(photoCategories).forEach(([photoId, catIds]) => {

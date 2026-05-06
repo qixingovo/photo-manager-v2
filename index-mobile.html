@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=3">
+    <link rel="stylesheet" href="mobile.css?v=4">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -239,12 +239,12 @@
                 <span>拼贴墙</span>
             </div>
         </header>
-        <div style="padding:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <select id="mobileCollageCategorySelect" style="flex:1;min-width:120px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;">
-                <option value="all">全部照片</option>
-            </select>
-            <button class="btn-primary" style="border-radius:8px;" onclick="mobile.generateCollage()">🎨 生成拼贴</button>
-            <button class="btn-secondary" style="border-radius:8px;" onclick="mobile.downloadCollage()">⬇️ 下载</button>
+        <div style="padding:12px;">
+            <div id="mobileCollageCategoryCascade" class="cascade-container" style="margin-bottom:8px;"></div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn-primary" style="flex:1;border-radius:8px;" onclick="mobile.generateCollage()">🎨 生成拼贴</button>
+                <button class="btn-secondary" style="flex:1;border-radius:8px;" onclick="mobile.downloadCollage()">⬇️ 下载</button>
+            </div>
         </div>
         <div style="padding:12px;display:flex;justify-content:center;">
             <canvas id="mobileCollageCanvas" width="360" height="360" style="max-width:100%;border-radius:12px;"></canvas>
@@ -448,7 +448,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=3"></script>
+    <script type="module" src="mobile-app.js?v=4"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
