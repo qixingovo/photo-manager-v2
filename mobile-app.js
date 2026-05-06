@@ -3480,55 +3480,44 @@ const mobile = {
         if (!container) return;
         container.innerHTML = '';
 
-        const topLevel = this.categories.filter(c => !c.parent_id);
-        if (topLevel.length === 0) {
+        if (this.categories.length === 0) {
             container.innerHTML = '<p style="color:#999;font-size:14px;">暂无分类</p>';
             return;
         }
 
+        function buildOptions(parentId, depth) {
+            const children = this.categories.filter(c => parentId === null ? !c.parent_id : String(c.parent_id) === String(parentId));
+            let html = '';
+            children.forEach(cat => {
+                const indent = '\u00A0\u00A0\u00A0\u00A0'.repeat(depth);
+                const hasChildren = this.categories.some(child => String(child.parent_id) === String(cat.id));
+                const suffix = hasChildren ? ' \uD83D\uDCC1' : '';
+                html += `<option value="${cat.id}">${indent}${cat.name}${suffix}</option>`;
+                html += buildOptions.call(this, cat.id, depth + 1);
+            });
+            return html;
+        }
+
         const select = document.createElement('select');
-        select.id = 'mobileCollageCatLevel0';
-        select.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:4px;';
-        select.onchange = () => this.onMobileCollageCatLevelChange(0);
-        select.innerHTML = `<option value="">全部照片</option>${topLevel.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
+        select.id = 'mobileCollageCatSelect';
+        select.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;';
+        select.innerHTML = `<option value="">全部照片</option>${buildOptions.call(this, null, 0)}`;
         container.appendChild(select);
+
+        const hint = document.createElement('p');
+        hint.style.cssText = 'font-size:12px;color:#888;margin:4px 0 0 0;';
+        hint.textContent = '\uD83D\uDCA1 选择任意分类将自动包含其所有子分类的照片';
+        container.appendChild(hint);
     },
 
-    onMobileCollageCatLevelChange(level) {
-        const container = document.getElementById('mobileCollageCategoryCascade');
-        if (!container) return;
-        const select = document.getElementById(`mobileCollageCatLevel${level}`);
-        if (!select) return;
-
-        const selectedValue = select.value;
-
-        const selects = container.querySelectorAll('select');
-        selects.forEach((s, i) => {
-            if (i > level) s.remove();
-        });
-
-        if (selectedValue) {
-            const children = this.categories.filter(c => c.parent_id === Number(selectedValue));
-            if (children.length > 0) {
-                const nextLevel = level + 1;
-                const nextSelect = document.createElement('select');
-                nextSelect.id = `mobileCollageCatLevel${nextLevel}`;
-                nextSelect.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:4px;';
-                nextSelect.onchange = () => this.onMobileCollageCatLevelChange(nextLevel);
-                nextSelect.innerHTML = `<option value="">选择子分类</option>${children.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
-                container.appendChild(nextSelect);
-            }
-        }
+    onMobileCollageCatLevelChange() {
+        // 已废弃，保留空函数防止旧引用报错
     },
 
     getMobileCollageSelectedCategoryId() {
-        const container = document.getElementById('mobileCollageCategoryCascade');
-        if (!container) return null;
-        const selects = container.querySelectorAll('select');
-        for (let i = selects.length - 1; i >= 0; i--) {
-            if (selects[i].value) return selects[i].value;
-        }
-        return null;
+        const select = document.getElementById('mobileCollageCatSelect');
+        if (!select) return null;
+        return select.value || null;
     },
 
     async generateCollage() {

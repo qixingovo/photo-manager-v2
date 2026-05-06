@@ -2599,59 +2599,46 @@ window.renderCollageCategorySelect = function() {
     if (!container) return;
     container.innerHTML = '';
 
-    const topLevel = categories.filter(c => !c.parent_id);
-    if (topLevel.length === 0) {
+    if (categories.length === 0) {
         container.innerHTML = '<p style="color:#999;font-size:14px;">暂无分类</p>';
         return;
     }
 
-    const select = document.createElement('select');
-    select.id = 'collageCatLevel0';
-    select.className = 'category-select';
-    select.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:8px;';
-    select.onchange = () => window.onCollageCatLevelChange(0);
-    select.innerHTML = `<option value="">全部照片</option>${topLevel.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
-    container.appendChild(select);
-};
-
-window.onCollageCatLevelChange = function(level) {
-    const container = document.getElementById('collageCategoryCascade');
-    if (!container) return;
-    const select = document.getElementById(`collageCatLevel${level}`);
-    if (!select) return;
-
-    const selectedValue = select.value;
-
-    // 删除高于当前级别的选择器
-    const selects = container.querySelectorAll('select');
-    selects.forEach((s, i) => {
-        if (i > level) s.remove();
-    });
-
-    // 如果选中了某个分类，显示其子分类
-    if (selectedValue) {
-        const children = categories.filter(c => c.parent_id === Number(selectedValue));
-        if (children.length > 0) {
-            const nextLevel = level + 1;
-            const nextSelect = document.createElement('select');
-            nextSelect.id = `collageCatLevel${nextLevel}`;
-            nextSelect.className = 'category-select';
-            nextSelect.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:8px;';
-            nextSelect.onchange = () => window.onCollageCatLevelChange(nextLevel);
-            nextSelect.innerHTML = `<option value="">选择子分类</option>${children.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
-            container.appendChild(nextSelect);
-        }
+    // 递归构建缩进选项（显示完整层级结构）
+    function buildOptions(parentId, depth) {
+        const children = categories.filter(c => parentId === null ? !c.parent_id : c.parent_id === Number(parentId));
+        let html = '';
+        children.forEach(cat => {
+            const indent = '\u00A0\u00A0\u00A0\u00A0'.repeat(depth);
+            const hasChildren = categories.some(child => child.parent_id === Number(cat.id));
+            const suffix = hasChildren ? ' \uD83D\uDCC1' : '';
+            html += `<option value="${cat.id}">${indent}${cat.name}${suffix}</option>`;
+            html += buildOptions(cat.id, depth + 1);
+        });
+        return html;
     }
+
+    const select = document.createElement('select');
+    select.id = 'collageCatSelect';
+    select.className = 'category-select';
+    select.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;';
+    select.innerHTML = `<option value="">全部照片</option>${buildOptions(null, 0)}`;
+    container.appendChild(select);
+
+    // 提示：选择任意分类将自动包含其所有子分类
+    const hint = document.createElement('p');
+    hint.style.cssText = 'font-size:12px;color:#888;margin:4px 0 0 0;';
+    hint.textContent = '\uD83D\uDCA1 选择任意分类将自动包含其所有子分类的照片';
+    container.appendChild(hint);
 };
+
+// onCollageCatLevelChange 已废弃，保留空函数防止旧引用报错
+window.onCollageCatLevelChange = function() {};
 
 window.getCollageSelectedCategoryId = function() {
-    const container = document.getElementById('collageCategoryCascade');
-    if (!container) return null;
-    const selects = container.querySelectorAll('select');
-    for (let i = selects.length - 1; i >= 0; i--) {
-        if (selects[i].value) return selects[i].value;
-    }
-    return null;
+    const select = document.getElementById('collageCatSelect');
+    if (!select) return null;
+    return select.value || null;
 };
 
 window.generateCollage = async function() {
