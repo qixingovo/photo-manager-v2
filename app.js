@@ -387,73 +387,69 @@ window.toggleSection = function(section) {
     const categorySection = document.getElementById('categorySection')
     const mapSection = document.getElementById('mapSection')
     const timelineSection = document.getElementById('timelineSection')
+    const collageSection = document.getElementById('collageSection')
+    const achievementsSection = document.getElementById('achievementsSection')
+
+    // 辅助：隐藏所有分区
+    const hideAll = () => {
+        uploadSection.style.display = 'none'
+        categorySection.style.display = 'none'
+        if (mapSection) mapSection.style.display = 'none'
+        if (timelineSection) timelineSection.style.display = 'none'
+        if (collageSection) collageSection.style.display = 'none'
+        if (achievementsSection) achievementsSection.style.display = 'none'
+    }
 
     if (section === 'upload') {
-        uploadSection.style.display = uploadSection.style.display === 'none' ? 'block' : 'none'
-        categorySection.style.display = 'none'
-        if (mapSection) mapSection.style.display = 'none'
-        if (timelineSection) timelineSection.style.display = 'none'
+        if (uploadSection.style.display === 'none' || !uploadSection.style.display) {
+            hideAll()
+            uploadSection.style.display = 'block'
+        } else {
+            uploadSection.style.display = 'none'
+        }
     } else if (section === 'category') {
-        categorySection.style.display = categorySection.style.display === 'none' ? 'block' : 'none'
-        uploadSection.style.display = 'none'
-        if (mapSection) mapSection.style.display = 'none'
-        if (timelineSection) timelineSection.style.display = 'none'
-        if (categorySection.style.display === 'block') {
+        if (categorySection.style.display === 'none' || !categorySection.style.display) {
+            hideAll()
+            categorySection.style.display = 'block'
             renderParentCategorySelect()
+        } else {
+            categorySection.style.display = 'none'
         }
     } else if (section === 'map') {
-        uploadSection.style.display = 'none'
-        categorySection.style.display = 'none'
-        if (timelineSection) timelineSection.style.display = 'none'
-        if (mapSection) {
-            if (mapSection.style.display === 'none' || !mapSection.style.display) {
-                mapSection.style.display = 'block'
-                initMapView()
-            } else {
-                mapSection.style.display = 'none'
-            }
+        if (!mapSection) return
+        if (mapSection.style.display === 'none' || !mapSection.style.display) {
+            hideAll()
+            mapSection.style.display = 'block'
+            initMapView()
+        } else {
+            mapSection.style.display = 'none'
         }
     } else if (section === 'timeline') {
-        uploadSection.style.display = 'none'
-        categorySection.style.display = 'none'
-        if (mapSection) mapSection.style.display = 'none'
-        if (timelineSection) {
-            if (timelineSection.style.display === 'none' || !timelineSection.style.display) {
-                timelineSection.style.display = 'block'
-                initTimeline()
-            } else {
-                timelineSection.style.display = 'none'
-            }
+        if (!timelineSection) return
+        if (timelineSection.style.display === 'none' || !timelineSection.style.display) {
+            hideAll()
+            timelineSection.style.display = 'block'
+            initTimeline()
+        } else {
+            timelineSection.style.display = 'none'
         }
     } else if (section === 'collage') {
-        const collageSection = document.getElementById('collageSection')
-        uploadSection.style.display = 'none'
-        categorySection.style.display = 'none'
-        if (mapSection) mapSection.style.display = 'none'
-        if (timelineSection) timelineSection.style.display = 'none'
-        if (collageSection) {
-            if (collageSection.style.display === 'none' || !collageSection.style.display) {
-                collageSection.style.display = 'block'
-                renderCollageCategorySelect()
-            } else {
-                collageSection.style.display = 'none'
-            }
+        if (!collageSection) return
+        if (collageSection.style.display === 'none' || !collageSection.style.display) {
+            hideAll()
+            collageSection.style.display = 'block'
+            renderCollageCategorySelect()
+        } else {
+            collageSection.style.display = 'none'
         }
     } else if (section === 'achievements') {
-        const achievementsSection = document.getElementById('achievementsSection')
-        uploadSection.style.display = 'none'
-        categorySection.style.display = 'none'
-        if (mapSection) mapSection.style.display = 'none'
-        if (timelineSection) timelineSection.style.display = 'none'
-        const collageSection = document.getElementById('collageSection')
-        if (collageSection) collageSection.style.display = 'none'
-        if (achievementsSection) {
-            if (achievementsSection.style.display === 'none' || !achievementsSection.style.display) {
-                achievementsSection.style.display = 'block'
-                loadAchievements()
-            } else {
-                achievementsSection.style.display = 'none'
-            }
+        if (!achievementsSection) return
+        if (achievementsSection.style.display === 'none' || !achievementsSection.style.display) {
+            hideAll()
+            achievementsSection.style.display = 'block'
+            loadAchievements()
+        } else {
+            achievementsSection.style.display = 'none'
         }
     }
 }
