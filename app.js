@@ -2595,41 +2595,50 @@ window.deleteMilestone = function(id) {
 // 照片拼贴墙
 // ========================================
 window.renderCollageCategorySelect = function() {
-    const container = document.getElementById('collageCategoryCascade');
-    if (!container) return;
-    container.innerHTML = '';
+    try {
+        const container = document.getElementById('collageCategoryCascade');
+        if (!container) return;
+        container.innerHTML = '';
 
-    if (categories.length === 0) {
-        container.innerHTML = '<p style="color:#999;font-size:14px;">暂无分类</p>';
-        return;
+        const cats = categories || [];
+        if (cats.length === 0) {
+            container.innerHTML = '<p style="color:#999;font-size:14px;">暂无分类</p>';
+            return;
+        }
+
+        // 递归构建缩进选项
+        var optionsHtml = '';
+        function walk(parentId, depth) {
+            var children = cats.filter(function(c) {
+                if (parentId === null || parentId === undefined) return !c.parent_id;
+                return String(c.parent_id) === String(parentId);
+            });
+            children.forEach(function(cat) {
+                var indent = '';
+                for (var i = 0; i < depth; i++) indent += '\u00A0\u00A0\u00A0\u00A0';
+                var hasChildren = cats.some(function(child) {
+                    return String(child.parent_id) === String(cat.id);
+                });
+                optionsHtml += '<option value="' + cat.id + '">' + indent + escapeHtml(cat.name) + (hasChildren ? ' \uD83D\uDCC1' : '') + '</option>';
+                walk(cat.id, depth + 1);
+            });
+        }
+        walk(null, 0);
+
+        var select = document.createElement('select');
+        select.id = 'collageCatSelect';
+        select.className = 'category-select';
+        select.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;';
+        select.innerHTML = '<option value="">\u5168\u90E8\u7167\u7247</option>' + optionsHtml;
+        container.appendChild(select);
+
+        var hint = document.createElement('p');
+        hint.style.cssText = 'font-size:12px;color:#888;margin:4px 0 0 0;';
+        hint.textContent = '\uD83D\uDCA1 \u9009\u62E9\u4EFB\u610F\u5206\u7C7B\u5C06\u81EA\u52A8\u5305\u542B\u5176\u6240\u6709\u5B50\u5206\u7C7B\u7684\u7167\u7247';
+        container.appendChild(hint);
+    } catch (e) {
+        console.error('渲染拼贴墙分类选择器失败:', e);
     }
-
-    // 递归构建缩进选项（显示完整层级结构）
-    function buildOptions(parentId, depth) {
-        const children = categories.filter(c => parentId === null ? !c.parent_id : c.parent_id === Number(parentId));
-        let html = '';
-        children.forEach(cat => {
-            const indent = '\u00A0\u00A0\u00A0\u00A0'.repeat(depth);
-            const hasChildren = categories.some(child => child.parent_id === Number(cat.id));
-            const suffix = hasChildren ? ' \uD83D\uDCC1' : '';
-            html += `<option value="${cat.id}">${indent}${cat.name}${suffix}</option>`;
-            html += buildOptions(cat.id, depth + 1);
-        });
-        return html;
-    }
-
-    const select = document.createElement('select');
-    select.id = 'collageCatSelect';
-    select.className = 'category-select';
-    select.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;';
-    select.innerHTML = `<option value="">全部照片</option>${buildOptions(null, 0)}`;
-    container.appendChild(select);
-
-    // 提示：选择任意分类将自动包含其所有子分类
-    const hint = document.createElement('p');
-    hint.style.cssText = 'font-size:12px;color:#888;margin:4px 0 0 0;';
-    hint.textContent = '\uD83D\uDCA1 选择任意分类将自动包含其所有子分类的照片';
-    container.appendChild(hint);
 };
 
 // onCollageCatLevelChange 已废弃，保留空函数防止旧引用报错
