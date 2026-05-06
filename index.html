@@ -12,6 +12,7 @@
     }
     </script>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="config.js"></script>
 </head>
@@ -54,6 +55,16 @@
                 <span class="nav-text">分类管理</span>
             </div>
             <div class="nav-divider"></div>
+            <div class="nav-section" onclick="window.toggleSection('map')">
+                <span class="nav-icon">🗺️</span>
+                <span class="nav-text">我们的地图</span>
+            </div>
+            <div class="nav-divider"></div>
+            <div class="nav-section" onclick="window.toggleSection('timeline')">
+                <span class="nav-icon">💝</span>
+                <span class="nav-text">纪念日</span>
+            </div>
+            <div class="nav-divider"></div>
             <div class="nav-section" onclick="window.refreshData()">
                 <span class="nav-icon">🔄</span>
                 <span class="nav-text">刷新</span>
@@ -87,6 +98,12 @@
                 </div>
                 <!-- 级联分类选择器 -->
                 <div id="uploadCategoryCascade" class="cascade-select"></div>
+                <div class="form-row" style="margin-top:8px;">
+                    <input type="text" id="photoLocationName" placeholder="📍 地点名称（如：北京故宫）" style="flex:1;">
+                    <input type="number" id="photoLatitude" placeholder="纬度" step="any" style="width:120px;">
+                    <input type="number" id="photoLongitude" placeholder="经度" step="any" style="width:120px;">
+                    <button type="button" class="btn btn-secondary" onclick="window.pickLocationOnMap()" style="white-space:nowrap;">📍 地图选点</button>
+                </div>
                 <button type="submit" class="btn btn-primary">上传</button>
                 <div id="uploadProgress" class="upload-progress" style="display:none;">
                     <div class="progress-bar">
@@ -106,6 +123,34 @@
                 <button onclick="window.createCategory()" class="btn btn-secondary">添加分类</button>
             </div>
             <div id="categoryList" class="category-list"></div>
+        </section>
+
+        <!-- 我们的地图 -->
+        <section class="map-section" id="mapSection" style="display:none;">
+            <h2>🗺️ 我们的地图</h2>
+            <div id="mapContainer" style="height:500px;border-radius:12px;overflow:hidden;margin-bottom:12px;"></div>
+            <div id="mapPhotoGrid" class="photo-grid" style="display:flex;flex-wrap:wrap;gap:12px;margin-top:16px;"></div>
+            <div id="mapEmpty" style="display:none;text-align:center;padding:40px;color:#999;">
+                <p>还没有带位置的照片</p>
+                <small>上传照片时添加位置信息即可在地图上看到</small>
+            </div>
+        </section>
+
+        <!-- 纪念日时间线 -->
+        <section class="timeline-section" id="timelineSection" style="display:none;">
+            <h2>💝 纪念日时间线</h2>
+            <div id="daysCounter" style="text-align:center;padding:20px;background:linear-gradient(135deg,#ff9a9e 0%,#fad0c4 100%);border-radius:12px;color:white;margin-bottom:20px;">
+                <div style="font-size:2.5rem;font-weight:bold;" id="daysCount">0</div>
+                <div style="font-size:1rem;opacity:0.9;">我们在一起</div>
+                <div style="margin-top:12px;">
+                    <input type="date" id="startDateInput" onchange="window.updateStartDate()"
+                           style="padding:6px 12px;border:none;border-radius:8px;font-size:14px;">
+                </div>
+            </div>
+            <div id="timelineContainer" class="timeline-container"></div>
+            <div style="text-align:center;margin-top:16px;">
+                <button class="btn btn-primary" onclick="window.openAddMilestoneModal()">+ 添加纪念日</button>
+            </div>
         </section>
 
         <button onclick="window.handleLogout()" class="btn btn-secondary" style="position:fixed;top:20px;right:20px;z-index:100;">退出登录</button>
@@ -182,6 +227,14 @@
                     <label>描述</label>
                     <textarea id="editDesc" rows="3"></textarea>
                 </div>
+                <div class="form-group">
+                    <label>地点名称</label>
+                    <input type="text" id="editLocationName">
+                </div>
+                <div class="form-row">
+                    <input type="number" id="editLatitude" placeholder="纬度" step="any" style="flex:1;">
+                    <input type="number" id="editLongitude" placeholder="经度" step="any" style="flex:1;">
+                </div>
                 <button type="submit" class="btn btn-primary">保存</button>
             </form>
         </div>
@@ -243,6 +296,7 @@
         </div>
     </div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="app.js"></script>
 </body>
 </html>

@@ -972,3 +972,111 @@ input[type="file"] {
     font-size: 14px;
     color: #666;
 }
+
+/* ========================================
+   地图
+   ======================================== */
+.leaflet-popup-content {
+    margin: 8px;
+    min-width: 180px;
+}
+
+.leaflet-popup-content img {
+    border-radius: 8px;
+}
+
+/* ========================================
+   纪念日时间线
+   ======================================== */
+.timeline-container {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline-container::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, #ff9a9e, #fad0c4);
+    transform: translateX(-50%);
+}
+
+.timeline-item {
+    position: relative;
+    width: 50%;
+    padding: 20px 40px;
+    box-sizing: border-box;
+}
+
+.timeline-left {
+    left: 0;
+    text-align: right;
+}
+
+.timeline-right {
+    left: 50%;
+    text-align: left;
+}
+
+.timeline-dot {
+    position: absolute;
+    top: 30px;
+    width: 16px;
+    height: 16px;
+    background: #ff6b6b;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px #ff9a9e;
+    z-index: 1;
+}
+
+.timeline-left .timeline-dot {
+    right: -8px;
+}
+
+.timeline-right .timeline-dot {
+    left: -8px;
+}
+
+.timeline-content {
+    background: white;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.timeline-date {
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 4px;
+}
+
+.timeline-content h3 {
+    font-size: 15px;
+    margin-bottom: 6px;
+}
+
+.timeline-content p {
+    font-size: 13px;
+    color: #666;
+}
+
+/* 时间线响应式：移动端单列 */
+@media (max-width: 600px) {
+    .timeline-container::before {
+        left: 20px;
+    }
+    .timeline-item {
+        width: 100%;
+        left: 0 !important;
+        text-align: left !important;
+        padding: 20px 20px 20px 50px;
+    }
+    .timeline-left .timeline-dot,
+    .timeline-right .timeline-dot {
+        left: 12px;
+    }
+}

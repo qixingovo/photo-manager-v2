@@ -1622,3 +1622,68 @@ input:checked + .slider:before {
 .delete-option-btn:hover {
     border-color: var(--primary);
 }
+
+/* ========================================
+   移动端时间线
+   ======================================== */
+#mobileTimelineContainer {
+    position: relative;
+    padding-left: 32px;
+}
+
+#mobileTimelineContainer::before {
+    content: '';
+    position: absolute;
+    left: 16px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, #ff9a9e, #fad0c4);
+}
+
+.timeline-mobile-item {
+    position: relative;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background: var(--card, #fff);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.timeline-mobile-item::before {
+    content: '';
+    position: absolute;
+    left: -24px;
+    top: 20px;
+    width: 12px;
+    height: 12px;
+    background: #ff6b6b;
+    border-radius: 50%;
+    border: 2px solid #fff;
+}
+
+.timeline-mobile-date {
+    font-size: 12px;
+    color: #999;
+}
+
+.timeline-mobile-item h3 {
+    font-size: 15px;
+    margin: 4px 0;
+}
+
+.timeline-mobile-item p {
+    font-size: 13px;
+    color: #666;
+    margin: 4px 0;
+}
+
+/* 移动端地图 */
+#mapPage .leaflet-popup-content {
+    margin: 6px;
+    min-width: 150px;
+}
+
+#mapPage .leaflet-popup-content img {
+    border-radius: 8px;
+}

@@ -8,6 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="mobile.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="config.js"></script>
 </head>
@@ -131,6 +132,15 @@
                     <label>描述</label>
                     <textarea id="mobilePhotoDesc" placeholder="optional" rows="2"></textarea>
                 </div>
+                <div class="form-item">
+                    <label>地点</label>
+                    <input type="text" id="mobilePhotoLocationName" placeholder="地点名称（如：北京故宫）">
+                </div>
+                <div class="form-item" style="display:flex;gap:8px;">
+                    <input type="number" id="mobilePhotoLatitude" placeholder="纬度" step="any" style="flex:1;">
+                    <input type="number" id="mobilePhotoLongitude" placeholder="经度" step="any" style="flex:1;">
+                    <button type="button" class="btn-secondary" onclick="mobile.pickLocationOnMap()" style="white-space:nowrap;">📍 选点</button>
+                </div>
 
                 <!-- 上传进度 -->
                 <div id="uploadProgress" class="progress-section" style="display:none;">
@@ -184,6 +194,40 @@
         </div>
     </div>
 
+    <!-- ========== 地图页面 ========== -->
+    <div id="mapPage" class="page">
+        <header class="top-bar">
+            <div class="logo">
+                <span>🗺️</span>
+                <span>我们的地图</span>
+            </div>
+        </header>
+        <div id="mobileMapContainer" style="flex:1;width:100%;min-height:400px;"></div>
+        <div id="mobileMapPhotos" style="padding:12px;display:flex;flex-wrap:wrap;gap:8px;overflow-y:auto;max-height:150px;"></div>
+    </div>
+
+    <!-- ========== 纪念日时间线页面 ========== -->
+    <div id="timelinePage" class="page">
+        <header class="top-bar">
+            <div class="logo">
+                <span>💝</span>
+                <span>纪念日</span>
+            </div>
+        </header>
+        <div id="mobileDaysCounter" style="text-align:center;padding:16px;background:linear-gradient(135deg,#ff9a9e 0%,#fad0c4 100%);color:white;">
+            <div style="font-size:2rem;font-weight:bold;" id="mobileDaysCount">0</div>
+            <div style="font-size:0.9rem;opacity:0.9;">我们在一起</div>
+            <div style="margin-top:8px;">
+                <input type="date" id="mobileStartDateInput" onchange="mobile.updateStartDate()"
+                       style="padding:6px 12px;border:none;border-radius:8px;font-size:13px;">
+            </div>
+        </div>
+        <div id="mobileTimelineContainer" style="flex:1;overflow-y:auto;padding:16px;"></div>
+        <button class="btn-primary" style="margin:12px;border-radius:25px;" onclick="mobile.openAddMilestoneModal()">
+            + 添加纪念日
+        </button>
+    </div>
+
     <!-- ========== 我的页面 ========== -->
     <div id="profilePage" class="page">
         <header class="top-bar">
@@ -210,6 +254,16 @@
             <div class="menu-item" onclick="mobile.showMarkedCategories()">
                 <span class="menu-icon">⭐</span>
                 <span class="menu-text">已标记分类</span>
+                <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item" onclick="mobile.switchTab('map')">
+                <span class="menu-icon">🗺️</span>
+                <span class="menu-text">我们的地图</span>
+                <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item" onclick="mobile.switchTab('timeline')">
+                <span class="menu-icon">💝</span>
+                <span class="menu-text">纪念日时间线</span>
                 <span class="menu-arrow">›</span>
             </div>
             <div class="menu-item" onclick="mobile.showSettings()">
@@ -288,6 +342,14 @@
                 <label>描述</label>
                 <textarea id="editPhotoDesc" rows="3"></textarea>
             </div>
+            <div class="form-item">
+                <label>地点名称</label>
+                <input type="text" id="editPhotoLocationName">
+            </div>
+            <div class="form-item" style="display:flex;gap:8px;">
+                <input type="number" id="editPhotoLatitude" placeholder="纬度" step="any" style="flex:1;">
+                <input type="number" id="editPhotoLongitude" placeholder="经度" step="any" style="flex:1;">
+            </div>
             <div class="modal-actions">
                 <button class="btn-secondary" onclick="mobile.closeEditModal()">取消</button>
                 <button class="btn-primary" onclick="mobile.saveEdit()">保存</button>
@@ -340,6 +402,7 @@
     <!-- Toast 提示 -->
     <div id="toast" class="toast"></div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="mobile-app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {

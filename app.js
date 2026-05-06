@@ -17,6 +17,18 @@ const PHOTOS_PER_PAGE = 20
 let currentPage = 1
 let totalPhotos = 0
 
+// 生日彩蛋状态
+let birthdayConfig = null
+
+// 地图状态
+let mapView = null
+let mapMarkers = []
+let mapPhotos = []
+
+// 纪念日时间线状态
+let anniversaryMilestones = []
+let anniversaryStartDate = null
+
 // Supabase 配置（从外部配置文件读取）
 const APP_CONFIG = window.__APP_CONFIG__ || {}
 const SUPABASE_URL = APP_CONFIG.SUPABASE_URL || ''
@@ -67,6 +79,29 @@ window.addEventListener('DOMContentLoaded', () => {
 function isLaodaFromSession(session) {
     const role = session?.role;
     return role === 'laoda';
+}
+
+function loadBirthdayConfig() {
+    try {
+        birthdayConfig = JSON.parse(localStorage.getItem('birthday_config') || 'null');
+        if (!birthdayConfig) {
+            birthdayConfig = { month: 5, day: 15, name: '老大' };
+        }
+    } catch (e) {
+        birthdayConfig = { month: 5, day: 15, name: '老大' };
+    }
+}
+
+function isBirthdayToday() {
+    loadBirthdayConfig();
+    if (!birthdayConfig) return false;
+    const today = new Date();
+    return today.getMonth() + 1 === birthdayConfig.month && today.getDate() === birthdayConfig.day;
+}
+
+function saveBirthdayConfig(config) {
+    birthdayConfig = config;
+    localStorage.setItem('birthday_config', JSON.stringify(config));
 }
 
 // 检查登录状态
@@ -125,8 +160,8 @@ window.handleLogin = async function(e) {
     }
     saveSession(session)
     errorEl.textContent = ''
-    // 如果是老大，显示生日快乐欢迎界面
-    if (isLaodaFromSession(session)) {
+    // 如果是老大且今天是生日，显示生日快乐欢迎界面
+    if (isLaodaFromSession(session) && isBirthdayToday()) {
         showBirthdayWelcome()
     } else {
         showMainApp()
@@ -151,18 +186,24 @@ function showBirthdayWelcome() {
         animation: fadeIn 0.5s ease;
     `
     
+    loadBirthdayConfig();
+    const cfg = birthdayConfig || { month: 5, day: 15, name: '老大' };
+    const monthOptions = [1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}" ${m === cfg.month ? 'selected' : ''}>${m}月</option>`).join('');
+    const dayOptions = Array.from({length: 31}, (_, i) => i + 1).map(d => `<option value="${d}" ${d === cfg.day ? 'selected' : ''}>${d}日</option>`).join('');
+
     overlay.innerHTML = `
-        <div style="text-align:center;color:white;animation: scaleIn 0.8s ease;position:relative;">
+        <canvas id="petalsCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9998;"></canvas>
+        <div style="text-align:center;color:white;animation: scaleIn 0.8s ease;position:relative;z-index:9999;">
             <div style="font-size:80px;margin-bottom:20px;">🎂</div>
             <h1 style="font-size:2rem;margin-bottom:20px;text-shadow:2px 2px 4px rgba(0,0,0,0.3);">生日快乐！</h1>
-            
+
             <!-- 箭头提示区域 - 放在老大左侧 -->
             <div id="arrowHint" style="position:absolute;top:50%;left:-80px;transform:translateY(-100%);cursor:pointer;animation: arrowPoint 1s infinite;" onclick="hideLaoda()">
                 <div style="font-size:3rem;text-shadow:2px 2px 4px rgba(0,0,0,0.3);">➜</div>
             </div>
-            
+
             <h2 id="laodaText" onclick="hideLaoda()" style="font-size:6rem;margin-bottom:10px;font-weight:bold;cursor:pointer;text-shadow:4px 4px 8px rgba(0,0,0,0.3);transition: all 0.3s;display:inline-block;"
-                onmouseover="this.style.transform='scale(1.1)'" 
+                onmouseover="this.style.transform='scale(1.1)'"
                 onmouseout="this.style.transform='scale(1)'">
                 老大 🎉
             </h2>
@@ -182,6 +223,15 @@ function showBirthdayWelcome() {
             " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                 进入系统 🎈
             </button>
+            <p style="margin-top:20px;font-size:0.9rem;opacity:0.7;">
+                生日日期:
+                <select id="birthdayMonth" onchange="window.updateBirthdayConfig()" style="padding:4px 8px;border:none;border-radius:6px;font-size:13px;">${monthOptions}</select>
+                <select id="birthdayDay" onchange="window.updateBirthdayConfig()" style="padding:4px 8px;border:none;border-radius:6px;font-size:13px;">${dayOptions}</select>
+            </p>
+            <button id="musicToggle" onclick="window.toggleBirthdayMusic(event)" style="
+                margin-top:12px;background:rgba(255,255,255,0.2);border:2px solid white;color:white;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;">
+                🔇
+            </button>
         </div>
         <style>
             @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -192,9 +242,99 @@ function showBirthdayWelcome() {
             @keyframes arrowFade { to { opacity: 0; transform: translateY(-100%) scale(0.5); } }
         </style>
     `
-    
+
     document.body.appendChild(overlay)
+    startPetalAnimation()
 }
+
+function startPetalAnimation() {
+    const canvas = document.getElementById('petalsCanvas');
+    if (!canvas) return;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const ctx = canvas.getContext('2d');
+    const petals = [];
+    const colors = ['#ff6b6b', '#ffa502', '#ff6348', '#ff4757', '#ff9ff3', '#feca57', '#ff6b81', '#eccc68'];
+
+    for (let i = 0; i < 40; i++) {
+        petals.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height - canvas.height,
+            size: 8 + Math.random() * 16,
+            speed: 1 + Math.random() * 2,
+            wobble: Math.random() * 2 - 1,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            rotation: Math.random() * Math.PI * 2,
+            rotSpeed: (Math.random() - 0.5) * 0.05
+        });
+    }
+
+    function drawPetal(p) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.size, p.size * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        petals.forEach(p => {
+            p.y += p.speed;
+            p.x += Math.sin(p.y * 0.02) * p.wobble;
+            p.rotation += p.rotSpeed;
+            if (p.y > canvas.height + 20) {
+                p.y = -20;
+                p.x = Math.random() * canvas.width;
+            }
+            drawPetal(p);
+        });
+        window.__petalAnimId = requestAnimationFrame(animate);
+    }
+    animate();
+}
+
+function stopPetalAnimation() {
+    if (window.__petalAnimId) {
+        cancelAnimationFrame(window.__petalAnimId);
+        window.__petalAnimId = null;
+    }
+    const canvas = document.getElementById('petalsCanvas');
+    if (canvas) canvas.remove();
+}
+
+window.updateBirthdayConfig = function() {
+    const monthEl = document.getElementById('birthdayMonth');
+    const dayEl = document.getElementById('birthdayDay');
+    if (!monthEl || !dayEl) return;
+    const month = parseInt(monthEl.value);
+    const day = parseInt(dayEl.value);
+    saveBirthdayConfig({ month, day, name: birthdayConfig?.name || '老大' });
+};
+
+window.toggleBirthdayMusic = function(e) {
+    e.stopPropagation();
+    let audio = document.getElementById('birthdayMusic');
+    const btn = document.getElementById('musicToggle');
+    if (!audio) {
+        audio = document.createElement('audio');
+        audio.id = 'birthdayMusic';
+        audio.loop = true;
+        audio.style.display = 'none';
+        audio.innerHTML = '<source src="assets/birthday-bgm.mp3" type="audio/mpeg">';
+        document.body.appendChild(audio);
+    }
+    if (audio.paused) {
+        audio.play().catch(() => {});
+        if (btn) btn.textContent = '🔊';
+    } else {
+        audio.pause();
+        if (btn) btn.textContent = '🔇';
+    }
+};
 
 window.hideLaoda = function() {
     const laodaText = document.getElementById('laodaText')
@@ -220,6 +360,7 @@ window.hideLaoda = function() {
 }
 
 window.enterMainApp = function() {
+    stopPetalAnimation();
     const overlay = document.getElementById('birthdayOverlay')
     if (overlay) {
         overlay.style.animation = 'fadeOut 0.8s ease forwards'
@@ -242,19 +383,47 @@ window.handleLogout = function() {
 }
 
 window.toggleSection = function(section) {
+    const uploadSection = document.getElementById('uploadSection')
+    const categorySection = document.getElementById('categorySection')
+    const mapSection = document.getElementById('mapSection')
+    const timelineSection = document.getElementById('timelineSection')
+
     if (section === 'upload') {
-        const uploadSection = document.getElementById('uploadSection')
-        const categorySection = document.getElementById('categorySection')
         uploadSection.style.display = uploadSection.style.display === 'none' ? 'block' : 'none'
         categorySection.style.display = 'none'
+        if (mapSection) mapSection.style.display = 'none'
+        if (timelineSection) timelineSection.style.display = 'none'
     } else if (section === 'category') {
-        const uploadSection = document.getElementById('uploadSection')
-        const categorySection = document.getElementById('categorySection')
         categorySection.style.display = categorySection.style.display === 'none' ? 'block' : 'none'
         uploadSection.style.display = 'none'
-        // 显示分类管理时，重新渲染父分类选择器
+        if (mapSection) mapSection.style.display = 'none'
+        if (timelineSection) timelineSection.style.display = 'none'
         if (categorySection.style.display === 'block') {
             renderParentCategorySelect()
+        }
+    } else if (section === 'map') {
+        uploadSection.style.display = 'none'
+        categorySection.style.display = 'none'
+        if (timelineSection) timelineSection.style.display = 'none'
+        if (mapSection) {
+            if (mapSection.style.display === 'none' || !mapSection.style.display) {
+                mapSection.style.display = 'block'
+                initMapView()
+            } else {
+                mapSection.style.display = 'none'
+            }
+        }
+    } else if (section === 'timeline') {
+        uploadSection.style.display = 'none'
+        categorySection.style.display = 'none'
+        if (mapSection) mapSection.style.display = 'none'
+        if (timelineSection) {
+            if (timelineSection.style.display === 'none' || !timelineSection.style.display) {
+                timelineSection.style.display = 'block'
+                initTimeline()
+            } else {
+                timelineSection.style.display = 'none'
+            }
         }
     }
 }
@@ -1365,6 +1534,9 @@ async function handleUpload(e) {
     const namePrefix = document.getElementById('photoName').value.trim()
     const description = document.getElementById('photoDesc').value.trim()
     const categoryId = window.getSelectedUploadCategoryId()
+    const locationName = (document.getElementById('photoLocationName')?.value || '').trim() || null
+    const latitude = parseFloat(document.getElementById('photoLatitude')?.value) || null
+    const longitude = parseFloat(document.getElementById('photoLongitude')?.value) || null
     
     const progressContainer = document.getElementById('uploadProgress')
     const progressFill = document.getElementById('progressFill')
@@ -1409,7 +1581,10 @@ async function handleUpload(e) {
                     storage_path: uniqueName,
                     original_name: file.name,
                     size: fileToUpload.size,
-                    is_favorite: false
+                    is_favorite: false,
+                    latitude,
+                    longitude,
+                    location_name: locationName
                 }])
                 .select()
                 .single()
@@ -1442,6 +1617,12 @@ async function handleUpload(e) {
     fileInput.value = ''
     document.getElementById('photoName').value = ''
     document.getElementById('photoDesc').value = ''
+    const locNameEl = document.getElementById('photoLocationName')
+    const latEl = document.getElementById('photoLatitude')
+    const lngEl = document.getElementById('photoLongitude')
+    if (locNameEl) locNameEl.value = ''
+    if (latEl) latEl.value = ''
+    if (lngEl) lngEl.value = ''
     renderUploadCategoryCascade()
     
     await loadPhotos()
@@ -1501,6 +1682,381 @@ async function compressImage(file, maxSizeMB) {
         img.src = URL.createObjectURL(file)
     })
 }
+
+// ========== 地图功能 ==========
+
+async function initMapView() {
+    const container = document.getElementById('mapContainer');
+    if (!container || mapView) return;
+
+    mapView = L.map('mapContainer').setView([35.86, 104.19], 4);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 18
+    }).addTo(mapView);
+
+    await loadMapPhotos();
+    setTimeout(() => mapView.invalidateSize(), 100);
+}
+
+async function loadMapPhotos() {
+    try {
+        const { data } = await supabase
+            .from('photos')
+            .select('*')
+            .not('latitude', 'is', null)
+            .not('longitude', 'is', null)
+            .order('created_at', { ascending: false });
+
+        mapPhotos = data || [];
+        renderMapMarkers();
+        renderMapPhotoGrid();
+    } catch (err) {
+        console.error('加载地图照片失败:', err);
+    }
+}
+
+function renderMapMarkers() {
+    if (!mapView) return;
+    mapMarkers.forEach(m => mapView.removeLayer(m));
+    mapMarkers = [];
+
+    if (mapPhotos.length === 0) return;
+
+    const bounds = [];
+    mapPhotos.forEach(photo => {
+        const marker = L.marker([photo.latitude, photo.longitude])
+            .addTo(mapView)
+            .bindPopup(`
+                <div style="text-align:center;max-width:200px;">
+                    <img src="${getPhotoUrl(photo.storage_path)}"
+                         style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px;"
+                         onerror="this.style.display='none'">
+                    <strong>${escapeHtml(photo.name)}</strong>
+                    <p style="margin:4px 0;font-size:12px;color:#666;">
+                        ${escapeHtml(photo.location_name || '')}
+                    </p>
+                    <button onclick="window.openPhotoModal('${photo.id}')"
+                        style="padding:4px 12px;background:#667eea;color:white;border:none;border-radius:4px;cursor:pointer;">
+                        查看详情
+                    </button>
+                </div>
+            `);
+        mapMarkers.push(marker);
+        bounds.push([photo.latitude, photo.longitude]);
+    });
+
+    if (bounds.length > 0) {
+        mapView.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+    }
+}
+
+function renderMapPhotoGrid() {
+    const grid = document.getElementById('mapPhotoGrid');
+    const empty = document.getElementById('mapEmpty');
+
+    if (!grid || !empty) return;
+
+    if (mapPhotos.length === 0) {
+        grid.style.display = 'none';
+        empty.style.display = 'block';
+        return;
+    }
+    grid.style.display = 'flex';
+    empty.style.display = 'none';
+
+    grid.innerHTML = mapPhotos.map(photo => {
+        const url = getPhotoUrl(photo.storage_path);
+        return `
+            <div class="photo-card" style="width:150px;cursor:pointer;"
+                 onclick="window.openPhotoModal('${photo.id}')">
+                <img src="${url}" alt="${escapeHtml(photo.name)}"
+                     style="width:100%;height:120px;object-fit:cover;">
+                <div class="photo-info">
+                    <h3 style="font-size:12px;">${escapeHtml(photo.name)}</h3>
+                    <p style="font-size:11px;color:#666;">${escapeHtml(photo.location_name || '')}</p>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+window.pickLocationOnMap = function() {
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'locationPickerModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:700px;padding:0;">
+            <span class="modal-close" onclick="document.getElementById('locationPickerModal').remove()">&times;</span>
+            <h3 style="padding:16px;">点击地图选择位置</h3>
+            <div id="pickerMap" style="height:400px;"></div>
+            <div style="padding:16px;display:flex;gap:8px;align-items:center;">
+                <input type="text" id="pickerLocationName" placeholder="地点名称" style="flex:1;">
+                <span id="pickerCoords" style="color:#666;white-space:nowrap;">点击地图获取坐标</span>
+                <button class="btn btn-primary" onclick="window.confirmMapPick()">确认</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    setTimeout(() => {
+        const pickerMap = L.map('pickerMap').setView([35.86, 104.19], 4);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OSM',
+            maxZoom: 18
+        }).addTo(pickerMap);
+
+        let pickedMarker = null;
+
+        pickerMap.on('click', function(e) {
+            window.__pickedLatLng = e.latlng;
+            if (pickedMarker) pickerMap.removeLayer(pickedMarker);
+            pickedMarker = L.marker(e.latlng).addTo(pickerMap);
+            document.getElementById('pickerCoords').textContent =
+                '纬:' + e.latlng.lat.toFixed(4) + ', 经:' + e.latlng.lng.toFixed(4);
+        });
+
+        setTimeout(() => pickerMap.invalidateSize(), 100);
+    }, 100);
+};
+
+window.confirmMapPick = function() {
+    if (window.__pickedLatLng) {
+        document.getElementById('photoLatitude').value = window.__pickedLatLng.lat.toFixed(6);
+        document.getElementById('photoLongitude').value = window.__pickedLatLng.lng.toFixed(6);
+        const locName = (document.getElementById('pickerLocationName')?.value || '').trim();
+        if (locName) document.getElementById('photoLocationName').value = locName;
+    }
+    const modal = document.getElementById('locationPickerModal');
+    if (modal) modal.remove();
+    window.__pickedLatLng = null;
+};
+
+// ========== 纪念日时间线 ==========
+
+function getDefaultMilestones() {
+    return [
+        { id: '1', date: '2020-06-15', title: '我们在一起的第一天', description: '故事从这里开始', photoId: null },
+        { id: '2', date: '2021-02-14', title: '第一个情人节', description: '', photoId: null },
+        { id: '3', date: '2021-01-01', title: '第一个新年', description: '', photoId: null },
+        { id: '4', date: '2021-12-25', title: '第一个圣诞节', description: '', photoId: null },
+    ];
+}
+
+function loadMilestones() {
+    try {
+        const saved = localStorage.getItem('anniversary_milestones');
+        if (saved) {
+            anniversaryMilestones = JSON.parse(saved);
+        } else {
+            anniversaryMilestones = getDefaultMilestones();
+            saveMilestones();
+        }
+    } catch (e) {
+        anniversaryMilestones = getDefaultMilestones();
+    }
+
+    try {
+        anniversaryStartDate = localStorage.getItem('anniversary_start_date') || '2020-06-15';
+    } catch (e) {
+        anniversaryStartDate = '2020-06-15';
+    }
+}
+
+function saveMilestones() {
+    localStorage.setItem('anniversary_milestones', JSON.stringify(anniversaryMilestones));
+}
+
+function saveStartDate() {
+    localStorage.setItem('anniversary_start_date', anniversaryStartDate);
+}
+
+function updateDaysCounter() {
+    if (!anniversaryStartDate) return;
+    const el = document.getElementById('daysCount');
+    if (!el) return;
+    const start = new Date(anniversaryStartDate);
+    const today = new Date();
+    const diffTime = today - start;
+    const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+    el.textContent = diffDays;
+}
+
+function initTimeline() {
+    loadMilestones();
+    const startInput = document.getElementById('startDateInput');
+    if (startInput) startInput.value = anniversaryStartDate;
+    updateDaysCounter();
+    renderTimeline();
+}
+
+window.updateStartDate = function() {
+    const input = document.getElementById('startDateInput');
+    if (!input) return;
+    anniversaryStartDate = input.value;
+    saveStartDate();
+    updateDaysCounter();
+};
+
+function renderTimeline() {
+    const container = document.getElementById('timelineContainer');
+    if (!container) return;
+
+    const sorted = [...anniversaryMilestones].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    container.innerHTML = sorted.map((m, i) => {
+        const milestoneDate = new Date(m.date);
+        const today = new Date();
+        const diffDays = Math.floor((today - milestoneDate) / (1000 * 60 * 60 * 24));
+        const years = Math.floor(diffDays / 365);
+        const remainDays = diffDays % 365;
+
+        const side = i % 2 === 0 ? 'left' : 'right';
+
+        let photoHtml = '';
+        if (m.photoId) {
+            const photo = photos.find(p => String(p.id) === String(m.photoId));
+            if (photo) {
+                photoHtml = `<img src="${getPhotoUrl(photo.storage_path)}"
+                    style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:8px;cursor:pointer;"
+                    onclick="window.openPhotoModal('${photo.id}')">`;
+            }
+        }
+
+        let timeAgo = '';
+        if (years > 0) timeAgo += years + '年';
+        if (remainDays > 0 || years === 0) timeAgo += remainDays + '天';
+        timeAgo += '前';
+
+        return `
+            <div class="timeline-item timeline-${side}">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-date">${m.date}</div>
+                    <h3>${escapeHtml(m.title)}</h3>
+                    ${m.description ? '<p>' + escapeHtml(m.description) + '</p>' : ''}
+                    <small style="color:#999;">${timeAgo}</small>
+                    ${photoHtml}
+                    <div class="milestone-actions" style="margin-top:8px;display:flex;gap:8px;">
+                        <button class="btn btn-secondary" style="font-size:11px;padding:4px 8px;"
+                            onclick="window.openEditMilestoneModal('${m.id}')">✏️</button>
+                        <button class="btn-danger" style="font-size:11px;padding:4px 8px;"
+                            onclick="window.deleteMilestone('${m.id}')">🗑️</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+window.openAddMilestoneModal = function() {
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'milestoneModal';
+    modal.innerHTML = `
+        <div class="modal-content modal-small" style="padding:24px;">
+            <span class="modal-close" onclick="document.getElementById('milestoneModal').remove()">&times;</span>
+            <h3>添加纪念日</h3>
+            <div class="form-group">
+                <label>日期</label>
+                <input type="date" id="milestoneDate">
+            </div>
+            <div class="form-group">
+                <label>标题</label>
+                <input type="text" id="milestoneTitle">
+            </div>
+            <div class="form-group">
+                <label>描述</label>
+                <textarea id="milestoneDesc" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+                <label>关联照片ID（可选）</label>
+                <input type="text" id="milestonePhotoId" placeholder="输入照片ID">
+            </div>
+            <button class="btn btn-primary" onclick="window.saveMilestone()">保存</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+};
+
+window.saveMilestone = function() {
+    const date = document.getElementById('milestoneDate').value;
+    const title = document.getElementById('milestoneTitle').value.trim();
+    const desc = document.getElementById('milestoneDesc').value.trim();
+    const photoId = document.getElementById('milestonePhotoId').value.trim() || null;
+
+    if (!date || !title) {
+        alert('请填写日期和标题');
+        return;
+    }
+
+    const newMilestone = {
+        id: Date.now().toString(),
+        date,
+        title,
+        description: desc,
+        photoId: photoId || null
+    };
+
+    anniversaryMilestones.push(newMilestone);
+    saveMilestones();
+    renderTimeline();
+    document.getElementById('milestoneModal').remove();
+};
+
+window.openEditMilestoneModal = function(id) {
+    const m = anniversaryMilestones.find(ms => ms.id === id);
+    if (!m) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'milestoneModal';
+    modal.innerHTML = `
+        <div class="modal-content modal-small" style="padding:24px;">
+            <span class="modal-close" onclick="document.getElementById('milestoneModal').remove()">&times;</span>
+            <h3>编辑纪念日</h3>
+            <div class="form-group">
+                <label>日期</label>
+                <input type="date" id="milestoneDate" value="${m.date}">
+            </div>
+            <div class="form-group">
+                <label>标题</label>
+                <input type="text" id="milestoneTitle" value="${escapeHtml(m.title)}">
+            </div>
+            <div class="form-group">
+                <label>描述</label>
+                <textarea id="milestoneDesc" rows="2">${escapeHtml(m.description || '')}</textarea>
+            </div>
+            <div class="form-group">
+                <label>关联照片ID（可选）</label>
+                <input type="text" id="milestonePhotoId" value="${m.photoId || ''}">
+            </div>
+            <button class="btn btn-primary" onclick="window.updateMilestone('${id}')">保存</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+};
+
+window.updateMilestone = function(id) {
+    const m = anniversaryMilestones.find(ms => ms.id === id);
+    if (!m) return;
+
+    m.date = document.getElementById('milestoneDate').value;
+    m.title = document.getElementById('milestoneTitle').value.trim();
+    m.description = document.getElementById('milestoneDesc').value.trim();
+    m.photoId = document.getElementById('milestonePhotoId').value.trim() || null;
+
+    saveMilestones();
+    renderTimeline();
+    document.getElementById('milestoneModal').remove();
+};
+
+window.deleteMilestone = function(id) {
+    if (!confirm('确定删除这个纪念日？')) return;
+    anniversaryMilestones = anniversaryMilestones.filter(m => m.id !== id);
+    saveMilestones();
+    renderTimeline();
+};
 
 function getPhotoUrl(storagePath) {
     const { data } = supabase.storage
@@ -1760,11 +2316,18 @@ window.closeModal = function() {
 
 window.openEditModal = function() {
     if (!currentPhoto) return
-    
+
     document.getElementById('editPhotoId').value = currentPhoto.id
     document.getElementById('editName').value = currentPhoto.name
     document.getElementById('editDesc').value = currentPhoto.description || ''
-    
+
+    const locNameEl = document.getElementById('editLocationName')
+    const latEl = document.getElementById('editLatitude')
+    const lngEl = document.getElementById('editLongitude')
+    if (locNameEl) locNameEl.value = currentPhoto.location_name || ''
+    if (latEl) latEl.value = currentPhoto.latitude || ''
+    if (lngEl) lngEl.value = currentPhoto.longitude || ''
+
     document.getElementById('editModal').classList.add('active')
 }
 
@@ -1774,15 +2337,18 @@ window.closeEditModal = function() {
 
 window.handleEdit = async function(e) {
     e.preventDefault()
-    
+
     const id = document.getElementById('editPhotoId').value
     const name = document.getElementById('editName').value.trim()
     const description = document.getElementById('editDesc').value.trim()
-    
+    const location_name = (document.getElementById('editLocationName')?.value || '').trim() || null
+    const latitude = parseFloat(document.getElementById('editLatitude')?.value) || null
+    const longitude = parseFloat(document.getElementById('editLongitude')?.value) || null
+
     try {
         const { error } = await supabase
             .from('photos')
-            .update({ name, description })
+            .update({ name, description, latitude, longitude, location_name })
             .eq('id', id)
         
         if (error) throw error
@@ -1793,6 +2359,9 @@ window.handleEdit = async function(e) {
         if (photo) {
             photo.name = name
             photo.description = description
+            photo.latitude = latitude
+            photo.longitude = longitude
+            photo.location_name = location_name
         }
         
         document.getElementById('modalPhotoName').textContent = name

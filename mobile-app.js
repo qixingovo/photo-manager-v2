@@ -40,6 +40,18 @@ const mobile = {
     // 分类加锁状态 (categoryId -> password)
     lockedCategories: {},
 
+    // 生日彩蛋
+    birthdayConfig: null,
+
+    // 地图状态
+    mapView: null,
+    mapMarkers: [],
+    mapPhotos: [],
+
+    // 纪念日时间线
+    anniversaryMilestones: [],
+    anniversaryStartDate: null,
+
     // Supabase 配置（从外部配置文件读取）
     SUPABASE_URL: APP_CONFIG.SUPABASE_URL || '',
     SUPABASE_KEY: APP_CONFIG.SUPABASE_ANON_KEY || '',
@@ -199,6 +211,159 @@ const mobile = {
     },
 
     // ========================================
+    // 生日彩蛋
+    // ========================================
+    loadBirthdayConfig() {
+        try {
+            this.birthdayConfig = JSON.parse(localStorage.getItem('birthday_config') || 'null');
+            if (!this.birthdayConfig) {
+                this.birthdayConfig = { month: 5, day: 15, name: '老大' };
+            }
+        } catch (e) {
+            this.birthdayConfig = { month: 5, day: 15, name: '老大' };
+        }
+    },
+
+    isBirthdayToday() {
+        this.loadBirthdayConfig();
+        if (!this.birthdayConfig) return false;
+        const today = new Date();
+        return today.getMonth() + 1 === this.birthdayConfig.month && today.getDate() === this.birthdayConfig.day;
+    },
+
+    saveBirthdayConfig(config) {
+        this.birthdayConfig = config;
+        localStorage.setItem('birthday_config', JSON.stringify(config));
+    },
+
+    showBirthdayWelcomeOverlay() {
+        this.loadBirthdayConfig();
+        const cfg = this.birthdayConfig || { month: 5, day: 15, name: '老大' };
+        const monthOptions = [1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}" ${m === cfg.month ? 'selected' : ''}>${m}月</option>`).join('');
+        const dayOptions = Array.from({length: 31}, (_, i) => i + 1).map(d => `<option value="${d}" ${d === cfg.day ? 'selected' : ''}>${d}日</option>`).join('');
+
+        const overlay = document.createElement('div');
+        overlay.id = 'mobileBirthdayOverlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;z-index:9999;';
+        overlay.innerHTML = `
+            <canvas id="mobilePetalsCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9998;"></canvas>
+            <div style="text-align:center;color:white;z-index:9999;padding:20px;">
+                <div style="font-size:60px;margin-bottom:16px;">🎂</div>
+                <h1 style="font-size:1.5rem;margin-bottom:16px;">生日快乐！</h1>
+                <h2 style="font-size:2.5rem;margin-bottom:10px;font-weight:bold;">老大 🎉</h2>
+                <p style="font-size:1rem;opacity:0.9;margin-bottom:24px;">老大万岁万岁万万岁≧▽≦</p>
+                <button onclick="mobile.enterFromBirthday()" style="
+                    padding:12px 40px;font-size:1rem;background:white;color:#764ba2;
+                    border:none;border-radius:50px;cursor:pointer;font-weight:bold;
+                    box-shadow:0 4px 15px rgba(0,0,0,0.2);">进入系统 🎈</button>
+                <p style="margin-top:16px;font-size:0.85rem;opacity:0.7;">
+                    生日日期:
+                    <select id="mobileBirthdayMonth" onchange="mobile.updateBirthdayConfigMobile()" style="padding:4px 8px;border:none;border-radius:6px;font-size:13px;">${monthOptions}</select>
+                    <select id="mobileBirthdayDay" onchange="mobile.updateBirthdayConfigMobile()" style="padding:4px 8px;border:none;border-radius:6px;font-size:13px;">${dayOptions}</select>
+                </p>
+                <button id="mobileMusicToggle" onclick="mobile.toggleBirthdayMusicMobile(event)" style="
+                    margin-top:8px;background:rgba(255,255,255,0.2);border:2px solid white;color:white;
+                    width:40px;height:40px;border-radius:50%;font-size:16px;cursor:pointer;">🔇</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        this.startMobilePetalAnimation();
+    },
+
+    enterFromBirthday() {
+        this.stopMobilePetalAnimation();
+        const overlay = document.getElementById('mobileBirthdayOverlay');
+        if (overlay) overlay.remove();
+        this.showPage('home');
+        this.loadData().catch(err => console.error('加载数据失败:', err));
+    },
+
+    updateBirthdayConfigMobile() {
+        const monthEl = document.getElementById('mobileBirthdayMonth');
+        const dayEl = document.getElementById('mobileBirthdayDay');
+        if (!monthEl || !dayEl) return;
+        this.saveBirthdayConfig({ month: parseInt(monthEl.value), day: parseInt(dayEl.value), name: '老大' });
+    },
+
+    toggleBirthdayMusicMobile(e) {
+        e.stopPropagation();
+        let audio = document.getElementById('mobileBirthdayMusic');
+        const btn = document.getElementById('mobileMusicToggle');
+        if (!audio) {
+            audio = document.createElement('audio');
+            audio.id = 'mobileBirthdayMusic';
+            audio.loop = true;
+            audio.style.display = 'none';
+            audio.innerHTML = '<source src="assets/birthday-bgm.mp3" type="audio/mpeg">';
+            document.body.appendChild(audio);
+        }
+        if (audio.paused) {
+            audio.play().catch(() => {});
+            if (btn) btn.textContent = '🔊';
+        } else {
+            audio.pause();
+            if (btn) btn.textContent = '🔇';
+        }
+    },
+
+    startMobilePetalAnimation() {
+        const canvas = document.getElementById('mobilePetalsCanvas');
+        if (!canvas) return;
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const ctx = canvas.getContext('2d');
+        const petals = [];
+        const colors = ['#ff6b6b', '#ffa502', '#ff6348', '#ff4757', '#ff9ff3', '#feca57', '#ff6b81', '#eccc68'];
+
+        for (let i = 0; i < 30; i++) {
+            petals.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height - canvas.height,
+                size: 6 + Math.random() * 12,
+                speed: 0.8 + Math.random() * 1.5,
+                wobble: Math.random() * 2 - 1,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                rotation: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 0.04
+            });
+        }
+
+        const self = this;
+        function drawPetal(p) {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rotation);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, p.size, p.size * 0.4, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            petals.forEach(p => {
+                p.y += p.speed;
+                p.x += Math.sin(p.y * 0.02) * p.wobble;
+                p.rotation += p.rotSpeed;
+                if (p.y > canvas.height + 20) { p.y = -20; p.x = Math.random() * canvas.width; }
+                drawPetal(p);
+            });
+            self.__petalAnimId = requestAnimationFrame(animate);
+        }
+        animate();
+    },
+
+    stopMobilePetalAnimation() {
+        if (this.__petalAnimId) {
+            cancelAnimationFrame(this.__petalAnimId);
+            this.__petalAnimId = null;
+        }
+        const canvas = document.getElementById('mobilePetalsCanvas');
+        if (canvas) canvas.remove();
+    },
+
+    // ========================================
     // 登录相关
     // ========================================
     async checkLogin() {
@@ -259,9 +424,10 @@ const mobile = {
         this.currentUser = this.getUserFromSession(session);
         errorEl.textContent = '';
         
-        // 老大欢迎页
-        if (this.currentUser.isLaoda) {
-            this.showToast('🎉 老大生日快乐！');
+        // 老大生日彩蛋
+        if (this.currentUser.isLaoda && this.isBirthdayToday()) {
+            this.showBirthdayWelcomeOverlay();
+            return;
         }
         
         // 先跳转页面
@@ -320,6 +486,12 @@ const mobile = {
         } else if (tab === 'category') {
             this.showPage('category');
             this.renderCategories();
+        } else if (tab === 'map') {
+            this.showPage('map');
+            this.initMapView();
+        } else if (tab === 'timeline') {
+            this.showPage('timeline');
+            this.initTimeline();
         } else if (tab === 'profile') {
             this.showPage('profile');
             this.updateProfile();
@@ -811,6 +983,9 @@ const mobile = {
         const namePrefix = document.getElementById('mobilePhotoName').value.trim();
         const description = document.getElementById('mobilePhotoDesc').value.trim();
         const categoryId = this.getSelectedUploadCategoryId();
+        const locationName = (document.getElementById('mobilePhotoLocationName')?.value || '').trim() || null;
+        const latitude = parseFloat(document.getElementById('mobilePhotoLatitude')?.value) || null;
+        const longitude = parseFloat(document.getElementById('mobilePhotoLongitude')?.value) || null;
         
         let successCount = 0;
         
@@ -848,7 +1023,10 @@ const mobile = {
                         storage_path: uniqueName,
                         original_name: file.name,
                         size: file.size,
-                        is_favorite: false
+                        is_favorite: false,
+                        latitude,
+                        longitude,
+                        location_name: locationName
                     }])
                     .select()
                     .single();
@@ -883,6 +1061,12 @@ const mobile = {
         this.clearPreviews();
         document.getElementById('mobilePhotoName').value = '';
         document.getElementById('mobilePhotoDesc').value = '';
+        const locNameEl = document.getElementById('mobilePhotoLocationName');
+        const latEl = document.getElementById('mobilePhotoLatitude');
+        const lngEl = document.getElementById('mobilePhotoLongitude');
+        if (locNameEl) locNameEl.value = '';
+        if (latEl) latEl.value = '';
+        if (lngEl) lngEl.value = '';
         this.renderUploadCategoryCascade();
         this.showToast(`成功上传 ${successCount} 张照片`);
 
@@ -2284,6 +2468,14 @@ const mobile = {
 
         document.getElementById('editPhotoName').value = photo.name || '';
         document.getElementById('editPhotoDesc').value = photo.description || '';
+
+        const locNameEl = document.getElementById('editPhotoLocationName');
+        const latEl = document.getElementById('editPhotoLatitude');
+        const lngEl = document.getElementById('editPhotoLongitude');
+        if (locNameEl) locNameEl.value = photo.location_name || '';
+        if (latEl) latEl.value = photo.latitude || '';
+        if (lngEl) lngEl.value = photo.longitude || '';
+
         document.getElementById('editModal').style.display = 'flex';
     },
 
@@ -2294,6 +2486,9 @@ const mobile = {
     async saveEdit() {
         const name = document.getElementById('editPhotoName').value.trim();
         const desc = document.getElementById('editPhotoDesc').value.trim();
+        const location_name = (document.getElementById('editPhotoLocationName')?.value || '').trim() || null;
+        const latitude = parseFloat(document.getElementById('editPhotoLatitude')?.value) || null;
+        const longitude = parseFloat(document.getElementById('editPhotoLongitude')?.value) || null;
 
         const photo = this.photos.find(p => p.id === this.currentPhotoId);
         if (!photo) return;
@@ -2304,13 +2499,16 @@ const mobile = {
 
             const { error } = await supabase
                 .from('photos')
-                .update({ name, description: desc })
+                .update({ name, description: desc, latitude, longitude, location_name })
                 .eq('id', this.currentPhotoId);
 
             if (error) throw error;
 
             photo.name = name;
             photo.description = desc;
+            photo.latitude = latitude;
+            photo.longitude = longitude;
+            photo.location_name = location_name;
             document.getElementById('detailName').textContent = name;
             document.getElementById('detailDesc').textContent = desc;
 
@@ -2418,7 +2616,389 @@ const mobile = {
             };
             reader.readAsDataURL(file);
         });
-    }
+    },
+
+    // ========================================
+    // 地图功能
+    // ========================================
+    initMapView() {
+        const container = document.getElementById('mobileMapContainer');
+        if (!container || this.mapView) return;
+
+        this.mapView = L.map('mobileMapContainer').setView([35.86, 104.19], 4);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OSM',
+            maxZoom: 18
+        }).addTo(this.mapView);
+
+        this.loadMapPhotos();
+        setTimeout(() => this.mapView.invalidateSize(), 200);
+    },
+
+    async loadMapPhotos() {
+        try {
+            const supabase = this.initSupabase();
+            if (!supabase) return;
+
+            const { data } = await supabase
+                .from('photos')
+                .select('*')
+                .not('latitude', 'is', null)
+                .not('longitude', 'is', null)
+                .order('created_at', { ascending: false });
+
+            this.mapPhotos = data || [];
+            this.renderMapMarkers();
+            this.renderMobileMapPhotos();
+        } catch (err) {
+            console.error('加载地图照片失败:', err);
+        }
+    },
+
+    renderMapMarkers() {
+        if (!this.mapView) return;
+        this.mapMarkers.forEach(m => this.mapView.removeLayer(m));
+        this.mapMarkers = [];
+
+        if (this.mapPhotos.length === 0) return;
+
+        const bounds = [];
+        this.mapPhotos.forEach(photo => {
+            const url = this.getPhotoUrl(photo.storage_path);
+            const marker = L.marker([photo.latitude, photo.longitude])
+                .addTo(this.mapView)
+                .bindPopup(`
+                    <div style="text-align:center;max-width:180px;">
+                        <img src="${url}"
+                             style="width:100%;max-height:100px;object-fit:cover;border-radius:8px;margin-bottom:6px;"
+                             onerror="this.style.display='none'">
+                        <strong>${this.escapeHtml(photo.name)}</strong>
+                        <p style="margin:4px 0;font-size:11px;color:#666;">
+                            ${this.escapeHtml(photo.location_name || '')}
+                        </p>
+                        <button onclick="mobile.openDetail('${photo.id}')"
+                            style="padding:4px 12px;background:#667eea;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">
+                            查看详情
+                        </button>
+                    </div>
+                `);
+            this.mapMarkers.push(marker);
+            bounds.push([photo.latitude, photo.longitude]);
+        });
+
+        if (bounds.length > 0) {
+            this.mapView.fitBounds(bounds, { padding: [20, 20], maxZoom: 14 });
+        }
+    },
+
+    renderMobileMapPhotos() {
+        const container = document.getElementById('mobileMapPhotos');
+        if (!container) return;
+
+        if (this.mapPhotos.length === 0) {
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:#999;width:100%;">还没有带位置的照片</div>';
+            return;
+        }
+
+        container.innerHTML = this.mapPhotos.map(photo => {
+            const url = this.getPhotoUrl(photo.storage_path);
+            return `
+                <div style="width:80px;cursor:pointer;border-radius:8px;overflow:hidden;"
+                     onclick="mobile.openDetail('${photo.id}')">
+                    <img src="${url}" alt="${this.escapeHtml(photo.name)}"
+                         style="width:80px;height:80px;object-fit:cover;">
+                    <div style="font-size:10px;text-align:center;padding:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        ${this.escapeHtml(photo.location_name || photo.name)}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    },
+
+    pickLocationOnMap() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'mobileLocationPickerModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '2000';
+        modal.innerHTML = `
+            <div class="modal-card" style="width:95%;max-width:500px;padding:0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #eee;">
+                    <h3 style="margin:0;font-size:16px;">点击地图选择位置</h3>
+                    <button onclick="document.getElementById('mobileLocationPickerModal').remove()" style="background:none;border:none;font-size:24px;cursor:pointer;">&times;</button>
+                </div>
+                <div id="mobilePickerMap" style="height:350px;"></div>
+                <div style="padding:12px;display:flex;flex-direction:column;gap:8px;">
+                    <input type="text" id="mobilePickerLocationName" placeholder="地点名称" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;">
+                    <span id="mobilePickerCoords" style="color:#666;font-size:13px;">点击地图获取坐标</span>
+                    <button class="btn-primary" onclick="mobile.confirmMobileMapPick()" style="width:100%;">确认</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        setTimeout(() => {
+            const pickerMap = L.map('mobilePickerMap').setView([35.86, 104.19], 4);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OSM',
+                maxZoom: 18
+            }).addTo(pickerMap);
+
+            let pickedMarker = null;
+
+            pickerMap.on('click', function(e) {
+                window.__mobilePickedLatLng = e.latlng;
+                if (pickedMarker) pickerMap.removeLayer(pickedMarker);
+                pickedMarker = L.marker(e.latlng).addTo(pickerMap);
+                document.getElementById('mobilePickerCoords').textContent =
+                    '纬:' + e.latlng.lat.toFixed(4) + ', 经:' + e.latlng.lng.toFixed(4);
+            });
+
+            setTimeout(() => pickerMap.invalidateSize(), 100);
+        }, 100);
+    },
+
+    confirmMobileMapPick() {
+        if (window.__mobilePickedLatLng) {
+            document.getElementById('mobilePhotoLatitude').value = window.__mobilePickedLatLng.lat.toFixed(6);
+            document.getElementById('mobilePhotoLongitude').value = window.__mobilePickedLatLng.lng.toFixed(6);
+            const locName = (document.getElementById('mobilePickerLocationName')?.value || '').trim();
+            if (locName) document.getElementById('mobilePhotoLocationName').value = locName;
+        }
+        const modal = document.getElementById('mobileLocationPickerModal');
+        if (modal) modal.remove();
+        window.__mobilePickedLatLng = null;
+    },
+
+    // ========================================
+    // 纪念日时间线
+    // ========================================
+    getDefaultMilestones() {
+        return [
+            { id: '1', date: '2020-06-15', title: '我们在一起的第一天', description: '故事从这里开始', photoId: null },
+            { id: '2', date: '2021-02-14', title: '第一个情人节', description: '', photoId: null },
+            { id: '3', date: '2021-01-01', title: '第一个新年', description: '', photoId: null },
+            { id: '4', date: '2021-12-25', title: '第一个圣诞节', description: '', photoId: null },
+        ];
+    },
+
+    loadMilestones() {
+        try {
+            const saved = localStorage.getItem('anniversary_milestones');
+            if (saved) {
+                this.anniversaryMilestones = JSON.parse(saved);
+            } else {
+                this.anniversaryMilestones = this.getDefaultMilestones();
+                this.saveMilestones();
+            }
+        } catch (e) {
+            this.anniversaryMilestones = this.getDefaultMilestones();
+        }
+
+        try {
+            this.anniversaryStartDate = localStorage.getItem('anniversary_start_date') || '2020-06-15';
+        } catch (e) {
+            this.anniversaryStartDate = '2020-06-15';
+        }
+    },
+
+    saveMilestones() {
+        localStorage.setItem('anniversary_milestones', JSON.stringify(this.anniversaryMilestones));
+    },
+
+    saveStartDate() {
+        localStorage.setItem('anniversary_start_date', this.anniversaryStartDate);
+    },
+
+    initTimeline() {
+        this.loadMilestones();
+        const startInput = document.getElementById('mobileStartDateInput');
+        if (startInput) startInput.value = this.anniversaryStartDate;
+        this.updateDaysCounter();
+        this.renderTimeline();
+    },
+
+    updateDaysCounter() {
+        if (!this.anniversaryStartDate) return;
+        const el = document.getElementById('mobileDaysCount');
+        if (!el) return;
+        const start = new Date(this.anniversaryStartDate);
+        const today = new Date();
+        const diffTime = today - start;
+        const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+        el.textContent = diffDays;
+    },
+
+    updateStartDate() {
+        const input = document.getElementById('mobileStartDateInput');
+        if (!input) return;
+        this.anniversaryStartDate = input.value;
+        this.saveStartDate();
+        this.updateDaysCounter();
+    },
+
+    renderTimeline() {
+        const container = document.getElementById('mobileTimelineContainer');
+        if (!container) return;
+
+        const sorted = [...this.anniversaryMilestones].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        container.innerHTML = sorted.map(m => {
+            const milestoneDate = new Date(m.date);
+            const today = new Date();
+            const diffDays = Math.floor((today - milestoneDate) / (1000 * 60 * 60 * 24));
+            const years = Math.floor(diffDays / 365);
+            const remainDays = diffDays % 365;
+
+            let photoHtml = '';
+            if (m.photoId) {
+                const photo = this.photos.find(p => String(p.id) === String(m.photoId));
+                if (photo) {
+                    const url = this.getPhotoUrl(photo.storage_path);
+                    photoHtml = `<img src="${url}"
+                        style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:8px;cursor:pointer;"
+                        onclick="mobile.openDetail('${photo.id}')">`;
+                }
+            }
+
+            let timeAgo = '';
+            if (years > 0) timeAgo += years + '年';
+            if (remainDays > 0 || years === 0) timeAgo += remainDays + '天';
+            timeAgo += '前';
+
+            return `
+                <div class="timeline-mobile-item">
+                    <div class="timeline-mobile-date">${m.date}</div>
+                    <h3>${this.escapeHtml(m.title)}</h3>
+                    ${m.description ? '<p>' + this.escapeHtml(m.description) + '</p>' : ''}
+                    <small style="color:#999;">${timeAgo}</small>
+                    ${photoHtml}
+                    <div style="margin-top:8px;display:flex;gap:8px;">
+                        <button class="btn-secondary" style="font-size:11px;padding:4px 8px;"
+                            onclick="mobile.openEditMilestoneModal('${m.id}')">✏️</button>
+                        <button class="btn-danger" style="font-size:11px;padding:4px 8px;"
+                            onclick="mobile.deleteMilestone('${m.id}')">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    },
+
+    openAddMilestoneModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'mobileMilestoneModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '2000';
+        modal.innerHTML = `
+            <div class="modal-card" style="width:90%;max-width:400px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                    <h3 style="margin:0;">添加纪念日</h3>
+                    <button onclick="document.getElementById('mobileMilestoneModal').remove()" style="background:none;border:none;font-size:24px;cursor:pointer;">&times;</button>
+                </div>
+                <div class="form-item">
+                    <label>日期</label>
+                    <input type="date" id="mobileMilestoneDate">
+                </div>
+                <div class="form-item">
+                    <label>标题</label>
+                    <input type="text" id="mobileMilestoneTitle">
+                </div>
+                <div class="form-item">
+                    <label>描述</label>
+                    <textarea id="mobileMilestoneDesc" rows="2"></textarea>
+                </div>
+                <div class="form-item">
+                    <label>关联照片ID（可选）</label>
+                    <input type="text" id="mobileMilestonePhotoId" placeholder="输入照片ID">
+                </div>
+                <button class="btn-primary" onclick="mobile.saveMilestoneMobile()" style="width:100%;">保存</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    saveMilestoneMobile() {
+        const date = document.getElementById('mobileMilestoneDate').value;
+        const title = document.getElementById('mobileMilestoneTitle').value.trim();
+        const desc = document.getElementById('mobileMilestoneDesc').value.trim();
+        const photoId = document.getElementById('mobileMilestonePhotoId').value.trim() || null;
+
+        if (!date || !title) {
+            this.showToast('请填写日期和标题');
+            return;
+        }
+
+        this.anniversaryMilestones.push({
+            id: Date.now().toString(),
+            date,
+            title,
+            description: desc,
+            photoId: photoId || null
+        });
+        this.saveMilestones();
+        this.renderTimeline();
+        document.getElementById('mobileMilestoneModal').remove();
+    },
+
+    openEditMilestoneModal(id) {
+        const m = this.anniversaryMilestones.find(ms => ms.id === id);
+        if (!m) return;
+
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'mobileMilestoneModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '2000';
+        modal.innerHTML = `
+            <div class="modal-card" style="width:90%;max-width:400px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                    <h3 style="margin:0;">编辑纪念日</h3>
+                    <button onclick="document.getElementById('mobileMilestoneModal').remove()" style="background:none;border:none;font-size:24px;cursor:pointer;">&times;</button>
+                </div>
+                <div class="form-item">
+                    <label>日期</label>
+                    <input type="date" id="mobileMilestoneDate" value="${m.date}">
+                </div>
+                <div class="form-item">
+                    <label>标题</label>
+                    <input type="text" id="mobileMilestoneTitle" value="${this.escapeHtml(m.title)}">
+                </div>
+                <div class="form-item">
+                    <label>描述</label>
+                    <textarea id="mobileMilestoneDesc" rows="2">${this.escapeHtml(m.description || '')}</textarea>
+                </div>
+                <div class="form-item">
+                    <label>关联照片ID（可选）</label>
+                    <input type="text" id="mobileMilestonePhotoId" value="${m.photoId || ''}">
+                </div>
+                <button class="btn-primary" onclick="mobile.updateMilestoneMobile('${id}')" style="width:100%;">保存</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    updateMilestoneMobile(id) {
+        const m = this.anniversaryMilestones.find(ms => ms.id === id);
+        if (!m) return;
+
+        m.date = document.getElementById('mobileMilestoneDate').value;
+        m.title = document.getElementById('mobileMilestoneTitle').value.trim();
+        m.description = document.getElementById('mobileMilestoneDesc').value.trim();
+        m.photoId = document.getElementById('mobileMilestonePhotoId').value.trim() || null;
+
+        this.saveMilestones();
+        this.renderTimeline();
+        document.getElementById('mobileMilestoneModal').remove();
+    },
+
+    deleteMilestone(id) {
+        if (!confirm('确定删除这个纪念日？')) return;
+        this.anniversaryMilestones = this.anniversaryMilestones.filter(m => m.id !== id);
+        this.saveMilestones();
+        this.renderTimeline();
+    },
+
 };
 
 // 页面加载完成后初始化
