@@ -3704,6 +3704,11 @@ function generateShareToken() {
     return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('')
 }
 
+window.openShareCurrentAlbum = function() {
+    if (!currentAlbum) { alert('请先打开一个相册'); return }
+    window.openCreateShareModal(currentAlbum.id)
+}
+
 window.openCreateShareModal = function(albumId) {
     if (!albumId) { alert('请先打开一个相册'); return }
     const album = albums.find(a => a.id === albumId)
