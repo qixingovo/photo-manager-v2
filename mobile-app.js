@@ -3326,7 +3326,7 @@ const mobile = {
         }
 
         const catId = document.getElementById('mobileMilestoneCategoryId').value || null;
-        const catName = catId ? (this.categories.find(c => c.id === catId) || {}).name || '' : '';
+        const catName = catId ? (this.categories.find(c => String(c.id) === String(catId)) || {}).name || '' : '';
         const pd = this._milestonePhotoData;
         this.anniversaryMilestones.push({
             id: Date.now().toString(),
@@ -3415,7 +3415,7 @@ const mobile = {
         m.photoName = pd ? pd.name : null;
         const catId = document.getElementById('mobileMilestoneCategoryId').value || null;
         m.categoryId = catId || null;
-        m.categoryName = catId ? (this.categories.find(c => c.id === catId) || {}).name || '' : null;
+        m.categoryName = catId ? (this.categories.find(c => String(c.id) === String(catId)) || {}).name || '' : null;
 
         this._milestonePhotoData = null;
         this.saveMilestonesToSupabase();

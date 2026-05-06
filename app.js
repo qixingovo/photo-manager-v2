@@ -2482,7 +2482,7 @@ window.saveMilestone = function() {
     const desc = document.getElementById('milestoneDesc').value.trim();
     const photoId = document.getElementById('milestonePhotoId').value.trim() || null;
     const catId = document.getElementById('milestoneCategoryId').value || null;
-    const catName = catId ? (categories.find(c => c.id === catId) || {}).name || '' : '';
+    const catName = catId ? (categories.find(c => String(c.id) === String(catId)) || {}).name || '' : '';
 
     if (!date || !title) {
         alert('请填写日期和标题');
@@ -2519,6 +2519,9 @@ window.updateMilestone = function(id) {
     const pd = window._milestonePhotoData;
     m.photoPath = pd ? pd.storage_path : null;
     m.photoName = pd ? pd.name : null;
+    const catId = document.getElementById('milestoneCategoryId').value || null;
+    m.categoryId = catId || null;
+    m.categoryName = catId ? (categories.find(c => String(c.id) === String(catId)) || {}).name || '' : null;
 
     window._milestonePhotoData = null;
     saveMilestonesToSupabase();
