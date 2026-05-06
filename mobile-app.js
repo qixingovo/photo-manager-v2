@@ -5,6 +5,24 @@
 
 const APP_CONFIG = window.__APP_CONFIG__ || {};
 
+// 爱心轮廓半径辅助函数（用于拼贴墙）
+function heartRadius(angle) {
+    const x = Math.cos(angle);
+    const y = Math.sin(angle);
+    let lo = 0, hi = 2;
+    for (let iter = 0; iter < 20; iter++) {
+        const mid = (lo + hi) / 2;
+        const nx = mid * x;
+        const ny = mid * y;
+        if (Math.pow(nx * nx + ny * ny - 1, 3) - nx * nx * ny * ny * ny <= 0) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    return lo;
+}
+
 const mobile = {
     // 状态
     currentUser: null,
@@ -492,6 +510,12 @@ const mobile = {
         } else if (tab === 'timeline') {
             this.showPage('timeline');
             this.initTimeline();
+        } else if (tab === 'collage') {
+            this.showPage('collage');
+            this.renderMobileCollageCategorySelect();
+        } else if (tab === 'achievements') {
+            this.showPage('achievements');
+            this.loadAchievements();
         } else if (tab === 'profile') {
             this.showPage('profile');
             this.updateProfile();
@@ -608,11 +632,15 @@ const mobile = {
                 }
             }
 
-            // 搜索筛选
+            // 搜索筛选：多关键词，任一匹配即可
             const searchInput = document.getElementById('searchInput');
             if (searchInput && searchInput.value) {
-                const search = searchInput.value;
-                query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+                const search = searchInput.value.trim();
+                const keywords = search.split(/\s+/).filter(k => k.length > 0);
+                if (keywords.length > 0) {
+                    const filters = keywords.map(k => `name.ilike.%${k}%,description.ilike.%${k}%`).join(',');
+                    query = query.or(filters);
+                }
             }
 
             // 服务端分页
@@ -657,9 +685,10 @@ const mobile = {
 
         const totalPages = Math.max(1, Math.ceil(this.totalPhotos / this.photosPerPage));
 
+        const searchValue = document.getElementById('searchInput')?.value || '';
         feed.innerHTML = pagePhotos.map((photo, index) => {
-            const safeName = this.escapeHtml(photo.name || '未命名');
-            const safeDesc = this.escapeHtml(photo.description || '');
+            const safeName = this.highlightKeywords(this.escapeHtml(photo.name || '未命名'), searchValue);
+            const safeDesc = this.highlightKeywords(this.escapeHtml(photo.description || ''), searchValue);
             const safeImg = this.escapeHtml(this.getPhotoUrl(photo.storage_path) || ('https://picsum.photos/400/400?random=' + photo.id));
             return `
             <div class="photo-card ${this.selectMode ? 'select-mode' : ''} ${this.selectedPhotos.has(photo.id) ? 'selected' : ''}" 
@@ -791,16 +820,19 @@ const mobile = {
         const selectBtn = document.getElementById('selectModeBtn');
         const batchActions = document.getElementById('batchActions');
         const selectedCount = document.getElementById('selectedCount');
-        
+        const exportBtn = document.getElementById('batchExportBtn');
+
         if (this.selectMode) {
             selectBtn.textContent = '❌ 取消';
             selectBtn.classList.add('active');
             batchActions.style.display = 'flex';
+            if (exportBtn) exportBtn.style.display = '';
             selectedCount.textContent = this.selectedPhotos.size;
         } else {
             selectBtn.textContent = '☑️ 多选';
             selectBtn.classList.remove('active');
             batchActions.style.display = 'none';
+            if (exportBtn) exportBtn.style.display = 'none';
         }
     },
 
@@ -820,6 +852,55 @@ const mobile = {
         }
         this.renderPhotos();
         this.updateSelectModeUI();
+    },
+
+    async exportSelectedPhotos() {
+        if (this.selectedPhotos.size === 0) {
+            this.showToast('请先选择要导出的照片');
+            return;
+        }
+        if (this.selectedPhotos.size > 50) {
+            if (!confirm(`已选择 ${this.selectedPhotos.size} 张照片，一次最多导出 50 张。仅导出前 50 张？`)) return;
+        }
+
+        const photoIds = [...this.selectedPhotos].slice(0, 50);
+        const selectedPhotoData = this.photos.filter(p => photoIds.includes(p.id));
+
+        try {
+            const zip = new JSZip();
+            const total = selectedPhotoData.length;
+            let completed = 0;
+
+            for (const photo of selectedPhotoData) {
+                const url = this.getPhotoUrl(photo.storage_path);
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error('fetch failed');
+                    const blob = await response.blob();
+                    const ext = photo.storage_path.split('.').pop() || 'jpg';
+                    const fileName = `${photo.name || 'photo'}.${ext}`;
+                    zip.file(fileName, blob);
+                } catch (e) {
+                    console.warn(`下载失败: ${photo.name}`, e);
+                }
+                completed++;
+            }
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const downloadUrl = URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `照片导出_${new Date().toISOString().slice(0, 10)}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(downloadUrl);
+
+            this.showToast(`成功导出 ${completed} 张照片！`);
+        } catch (err) {
+            console.error('导出失败:', err);
+            this.showToast('导出失败: ' + err.message);
+        }
     },
 
     batchDeletePhotos() {
@@ -2309,6 +2390,15 @@ const mobile = {
         return div.innerHTML;
     },
 
+    highlightKeywords(text, searchValue) {
+        if (!searchValue || !text) return text;
+        const keywords = searchValue.trim().split(/\s+/).filter(k => k.length > 0);
+        if (keywords.length === 0) return text;
+        const escaped = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
+        return text.replace(regex, '<mark>$1</mark>');
+    },
+
     formatTime(timestamp) {
         if (!timestamp) return '';
         const date = new Date(timestamp);
@@ -3089,6 +3179,188 @@ const mobile = {
         this.anniversaryMilestones = this.anniversaryMilestones.filter(m => m.id !== id);
         this.saveMilestones();
         this.renderTimeline();
+    },
+
+    // ========================================
+    // 照片拼贴墙
+    // ========================================
+    renderMobileCollageCategorySelect() {
+        const select = document.getElementById('mobileCollageCategorySelect');
+        if (!select) return;
+        select.innerHTML = '<option value="all">全部照片</option>' +
+            this.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    },
+
+    async generateCollage() {
+        const canvas = document.getElementById('mobileCollageCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+
+        const catId = document.getElementById('mobileCollageCategorySelect')?.value || 'all';
+        let collagePhotos = this.photos;
+        if (catId !== 'all') {
+            const categoryIds = this.getCategoryAndChildrenIds(catId);
+            const matchingIds = new Set();
+            Object.entries(this.photoCategories).forEach(([photoId, catIds]) => {
+                if (catIds.some(cid => categoryIds.includes(cid))) matchingIds.add(photoId);
+            });
+            collagePhotos = this.photos.filter(p => matchingIds.has(String(p.id)));
+        }
+
+        if (collagePhotos.length === 0) {
+            this.showToast('所选分类下没有照片');
+            return;
+        }
+
+        const size = 360;
+        canvas.width = size;
+        canvas.height = size;
+
+        ctx.fillStyle = '#fff0f5';
+        ctx.fillRect(0, 0, size, size);
+
+        const cx = size / 2;
+        const cy = size / 2 + 10;
+        const scale = size / 3.8;
+
+        const imageCache = new Map();
+        const photosToUse = collagePhotos.slice(0, 50);
+        await Promise.all(photosToUse.map(async (photo) => {
+            const url = this.getPhotoUrl(photo.storage_path);
+            try {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = url;
+                });
+                imageCache.set(photo.id, img);
+            } catch (e) {}
+        }));
+
+        const loadedPhotos = photosToUse.filter(p => imageCache.has(p.id));
+        if (loadedPhotos.length === 0) {
+            ctx.fillStyle = '#999';
+            ctx.font = '16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('无法加载照片', cx, cy);
+            return;
+        }
+
+        const cellSize = 18;
+        const cells = [];
+        for (let y = -scale; y <= scale; y += cellSize) {
+            for (let x = -scale; x <= scale; x += cellSize) {
+                const nx = x / scale;
+                const ny = -y / scale;
+                const heartVal = Math.pow(nx * nx + ny * ny - 1, 3) - nx * nx * ny * ny * ny;
+                if (heartVal <= 0) {
+                    cells.push({ x: cx + x - cellSize / 2, y: cy + y - cellSize / 2, s: cellSize });
+                }
+            }
+        }
+
+        for (let i = cells.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [cells[i], cells[j]] = [cells[j], cells[i]];
+        }
+
+        let photoIndex = 0;
+        for (const cell of cells) {
+            const photo = loadedPhotos[photoIndex % loadedPhotos.length];
+            const img = imageCache.get(photo.id);
+            ctx.drawImage(img, cell.x, cell.y, cell.s, cell.s);
+            photoIndex++;
+        }
+
+        // 爱心轮廓
+        ctx.strokeStyle = '#ff6b81';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const steps = 150;
+        for (let i = 0; i <= steps; i++) {
+            const angle = (i / steps) * Math.PI * 2 - Math.PI;
+            const r = heartRadius(angle);
+            const px = cx + r * Math.cos(angle) * scale * 0.5;
+            const py = cy - r * Math.sin(angle) * scale * 0.48;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+    },
+
+    downloadCollage() {
+        const canvas = document.getElementById('mobileCollageCanvas');
+        if (!canvas) return;
+        const link = document.createElement('a');
+        link.download = '爱心拼贴_' + new Date().toISOString().slice(0, 10) + '.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    },
+
+    // ========================================
+    // 回忆成就
+    // ========================================
+    async loadAchievements() {
+        let firstLaunch = localStorage.getItem('app_first_launch_date');
+        if (!firstLaunch) {
+            firstLaunch = new Date().toISOString().slice(0, 10);
+            localStorage.setItem('app_first_launch_date', firstLaunch);
+        }
+        const daysSinceFirst = Math.floor((new Date() - new Date(firstLaunch)) / (1000 * 60 * 60 * 24));
+
+        let photoCount = 0, categoryCount = 0, commentCount = 0, favoriteCount = 0, locationCount = 0;
+        try {
+            const supabase = this.initSupabase();
+            if (supabase) {
+                const [{ count: pc }, { count: cc }, { count: coc }, { count: fc }, { count: lc }] = await Promise.all([
+                    supabase.from('photos').select('*', { count: 'exact', head: true }),
+                    supabase.from('categories').select('*', { count: 'exact', head: true }),
+                    supabase.from('comments').select('*', { count: 'exact', head: true }),
+                    supabase.from('photos').select('*', { count: 'exact', head: true }).eq('is_favorite', true),
+                    supabase.from('photos').select('*', { count: 'exact', head: true }).not('location_name', 'is', null),
+                ]);
+                photoCount = pc || 0;
+                categoryCount = cc || 0;
+                commentCount = coc || 0;
+                favoriteCount = fc || 0;
+                locationCount = lc || 0;
+            }
+        } catch (e) {
+            console.warn('加载成就统计失败:', e);
+        }
+
+        const stats = { photoCount, categoryCount, commentCount, favoriteCount, locationCount, daysSinceFirst };
+        this.renderAchievements(stats);
+    },
+
+    renderAchievements(stats) {
+        const grid = document.getElementById('mobileAchievementsGrid');
+        if (!grid) return;
+
+        const achievements = [
+            { id: 'first_photo', icon: '🐣', name: '初出茅庐', desc: '上传第 1 张照片', check: (s) => s.photoCount >= 1 },
+            { id: 'collector', icon: '📸', name: '记忆收集者', desc: '累计 100 张照片', check: (s) => s.photoCount >= 100 },
+            { id: 'master', icon: '🏆', name: '回忆大师', desc: '累计 500 张照片', check: (s) => s.photoCount >= 500 },
+            { id: 'organizer', icon: '📁', name: '整理达人', desc: '创建 5 个分类', check: (s) => s.categoryCount >= 5 },
+            { id: 'commenter', icon: '💬', name: '留言能手', desc: '发表 10 条留言', check: (s) => s.commentCount >= 10 },
+            { id: 'collector_20', icon: '⭐', name: '收藏家', desc: '收藏 20 张照片', check: (s) => s.favoriteCount >= 20 },
+            { id: 'collector_50', icon: '❤️', name: '真爱印记', desc: '收藏 50 张照片', check: (s) => s.favoriteCount >= 50 },
+            { id: 'witness', icon: '📅', name: '岁月见证', desc: '使用超过 365 天', check: (s) => s.daysSinceFirst >= 365 },
+            { id: 'explorer', icon: '🗺️', name: '足迹遍布', desc: '标记 10 个地点', check: (s) => s.locationCount >= 10 },
+        ];
+
+        grid.innerHTML = achievements.map(a => {
+            const unlocked = a.check(stats);
+            return `
+                <div class="achievement-badge ${unlocked ? 'unlocked' : 'locked'}">
+                    <span class="achievement-icon">${a.icon}</span>
+                    <span class="achievement-name">${a.name}</span>
+                    <span class="achievement-desc">${unlocked ? a.desc : '???'}</span>
+                </div>
+            `;
+        }).join('');
     },
 
 };

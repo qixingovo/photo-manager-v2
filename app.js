@@ -425,6 +425,36 @@ window.toggleSection = function(section) {
                 timelineSection.style.display = 'none'
             }
         }
+    } else if (section === 'collage') {
+        const collageSection = document.getElementById('collageSection')
+        uploadSection.style.display = 'none'
+        categorySection.style.display = 'none'
+        if (mapSection) mapSection.style.display = 'none'
+        if (timelineSection) timelineSection.style.display = 'none'
+        if (collageSection) {
+            if (collageSection.style.display === 'none' || !collageSection.style.display) {
+                collageSection.style.display = 'block'
+                renderCollageCategorySelect()
+            } else {
+                collageSection.style.display = 'none'
+            }
+        }
+    } else if (section === 'achievements') {
+        const achievementsSection = document.getElementById('achievementsSection')
+        uploadSection.style.display = 'none'
+        categorySection.style.display = 'none'
+        if (mapSection) mapSection.style.display = 'none'
+        if (timelineSection) timelineSection.style.display = 'none'
+        const collageSection = document.getElementById('collageSection')
+        if (collageSection) collageSection.style.display = 'none'
+        if (achievementsSection) {
+            if (achievementsSection.style.display === 'none' || !achievementsSection.style.display) {
+                achievementsSection.style.display = 'block'
+                loadAchievements()
+            } else {
+                achievementsSection.style.display = 'none'
+            }
+        }
     }
 }
 
@@ -553,7 +583,11 @@ async function loadPhotos() {
         }
 
         if (search) {
-            query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
+            const keywords = search.trim().split(/\s+/).filter(k => k.length > 0);
+            if (keywords.length > 0) {
+                const filters = keywords.map(k => `name.ilike.%${k}%,description.ilike.%${k}%`).join(',');
+                query = query.or(filters);
+            }
         }
 
         // 分类筛选：通过内存映射获取匹配 photo ID，推服务端过滤
@@ -805,6 +839,7 @@ window.toggleSelectMode = function() {
     const selectAllBtn = document.getElementById('selectAllBtn')
     const batchCategoryBtn = document.getElementById('batchCategoryBtn')
     const batchLocationBtn = document.getElementById('batchLocationBtn')
+    const batchExportBtn = document.getElementById('batchExportBtn')
     const batchBtn = document.getElementById('batchDeleteBtn')
 
     if (selectMode) {
@@ -813,6 +848,7 @@ window.toggleSelectMode = function() {
         selectAllBtn.style.display = 'inline-block'
         batchCategoryBtn.style.display = 'inline-block'
         if (batchLocationBtn) batchLocationBtn.style.display = 'inline-block'
+        if (batchExportBtn) batchExportBtn.style.display = 'inline-block'
         batchBtn.style.display = 'inline-block'
     } else {
         selectBtn.classList.remove('active')
@@ -820,6 +856,7 @@ window.toggleSelectMode = function() {
         selectAllBtn.style.display = 'none'
         batchCategoryBtn.style.display = 'none'
         if (batchLocationBtn) batchLocationBtn.style.display = 'none'
+        if (batchExportBtn) batchExportBtn.style.display = 'none'
         batchBtn.style.display = 'none'
     }
     
@@ -836,6 +873,64 @@ window.togglePhotoSelect = function(photoId) {
     document.getElementById('selectedCount').textContent = selectedPhotos.size
     renderPhotos()
 }
+
+window.exportSelectedPhotos = async function() {
+    if (selectedPhotos.size === 0) {
+        alert('请先选择要导出的照片');
+        return;
+    }
+    if (selectedPhotos.size > 50) {
+        if (!confirm(`已选择 ${selectedPhotos.size} 张照片，一次最多导出 50 张。仅导出前 50 张？`)) return;
+    }
+
+    const photoIds = [...selectedPhotos].slice(0, 50);
+    const selectedPhotoData = photos.filter(p => photoIds.includes(p.id));
+
+    try {
+        const zip = new JSZip();
+        const total = selectedPhotoData.length;
+        let completed = 0;
+
+        const progressBar = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const progressSection = document.getElementById('uploadProgress');
+        if (progressSection) progressSection.style.display = 'block';
+
+        for (const photo of selectedPhotoData) {
+            const url = getPhotoUrl(photo.storage_path);
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('fetch failed');
+                const blob = await response.blob();
+                // 保持原始文件名或使用 photo.name
+                const ext = photo.storage_path.split('.').pop() || 'jpg';
+                const fileName = `${photo.name || 'photo'}.${ext}`;
+                zip.file(fileName, blob);
+            } catch (e) {
+                console.warn(`下载失败: ${photo.name}`, e);
+            }
+            completed++;
+            if (progressFill) progressFill.style.width = `${(completed / total) * 100}%`;
+            if (progressText) progressText.textContent = `${Math.round((completed / total) * 100)}%`;
+        }
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const downloadUrl = URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `照片导出_${new Date().toISOString().slice(0, 10)}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
+
+        if (progressSection) progressSection.style.display = 'none';
+        alert(`成功导出 ${completed} 张照片！`);
+    } catch (err) {
+        console.error('导出失败:', err);
+        alert('导出失败: ' + err.message);
+    }
+};
 
 window.batchDeletePhotos = async function() {
     if (selectedPhotos.size === 0) {
@@ -2144,6 +2239,216 @@ window.deleteMilestone = function(id) {
     renderTimeline();
 };
 
+// ========================================
+// 照片拼贴墙
+// ========================================
+window.renderCollageCategorySelect = function() {
+    const select = document.getElementById('collageCategorySelect');
+    if (!select) return;
+    select.innerHTML = '<option value="all">全部照片</option>' +
+        categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+};
+
+window.generateCollage = async function() {
+    const canvas = document.getElementById('collageCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // 获取按分类筛选的照片
+    const catId = document.getElementById('collageCategorySelect')?.value || 'all';
+    let collagePhotos = photos;
+    if (catId !== 'all') {
+        const categoryIds = getCategoryAndChildrenIds(catId);
+        const matchingIds = new Set();
+        Object.entries(photoCategories).forEach(([photoId, catIds]) => {
+            if (catIds.some(cid => categoryIds.includes(cid))) matchingIds.add(photoId);
+        });
+        collagePhotos = photos.filter(p => matchingIds.has(String(p.id)));
+    }
+
+    if (collagePhotos.length === 0) {
+        alert('所选分类下没有照片');
+        return;
+    }
+
+    const size = 800;
+    canvas.width = size;
+    canvas.height = size;
+
+    // 清空画布
+    ctx.fillStyle = '#fff0f5';
+    ctx.fillRect(0, 0, size, size);
+
+    // 爱心参数
+    const cx = size / 2;
+    const cy = size / 2 + 20;
+    const scale = size / 3.8;
+
+    // 预加载图片
+    const imageCache = new Map();
+    const photosToUse = collagePhotos.slice(0, 80);
+    await Promise.all(photosToUse.map(async (photo) => {
+        const url = getPhotoUrl(photo.storage_path);
+        try {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+                img.src = url;
+            });
+            imageCache.set(photo.id, img);
+        } catch (e) {
+            // 忽略加载失败的图片
+        }
+    }));
+
+    const loadedPhotos = photosToUse.filter(p => imageCache.has(p.id));
+    if (loadedPhotos.length === 0) {
+        ctx.fillStyle = '#999';
+        ctx.font = '24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('无法加载照片', cx, cy);
+        return;
+    }
+
+    // 在爱心内均匀分布照片
+    const cellSize = 40;
+    const cells = [];
+    for (let y = -scale; y <= scale; y += cellSize) {
+        for (let x = -scale; x <= scale; x += cellSize) {
+            const nx = x / scale;
+            const ny = -y / scale; // Y轴反转
+            const heartVal = Math.pow(nx * nx + ny * ny - 1, 3) - nx * nx * ny * ny * ny;
+            if (heartVal <= 0) {
+                cells.push({ x: cx + x - cellSize / 2, y: cy + y - cellSize / 2, s: cellSize });
+            }
+        }
+    }
+
+    // 随机打乱 cell 顺序
+    for (let i = cells.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cells[i], cells[j]] = [cells[j], cells[i]];
+    }
+
+    // 绘制照片
+    let photoIndex = 0;
+    for (const cell of cells) {
+        const photo = loadedPhotos[photoIndex % loadedPhotos.length];
+        const img = imageCache.get(photo.id);
+        ctx.drawImage(img, cell.x, cell.y, cell.s, cell.s);
+        photoIndex++;
+    }
+
+    // 描边爱心轮廓
+    ctx.strokeStyle = '#ff6b81';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    const steps = 200;
+    for (let i = 0; i <= steps; i++) {
+        const angle = (i / steps) * Math.PI * 2 - Math.PI;
+        const r = heartRadius(angle);
+        const px = cx + r * Math.cos(angle) * scale * 0.5;
+        const py = cy - r * Math.sin(angle) * scale * 0.48;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+};
+
+function heartRadius(angle) {
+    // 爱心极坐标近似
+    const x = Math.cos(angle);
+    const y = Math.sin(angle);
+    const val = Math.pow(x * x + y * y - 1, 3) - x * x * y * y * y;
+    // 二分查找r使点落在爱心边界上
+    let lo = 0, hi = 2;
+    for (let iter = 0; iter < 20; iter++) {
+        const mid = (lo + hi) / 2;
+        const nx = mid * x;
+        const ny = mid * y;
+        if (Math.pow(nx * nx + ny * ny - 1, 3) - nx * nx * ny * ny * ny <= 0) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    return lo;
+}
+
+window.downloadCollage = function() {
+    const canvas = document.getElementById('collageCanvas');
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = '爱心拼贴_' + new Date().toISOString().slice(0, 10) + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+};
+
+// ========================================
+// 回忆成就系统
+// ========================================
+const ACHIEVEMENTS = [
+    { id: 'first_photo', icon: '🐣', name: '初出茅庐', desc: '上传第 1 张照片', check: (s) => s.photoCount >= 1 },
+    { id: 'collector', icon: '📸', name: '记忆收集者', desc: '累计 100 张照片', check: (s) => s.photoCount >= 100 },
+    { id: 'master', icon: '🏆', name: '回忆大师', desc: '累计 500 张照片', check: (s) => s.photoCount >= 500 },
+    { id: 'organizer', icon: '📁', name: '整理达人', desc: '创建 5 个分类', check: (s) => s.categoryCount >= 5 },
+    { id: 'commenter', icon: '💬', name: '留言能手', desc: '发表 10 条留言', check: (s) => s.commentCount >= 10 },
+    { id: 'collector_20', icon: '⭐', name: '收藏家', desc: '收藏 20 张照片', check: (s) => s.favoriteCount >= 20 },
+    { id: 'collector_50', icon: '❤️', name: '真爱印记', desc: '收藏 50 张照片', check: (s) => s.favoriteCount >= 50 },
+    { id: 'witness', icon: '📅', name: '岁月见证', desc: '使用超过 365 天', check: (s) => s.daysSinceFirst >= 365 },
+    { id: 'explorer', icon: '🗺️', name: '足迹遍布', desc: '标记 10 个地点', check: (s) => s.locationCount >= 10 },
+];
+
+window.loadAchievements = async function() {
+    // 记录首次使用日期
+    let firstLaunch = localStorage.getItem('app_first_launch_date');
+    if (!firstLaunch) {
+        firstLaunch = new Date().toISOString().slice(0, 10);
+        localStorage.setItem('app_first_launch_date', firstLaunch);
+    }
+    const daysSinceFirst = Math.floor((new Date() - new Date(firstLaunch)) / (1000 * 60 * 60 * 24));
+
+    // 查询统计数据
+    let photoCount = 0, categoryCount = 0, commentCount = 0, favoriteCount = 0, locationCount = 0;
+    try {
+        const [{ count: pc }, { count: cc }, { count: coc }, { count: fc }, { count: lc }] = await Promise.all([
+            supabase.from('photos').select('*', { count: 'exact', head: true }),
+            supabase.from('categories').select('*', { count: 'exact', head: true }),
+            supabase.from('comments').select('*', { count: 'exact', head: true }),
+            supabase.from('photos').select('*', { count: 'exact', head: true }).eq('is_favorite', true),
+            supabase.from('photos').select('*', { count: 'exact', head: true }).not('location_name', 'is', null),
+        ]);
+        photoCount = pc || 0;
+        categoryCount = cc || 0;
+        commentCount = coc || 0;
+        favoriteCount = fc || 0;
+        locationCount = lc || 0;
+    } catch (e) {
+        console.warn('加载成就统计失败:', e);
+    }
+
+    const stats = { photoCount, categoryCount, commentCount, favoriteCount, locationCount, daysSinceFirst };
+    renderAchievements(stats);
+};
+
+function renderAchievements(stats) {
+    const grid = document.getElementById('achievementsGrid');
+    if (!grid) return;
+
+    grid.innerHTML = ACHIEVEMENTS.map(a => {
+        const unlocked = a.check(stats);
+        return `
+            <div class="achievement-badge ${unlocked ? 'unlocked' : 'locked'}">
+                <span class="achievement-icon">${a.icon}</span>
+                <span class="achievement-name">${a.name}</span>
+                <span class="achievement-desc">${unlocked ? a.desc : '???'}</span>
+            </div>
+        `;
+    }).join('');
+}
+
 function getPhotoUrl(storagePath) {
     const { data } = supabase.storage
         .from('photo')
@@ -2240,10 +2545,20 @@ window.addComment = async function(e) {
     }
 }
 
+function highlightKeywords(text, searchValue) {
+    if (!searchValue || !text) return text;
+    const keywords = searchValue.trim().split(/\s+/).filter(k => k.length > 0);
+    if (keywords.length === 0) return text;
+    const escaped = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
+    return text.replace(regex, '<mark>$1</mark>');
+}
+
 function renderPhotos() {
     const grid = document.getElementById('photoGrid')
     const empty = document.getElementById('emptyState')
-    
+    const searchValue = document.getElementById('searchInput')?.value || '';
+
     if (photos.length === 0) {
         grid.style.display = 'none'
         empty.style.display = 'block'
@@ -2310,8 +2625,8 @@ function renderPhotos() {
                 ${checkboxHtml}
                 <img src="${photoUrl}" alt="${photo.name}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🖼️</text></svg>'">
                 <div class="photo-info">
-                    <h3 title="${photo.name}">${favoriteIcon} ${photo.name}</h3>
-                    ${photo.description ? `<p>${photo.description}</p>` : ''}
+                    <h3 title="${photo.name}">${favoriteIcon} ${highlightKeywords(photo.name, searchValue)}</h3>
+                    ${photo.description ? `<p>${highlightKeywords(photo.description, searchValue)}</p>` : ''}
                     <div class="photo-meta">
                         ${categoryHtml}
                         ${selectMode ? '' : `<div class="photo-actions" onclick="event.stopPropagation()">

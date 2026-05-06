@@ -7,9 +7,10 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=2">
+    <link rel="stylesheet" href="mobile.css?v=3">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="config.js"></script>
 </head>
 <body>
@@ -67,6 +68,7 @@
                 <button id="batchFavoriteBtn" class="btn-secondary" onclick="mobile.batchToggleFavorite()">❤️ 收藏 (<span id="selectedCount">0</span>)</button>
                 <button id="batchDeleteBtn" class="btn-danger" onclick="mobile.batchDeletePhotos()">🗑️ 删除</button>
                 <button id="batchLocationBtn" class="btn-secondary" onclick="mobile.openBatchLocationModal()">📍 设位置</button>
+                <button id="batchExportBtn" class="btn-secondary" onclick="mobile.exportSelectedPhotos()">📦 导出选中</button>
             </div>
         </div>
 
@@ -229,6 +231,38 @@
         </button>
     </div>
 
+    <!-- ========== 照片拼贴墙页面 ========== -->
+    <div id="collagePage" class="page">
+        <header class="top-bar">
+            <div class="logo">
+                <span>❤️</span>
+                <span>拼贴墙</span>
+            </div>
+        </header>
+        <div style="padding:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select id="mobileCollageCategorySelect" style="flex:1;min-width:120px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;">
+                <option value="all">全部照片</option>
+            </select>
+            <button class="btn-primary" style="border-radius:8px;" onclick="mobile.generateCollage()">🎨 生成拼贴</button>
+            <button class="btn-secondary" style="border-radius:8px;" onclick="mobile.downloadCollage()">⬇️ 下载</button>
+        </div>
+        <div style="padding:12px;display:flex;justify-content:center;">
+            <canvas id="mobileCollageCanvas" width="360" height="360" style="max-width:100%;border-radius:12px;"></canvas>
+        </div>
+        <p style="text-align:center;color:#999;font-size:13px;padding:8px;">选择分类后点击"生成拼贴"，照片将排列成爱心形状</p>
+    </div>
+
+    <!-- ========== 回忆成就页面 ========== -->
+    <div id="achievementsPage" class="page">
+        <header class="top-bar">
+            <div class="logo">
+                <span>🏆</span>
+                <span>回忆成就</span>
+            </div>
+        </header>
+        <div id="mobileAchievementsGrid" style="padding:16px;display:flex;flex-wrap:wrap;gap:12px;justify-content:center;"></div>
+    </div>
+
     <!-- ========== 我的页面 ========== -->
     <div id="profilePage" class="page">
         <header class="top-bar">
@@ -265,6 +299,16 @@
             <div class="menu-item" onclick="mobile.switchTab('timeline')">
                 <span class="menu-icon">💝</span>
                 <span class="menu-text">纪念日时间线</span>
+                <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item" onclick="mobile.switchTab('collage')">
+                <span class="menu-icon">❤️</span>
+                <span class="menu-text">照片拼贴墙</span>
+                <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item" onclick="mobile.switchTab('achievements')">
+                <span class="menu-icon">🏆</span>
+                <span class="menu-text">回忆成就</span>
                 <span class="menu-arrow">›</span>
             </div>
             <div class="menu-item" onclick="mobile.showSettings()">
@@ -404,7 +448,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=2"></script>
+    <script type="module" src="mobile-app.js?v=3"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
