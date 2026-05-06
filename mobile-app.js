@@ -3246,14 +3246,33 @@ const mobile = {
         const ctx = canvas.getContext('2d');
 
         const catId = this.getMobileCollageSelectedCategoryId();
-        let collagePhotos = this.photos;
+        let collagePhotos;
         if (catId) {
             const categoryIds = this.getCategoryAndChildrenIds(catId);
             const matchingIds = new Set();
             Object.entries(this.photoCategories).forEach(([photoId, catIds]) => {
                 if (catIds.some(cid => categoryIds.includes(cid))) matchingIds.add(photoId);
             });
-            collagePhotos = this.photos.filter(p => matchingIds.has(String(p.id)));
+            if (matchingIds.size > 0) {
+                const supabase = this.initSupabase();
+                const { data } = await supabase
+                    .from('photos')
+                    .select('*')
+                    .in('id', [...matchingIds])
+                    .order('created_at', { ascending: false })
+                    .limit(200);
+                collagePhotos = data || [];
+            } else {
+                collagePhotos = [];
+            }
+        } else {
+            const supabase = this.initSupabase();
+            const { data } = await supabase
+                .from('photos')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(200);
+            collagePhotos = data || [];
         }
 
         if (collagePhotos.length === 0) {

@@ -2305,14 +2305,33 @@ window.generateCollage = async function() {
 
     // 获取按分类筛选的照片（级联选择器：最深一级为所选分类）
     const catId = window.getCollageSelectedCategoryId();
-    let collagePhotos = photos;
+    let collagePhotos;
     if (catId) {
         const categoryIds = getCategoryAndChildrenIds(catId);
         const matchingIds = new Set();
         Object.entries(photoCategories).forEach(([photoId, catIds]) => {
             if (catIds.some(cid => categoryIds.includes(cid))) matchingIds.add(photoId);
         });
-        collagePhotos = photos.filter(p => matchingIds.has(String(p.id)));
+        // 从 Supabase 查询全量匹配照片（不依赖分页的 photos 数组）
+        if (matchingIds.size > 0) {
+            const { data } = await supabase
+                .from('photos')
+                .select('*')
+                .in('id', [...matchingIds])
+                .order('created_at', { ascending: false })
+                .limit(200);
+            collagePhotos = data || [];
+        } else {
+            collagePhotos = [];
+        }
+    } else {
+        // 未选分类：查全量照片（最多200张用于拼贴）
+        const { data } = await supabase
+            .from('photos')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(200);
+        collagePhotos = data || [];
     }
 
     if (collagePhotos.length === 0) {
