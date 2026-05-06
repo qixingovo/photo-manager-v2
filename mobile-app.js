@@ -918,6 +918,98 @@ const mobile = {
     },
 
     // ========================================
+    // 批量设置位置
+    // ========================================
+    openBatchLocationModal() {
+        if (this.selectedPhotos.size === 0) {
+            this.showToast('请先选择照片');
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'mobileBatchLocationModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '2000';
+        modal.innerHTML = `
+            <div class="modal-card" style="width:95%;max-width:500px;padding:0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #eee;">
+                    <h3 style="margin:0;font-size:16px;">为选中的 ${this.selectedPhotos.size} 张照片设置位置</h3>
+                    <button onclick="document.getElementById('mobileBatchLocationModal').remove()" style="background:none;border:none;font-size:24px;cursor:pointer;">&times;</button>
+                </div>
+                <div id="mobileBatchPickerMap" style="height:350px;"></div>
+                <div style="padding:12px;display:flex;flex-direction:column;gap:8px;">
+                    <input type="text" id="mobileBatchLocationName" placeholder="地点名称（如：北京故宫）" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;">
+                    <span id="mobileBatchPickerCoords" style="color:#666;font-size:13px;">点击地图获取坐标</span>
+                    <button class="btn-primary" onclick="mobile.saveBatchLocation()" style="width:100%;">确认</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        setTimeout(() => {
+            const pickerMap = L.map('mobileBatchPickerMap').setView([35.86, 104.19], 4);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OSM',
+                maxZoom: 18
+            }).addTo(pickerMap);
+
+            let pickedMarker = null;
+
+            pickerMap.on('click', function(e) {
+                window.__mobileBatchPickedLatLng = e.latlng;
+                if (pickedMarker) pickerMap.removeLayer(pickedMarker);
+                pickedMarker = L.marker(e.latlng).addTo(pickerMap);
+                document.getElementById('mobileBatchPickerCoords').textContent =
+                    '纬:' + e.latlng.lat.toFixed(4) + ', 经:' + e.latlng.lng.toFixed(4);
+            });
+
+            setTimeout(() => pickerMap.invalidateSize(), 100);
+        }, 100);
+    },
+
+    async saveBatchLocation() {
+        if (!window.__mobileBatchPickedLatLng) {
+            this.showToast('请先点击地图选择位置');
+            return;
+        }
+
+        const lat = window.__mobileBatchPickedLatLng.lat;
+        const lng = window.__mobileBatchPickedLatLng.lng;
+        const locationName = (document.getElementById('mobileBatchLocationName')?.value || '').trim() || null;
+        const photoIds = [...this.selectedPhotos];
+        const supabase = this.initSupabase();
+
+        try {
+            const { error } = await supabase
+                .from('photos')
+                .update({ latitude: lat, longitude: lng, location_name: locationName })
+                .in('id', photoIds);
+
+            if (error) throw error;
+
+            this.photos.forEach(p => {
+                if (this.selectedPhotos.has(p.id)) {
+                    p.latitude = lat;
+                    p.longitude = lng;
+                    p.location_name = locationName;
+                }
+            });
+
+            document.getElementById('mobileBatchLocationModal').remove();
+            window.__mobileBatchPickedLatLng = null;
+
+            this.selectedPhotos.clear();
+            this.selectMode = false;
+            this.updateSelectModeUI();
+            this.renderPhotos();
+            this.showToast(`已为 ${photoIds.length} 张照片设置位置`);
+        } catch (err) {
+            this.showToast('批量设置位置失败: ' + err.message);
+        }
+    },
+
+    // ========================================
     // 上传相关
     // ========================================
     handleFileSelect(e) {

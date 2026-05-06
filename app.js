@@ -804,19 +804,22 @@ window.toggleSelectMode = function() {
     const selectBtn = document.getElementById('selectModeBtn')
     const selectAllBtn = document.getElementById('selectAllBtn')
     const batchCategoryBtn = document.getElementById('batchCategoryBtn')
+    const batchLocationBtn = document.getElementById('batchLocationBtn')
     const batchBtn = document.getElementById('batchDeleteBtn')
-    
+
     if (selectMode) {
         selectBtn.classList.add('active')
         selectBtn.textContent = '❌ 取消'
         selectAllBtn.style.display = 'inline-block'
         batchCategoryBtn.style.display = 'inline-block'
+        if (batchLocationBtn) batchLocationBtn.style.display = 'inline-block'
         batchBtn.style.display = 'inline-block'
     } else {
         selectBtn.classList.remove('active')
         selectBtn.textContent = '☑️ 多选'
         selectAllBtn.style.display = 'none'
         batchCategoryBtn.style.display = 'none'
+        if (batchLocationBtn) batchLocationBtn.style.display = 'none'
         batchBtn.style.display = 'none'
     }
     
@@ -1029,6 +1032,89 @@ window.batchRemoveCategories = async function() {
     
     alert(`成功从 ${successCount} 张照片移除分类`)
 }
+
+// ========== 批量设置位置 ==========
+
+window.openBatchLocationModal = function() {
+    if (selectedPhotos.size === 0) {
+        alert('请先选择照片');
+        return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'batchLocationModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:700px;padding:0;">
+            <span class="modal-close" onclick="document.getElementById('batchLocationModal').remove()">&times;</span>
+            <h3 style="padding:16px;">为选中的 ${selectedPhotos.size} 张照片设置位置</h3>
+            <div id="batchPickerMap" style="height:400px;"></div>
+            <div style="padding:16px;display:flex;gap:8px;align-items:center;">
+                <input type="text" id="batchLocationName" placeholder="地点名称（如：北京故宫）" style="flex:1;">
+                <span id="batchPickerCoords" style="color:#666;white-space:nowrap;">点击地图获取坐标</span>
+                <button class="btn btn-primary" onclick="window.saveBatchLocation()">确认</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    setTimeout(() => {
+        const pickerMap = L.map('batchPickerMap').setView([35.86, 104.19], 4);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OSM',
+            maxZoom: 18
+        }).addTo(pickerMap);
+
+        let pickedMarker = null;
+
+        pickerMap.on('click', function(e) {
+            window.__batchPickedLatLng = e.latlng;
+            if (pickedMarker) pickerMap.removeLayer(pickedMarker);
+            pickedMarker = L.marker(e.latlng).addTo(pickerMap);
+            document.getElementById('batchPickerCoords').textContent =
+                '纬:' + e.latlng.lat.toFixed(4) + ', 经:' + e.latlng.lng.toFixed(4);
+        });
+
+        setTimeout(() => pickerMap.invalidateSize(), 100);
+    }, 100);
+};
+
+window.saveBatchLocation = async function() {
+    if (!window.__batchPickedLatLng) {
+        alert('请先在地图上点击选择位置');
+        return;
+    }
+
+    const lat = window.__batchPickedLatLng.lat;
+    const lng = window.__batchPickedLatLng.lng;
+    const locationName = (document.getElementById('batchLocationName')?.value || '').trim() || null;
+    const photoIds = [...selectedPhotos];
+
+    try {
+        const { error } = await supabase
+            .from('photos')
+            .update({ latitude: lat, longitude: lng, location_name: locationName })
+            .in('id', photoIds);
+
+        if (error) throw error;
+
+        // 更新本地缓存中的照片数据
+        photos.forEach(p => {
+            if (selectedPhotos.has(p.id)) {
+                p.latitude = lat;
+                p.longitude = lng;
+                p.location_name = locationName;
+            }
+        });
+
+        document.getElementById('batchLocationModal').remove();
+        window.__batchPickedLatLng = null;
+
+        alert(`成功为 ${photoIds.length} 张照片设置位置: ${locationName || '已定位'}`);
+    } catch (err) {
+        alert('批量设置位置失败: ' + err.message);
+    }
+};
 
 function updateFavoriteButton() {
     const btn = document.getElementById('favoriteBtn')
