@@ -4170,7 +4170,7 @@ const mobile = {
         try {
             const { data, error } = await supabase
                 .from('photos')
-                .select('id, name, storage_path, location_name, location_lat, location_lng')
+                .select('id, name, storage_path, location_name')
                 .not('location_name', 'is', null)
                 .neq('location_name', '')
                 .order('created_at', { ascending: false });
