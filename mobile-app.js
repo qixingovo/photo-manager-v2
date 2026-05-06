@@ -20,7 +20,11 @@ const mobile = {
     // 分页状态
     currentPage: 1,
     photosPerPage: 6,
-    
+    totalPhotos: 0,
+
+    // 收藏筛选
+    showFavoritesOnly: false,
+
     // 当前筛选的分类
     currentCategory: 'all',
     
@@ -328,8 +332,7 @@ const mobile = {
     async loadData() {
         await Promise.all([
             this.loadCategories(),
-            this.loadPhotos(),
-            this.loadAllPhotoCategories()
+            this.loadPhotos()  // loadPhotos 内部会调用 loadAllPhotoCategories
         ]);
         this.updateCategorySelects();
         this.updateCategoryPathDisplay();
@@ -366,28 +369,25 @@ const mobile = {
 
     async loadAllPhotoCategories() {
         try {
+            const supabase = this.initSupabase();
+            if (!supabase) return;
 
-            const response = await fetch(`${this.SUPABASE_URL}/rest/v1/photo_categories?select=*`, {
-                headers: {
-                    'apikey': this.SUPABASE_KEY,
-                    'Authorization': `Bearer ${this.SUPABASE_KEY}`
-                }
-            });
+            const { data, error } = await supabase
+                .from('photo_categories')
+                .select('photo_id, category_id')
+                .limit(10000);
 
-            if (response.ok) {
-                const relations = await response.json();
+            if (error) throw error;
 
-                this.photoCategories = {};
-                relations.forEach(rel => {
+            this.photoCategories = {};
+            if (data) {
+                data.forEach(rel => {
                     const pid = String(rel.photo_id);
                     if (!this.photoCategories[pid]) {
                         this.photoCategories[pid] = [];
                     }
                     this.photoCategories[pid].push(String(rel.category_id));
                 });
-
-            } else {
-                console.error('loadAllPhotoCategories: failed with status', response.status);
             }
         } catch (error) {
             console.warn('加载照片分类关联失败:', error);
@@ -397,18 +397,70 @@ const mobile = {
 
     async loadPhotos() {
         try {
-            const response = await fetch(`${this.SUPABASE_URL}/rest/v1/photos?select=*&order=created_at.desc`, {
-                headers: {
-                    'apikey': this.SUPABASE_KEY,
-                    'Authorization': `Bearer ${this.SUPABASE_KEY}`
-                }
-            });
-            if (response.ok) {
-                this.photos = await response.json();
+            const supabase = this.initSupabase();
+            if (!supabase) return;
+
+            // 始终先加载 photo_categories 映射（供分类筛选使用）
+            await this.loadAllPhotoCategories();
+
+            let query = supabase
+                .from('photos')
+                .select('*', { count: 'exact' })
+                .order('created_at', { ascending: false });
+
+            // 收藏筛选
+            if (this.showFavoritesOnly) {
+                query = query.eq('is_favorite', true);
             }
+
+            // 分类筛选：通过内存映射获取匹配 photo ID，推服务端过滤
+            if (this.currentCategory && this.currentCategory !== 'all') {
+                const categoryIds = this.getCategoryAndChildrenIds(this.currentCategory);
+                if (categoryIds.length > 0) {
+                    const matchingPhotoIds = new Set();
+                    Object.entries(this.photoCategories).forEach(([photoId, catIds]) => {
+                        if (catIds.some(cid => categoryIds.includes(cid))) {
+                            matchingPhotoIds.add(photoId);
+                        }
+                    });
+
+                    if (matchingPhotoIds.size > 0) {
+                        query = query.in('id', [...matchingPhotoIds]);
+                    } else {
+                        this.photos = [];
+                        this.totalPhotos = 0;
+                        this.renderPhotos();
+                        this.updateCategoryPathDisplay();
+                        return;
+                    }
+                }
+            }
+
+            // 搜索筛选
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput && searchInput.value) {
+                const search = searchInput.value;
+                query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+            }
+
+            // 服务端分页
+            const from = (this.currentPage - 1) * this.photosPerPage;
+            const to = from + this.photosPerPage - 1;
+            query = query.range(from, to);
+
+            const { data, error, count } = await query;
+
+            if (error) throw error;
+
+            this.photos = data || [];
+            this.totalPhotos = count || 0;
+
+            this.renderPhotos();
+            this.updateCategoryPathDisplay();
         } catch (error) {
-            console.warn('加载照片失败，使用空列表:', error);
+            console.warn('加载照片失败:', error);
             this.photos = [];
+            this.totalPhotos = 0;
         }
     },
 
@@ -418,32 +470,21 @@ const mobile = {
     renderPhotos() {
         const feed = document.getElementById('photoFeed');
         const empty = document.getElementById('emptyFeed');
-        
-        const filteredPhotos = this.getFilteredPhotos();
-        
-        if (filteredPhotos.length === 0) {
+
+        const pagePhotos = this.photos; // 已由服务端分页 + 筛选
+
+        if (pagePhotos.length === 0) {
             feed.style.display = 'none';
             empty.style.display = 'flex';
-            // 更新分页信息
-            this.updatePaginationInfo(0, 0, 0);
+            this.renderLoadMoreButton(0, 0);
             return;
         }
 
         feed.style.display = 'grid';
         empty.style.display = 'none';
-        
-        // 计算分页
-        const totalPages = Math.ceil(filteredPhotos.length / this.photosPerPage);
-        
-        // 边界保护：当前页不能超过总页数
-        if (this.currentPage > totalPages) {
-            this.currentPage = totalPages || 1;
-        }
-        
-        const startIndex = (this.currentPage - 1) * this.photosPerPage;
-        const endIndex = Math.min(startIndex + this.photosPerPage, filteredPhotos.length);
-        const pagePhotos = filteredPhotos.slice(startIndex, endIndex);
-        
+
+        const totalPages = Math.max(1, Math.ceil(this.totalPhotos / this.photosPerPage));
+
         feed.innerHTML = pagePhotos.map((photo, index) => {
             const safeName = this.escapeHtml(photo.name || '未命名');
             const safeDesc = this.escapeHtml(photo.description || '');
@@ -467,7 +508,7 @@ const mobile = {
         `}).join('');
         
         // 渲染分页控制
-        this.renderLoadMoreButton(totalPages, filteredPhotos.length);
+        this.renderLoadMoreButton(totalPages, this.totalPhotos);
     },
 
     updatePaginationInfo(displayed, total, pages) {
@@ -498,15 +539,18 @@ const mobile = {
     prevPage() {
         if (this.currentPage > 1) {
             this.currentPage--;
-            this.renderPhotos();
+            this.loadPhotos();
             this.scrollToTop();
         }
     },
 
     nextPage() {
-        this.currentPage++;
-        this.renderPhotos();
-        this.scrollToTop();
+        const totalPages = Math.max(1, Math.ceil(this.totalPhotos / this.photosPerPage));
+        if (this.currentPage < totalPages) {
+            this.currentPage++;
+            this.loadPhotos();
+            this.scrollToTop();
+        }
     },
 
     scrollToTop() {
@@ -616,29 +660,6 @@ const mobile = {
         document.getElementById('confirmTitle').textContent = '批量删除';
         document.getElementById('confirmMessage').textContent = `确定删除选中的 ${this.selectedPhotos.size} 张照片？`;
         document.getElementById('confirmModal').style.display = 'flex';
-    },
-
-    confirmBatchDelete() {
-        const supabase = this.initSupabase();
-        let deletedCount = 0;
-        
-        this.selectedPhotos.forEach(async (photoId) => {
-            try {
-                await supabase.from('photos').delete().eq('id', photoId);
-                deletedCount++;
-            } catch (err) {
-                console.error('删除失败:', err);
-            }
-        });
-        
-        this.selectedPhotos.clear();
-        this.selectMode = false;
-        this.updateSelectModeUI();
-        this.closeConfirmModal();
-        this.showToast(`已删除 ${deletedCount} 张照片`);
-        
-        // 重新加载
-        this.loadPhotos();
     },
 
     openDetail(photoId) {
@@ -753,6 +774,17 @@ const mobile = {
         }
     },
 
+    renderPreviews() {
+        const previewGrid = document.getElementById('previewGrid');
+        if (!previewGrid) return;
+        previewGrid.innerHTML = this.previewFiles.map((file, index) => `
+            <div class="preview-item">
+                <img src="${URL.createObjectURL(file)}" alt="Preview">
+                <button class="remove-btn" onclick="mobile.removePreview(${index})">×</button>
+            </div>
+        `).join('');
+    },
+
     clearPreviews() {
         this.previewFiles = [];
         document.getElementById('previewArea').style.display = 'none';
@@ -816,8 +848,7 @@ const mobile = {
                         storage_path: uniqueName,
                         original_name: file.name,
                         size: file.size,
-                        is_favorite: false,
-                        category_id: categoryId || null
+                        is_favorite: false
                     }])
                     .select()
                     .single();
@@ -1150,7 +1181,7 @@ const mobile = {
     switchToHomeAndFilter(categoryId) {
         // 切换到首页
         this.switchTab('home');
-        
+
         // 设置筛选器并筛选
         const filterSelect = document.getElementById('mobileFilterCategory');
         if (filterSelect) {
@@ -1158,18 +1189,11 @@ const mobile = {
         }
         this.currentCategory = categoryId;
         this.currentPage = 1;
-        
+
         // 更新分类路径显示
         this.updateCategoryPathDisplay();
-        
-        // 如果 photoCategories 还没加载，先等待加载完成再筛选
-        if (Object.keys(this.photoCategories).length === 0 && this.photos.length > 0) {
-            this.loadAllPhotoCategories().then(() => {
-                this.renderPhotos();
-            });
-        } else {
-            this.renderPhotos();
-        }
+
+        this.loadPhotos();
     },
 
     showAddCategory() {
@@ -1476,7 +1500,7 @@ const mobile = {
             // 获取这个分类及其子分类的照片数量
             const categoryIds = this.getCategoryAndChildrenIds(this.pendingDeleteId);
             const photoCount = this.photos.filter(photo => {
-                const photoCats = this.photoCategories[photo.id] || [];
+                const photoCats = this.photoCategories[String(photo.id)] || [];
                 return categoryIds.some(catId => photoCats.includes(catId));
             }).length;
             
@@ -1507,8 +1531,8 @@ const mobile = {
         if (!categoryId || categoryId === 'all') return [];
         
         const path = [];
-        let currentId = categoryId;
-        
+        let currentId = Number(categoryId);
+
         // 不断向上查找父类，直到找不到为止
         while (currentId) {
             const cat = this.categories.find(c => c.id === currentId);
@@ -1560,7 +1584,7 @@ const mobile = {
         // 获取这个分类及其子分类的照片数量
         const categoryIds = this.getCategoryAndChildrenIds(strId);
         const photoCount = this.photos.filter(photo => {
-            const photoCats = this.photoCategories[photo.id] || [];
+            const photoCats = this.photoCategories[String(photo.id)] || [];
             return categoryIds.some(catId => photoCats.includes(catId));
         }).length;
         
@@ -1669,12 +1693,18 @@ const mobile = {
         
         // 找出属于这些分类的所有照片
         const photosToDelete = this.photos.filter(photo => {
-            const photoCats = this.photoCategories[photo.id] || [];
+            const photoCats = this.photoCategories[String(photo.id)] || [];
             return categoryIds.some(catId => photoCats.includes(catId));
         });
         
         let deletedPhotoCount = 0;
-        
+
+        // 清理 Storage 文件
+        const storagePaths = photosToDelete.map(p => p.storage_path).filter(Boolean);
+        if (storagePaths.length > 0) {
+            try { await supabase.storage.from('photo').remove(storagePaths); } catch (e) { console.warn('Storage 清理失败:', e); }
+        }
+
         // 删除照片
         for (const photo of photosToDelete) {
             try {
@@ -1685,7 +1715,7 @@ const mobile = {
                 console.error('删除照片失败:', photo.id, err);
             }
         }
-        
+
         // 删除分类
         try {
             const { error: categoryDeleteError } = await supabase.from('categories').delete().eq('id', categoryId);
@@ -1727,12 +1757,18 @@ const mobile = {
         
         // 找出属于这些分类的所有照片
         const photosToDelete = this.photos.filter(photo => {
-            const photoCats = this.photoCategories[photo.id] || [];
+            const photoCats = this.photoCategories[String(photo.id)] || [];
             return categoryIds.some(catId => photoCats.includes(catId));
         });
         
         let deletedPhotoCount = 0;
-        
+
+        // 清理 Storage 文件
+        const storagePaths = photosToDelete.map(p => p.storage_path).filter(Boolean);
+        if (storagePaths.length > 0) {
+            try { await supabase.storage.from('photo').remove(storagePaths); } catch (e) { console.warn('Storage 清理失败:', e); }
+        }
+
         // 删除照片
         for (const photo of photosToDelete) {
             try {
@@ -1743,7 +1779,7 @@ const mobile = {
                 console.error('删除照片失败:', photo.id, err);
             }
         }
-        
+
         // 更新本地状态
         this.photos = this.photos.filter(p => !photosToDelete.includes(p));
         
@@ -1768,7 +1804,7 @@ const mobile = {
             
             // 找出属于这些分类的所有照片
             const photosToDelete = this.photos.filter(photo => {
-                const photoCats = this.photoCategories[photo.id] || [];
+                const photoCats = this.photoCategories[String(photo.id)] || [];
                 return categoryIds.some(catId => photoCats.includes(catId));
             });
             
@@ -1819,6 +1855,12 @@ const mobile = {
             const supabase = this.initSupabase();
             if (!supabase) return;
             try {
+                // 清理 Storage 文件
+                const photo = this.photos.find(p => p.id === photoId);
+                if (photo && photo.storage_path) {
+                    await supabase.storage.from('photo').remove([photo.storage_path]);
+                }
+
                 const { error: relationDeleteError } = await supabase
                     .from('photo_categories')
                     .delete()
@@ -1850,9 +1892,36 @@ const mobile = {
             // 批量删除
             const supabase = this.initSupabase();
             if (!supabase) return;
-            let deletedCount = 0;
-            for (const photoId of this.selectedPhotos) {
+
+            // 先获取所有选中照片的 storage_path
+            const photoIds = [...this.selectedPhotos];
+            let storagePaths = [];
+            try {
+                const { data: photoRecords } = await supabase
+                    .from('photos')
+                    .select('id, storage_path')
+                    .in('id', photoIds);
+                if (photoRecords) {
+                    storagePaths = photoRecords.map(p => p.storage_path).filter(Boolean);
+                }
+            } catch (e) {
+                console.warn('获取 storage_path 失败，跳过文件清理:', e);
+            }
+
+            // 清理 Storage 文件
+            if (storagePaths.length > 0) {
                 try {
+                    await supabase.storage.from('photo').remove(storagePaths);
+                } catch (e) {
+                    console.warn('Storage 文件清理失败:', e);
+                }
+            }
+
+            let deletedCount = 0;
+            for (const photoId of photoIds) {
+                try {
+                    await supabase.from('photo_categories').delete().eq('photo_id', photoId);
+                    await supabase.from('comments').delete().eq('photo_id', photoId);
                     const { error: photoDeleteError } = await supabase.from('photos').delete().eq('id', photoId);
                     if (photoDeleteError) throw photoDeleteError;
                     this.photos = this.photos.filter(p => p.id !== photoId);
@@ -1882,106 +1951,25 @@ const mobile = {
     },
 
     searchPhotos() {
-        const query = document.getElementById('searchInput').value.toLowerCase();
-        // 实际项目中应该请求后端过滤
-        this.renderPhotos();
+        this.currentPage = 1;
+        this.loadPhotos();
     },
 
     filterByCategory() {
         const categoryId = document.getElementById('mobileFilterCategory').value;
 
-
         this.currentCategory = categoryId;
         this.currentPage = 1;
-        
+
         // 更新分类路径显示
         this.updateCategoryPathDisplay();
-        
-        // 如果 photoCategories 还没加载，先等待加载完成再筛选
-        if (Object.keys(this.photoCategories).length === 0 && this.photos.length > 0) {
-            this.loadAllPhotoCategories().then(() => {
-                this.renderPhotos();
-            });
-        } else {
-            this.renderPhotos();
-        }
+
+        this.loadPhotos();
     },
 
     getFilteredPhotos() {
-        // 如果是"全部分类"，返回所有照片
-        if (this.currentCategory === 'all') {
-            return this.photos;
-        }
-        
-        // 如果 photoCategories 还没加载（空对象），且不是全部分类，返回空数组
-        const photoCatsKeys = Object.keys(this.photoCategories);
-        if (photoCatsKeys.length === 0) {
-            console.warn('[DEBUG] photoCategories 为空，当前分类:', this.currentCategory, '照片数:', this.photos.length);
-            return [];
-        }
-        
-        const categoryId = this.currentCategory;
-        
-        // 统计每个分类各有几张照片
-        const catCount = {};
-        Object.entries(this.photoCategories).forEach(([photoId, cats]) => {
-            cats.forEach(cat => {
-                catCount[cat] = (catCount[cat] || 0) + 1;
-            });
-        });
-        
-        console.log('[DEBUG] 筛选照片:', {
-            currentCategory: categoryId,
-            currentCategoryType: typeof categoryId,
-            totalPhotos: this.photos.length,
-            photoCategoriesKeysCount: photoCatsKeys.length,
-            categoryPhotoCount: catCount[categoryId] || 0
-        });
-        
-        // 打印 photoCategories 里实际的 key 和 value 类型
-        const firstEntry = Object.entries(this.photoCategories)[0];
-        if (firstEntry) {
-            console.log('[DEBUG] photoCategories sample:', {
-                photoId: firstEntry[0],
-                photoIdType: typeof firstEntry[0],
-                catIdSample: firstEntry[1][0],
-                catIdType: typeof firstEntry[1][0]
-            });
-        }
-        
-        // 获取当前分类及其所有子分类的 ID
-        const categoryIds = this.getCategoryAndChildrenIds(categoryId);
-        console.log('[DEBUG] 当前选中的分类ID:', categoryId);
-        console.log('[DEBUG] 该分类及其子分类IDs:', categoryIds);
-        
-        // 打印每个目标分类的名字
-        const targetCatNames = categoryIds.map(catId => {
-            const cat = this.categories.find(c => String(c.id) === String(catId));
-            return cat ? cat.name : '未知';
-        });
-        console.log('[DEBUG] 目标分类名字:', targetCatNames);
-        
-        // 打印有照片的前5个分类
-        const sortedCats = Object.entries(catCount).sort((a,b) => b[1]-a[1]).slice(0, 5);
-        console.log('[DEBUG] 有照片的前5个分类:', JSON.stringify(sortedCats));
-        
-        // 打印 categories 表里的分类（带名字对照）
-        const catsWithNames = this.categories.slice(0, 10).map(c => ({id: c.id, name: c.name}));
-        console.log('[DEBUG] categories表前10个:', JSON.stringify(catsWithNames));
-        
-        // 筛选照片：匹配当前分类及其所有子分类
-        const filtered = this.photos.filter(photo => {
-            const photoCats = this.photoCategories[String(photo.id)] || [];
-            // 检查照片是否属于当前分类或其任一子分类
-            return categoryIds.some(catId => 
-                photoCats.includes(catId) || 
-                photoCats.includes(String(catId)) ||
-                photoCats.includes(Number(catId))
-            );
-        });
-        
-        console.log('[DEBUG] 筛选结果:', filtered.length, '张 (包含子分类)');
-        return filtered;
+        // 分类筛选已由服务端 loadPhotos() 完成，直接返回当前页照片
+        return this.photos;
     },
 
     // ========================================
@@ -2069,16 +2057,13 @@ const mobile = {
     },
 
     toggleFavorites() {
-        // 显示收藏的照片
-        const favorites = this.photos.filter(p => p.is_favorite);
-        if (favorites.length === 0) {
-            this.showToast('暂无收藏照片');
-            return;
+        this.showFavoritesOnly = !this.showFavoritesOnly;
+        this.currentPage = 1;
+        if (this.showFavoritesOnly) {
+            this.showPage('home');
         }
-        this.photos = favorites;
-        this.renderPhotos();
-        this.showPage('home');
-        this.showToast(`显示 ${favorites.length} 张收藏`);
+        this.loadPhotos();
+        this.showToast(this.showFavoritesOnly ? '显示收藏照片' : '显示全部照片');
     },
 
     // ========================================
@@ -2105,7 +2090,7 @@ const mobile = {
             return `
                 <div class="marked-item" onclick="mobile.selectCategory('${strId}')">
                     <span>📁 ${cat.name}</span>
-                    <span class="unmark" onclick="event.stopPropagation();mobile.unmarkCategory('${id}')">✕</span>
+                    <span class="unmark" onclick="event.stopPropagation();mobile.unmarkCategory('${strId}')">✕</span>
                 </div>
             `;
         }).join('');
@@ -2379,49 +2364,55 @@ const mobile = {
     // ========================================
     compressImage(file, maxSizeMB) {
         return new Promise((resolve) => {
-            const maxSize = maxSizeMB * 1024 * 1024;
-            
+            const maxBytes = maxSizeMB * 1024 * 1024;
+
             // 如果文件小于限制，直接返回
-            if (file.size <= maxSize) {
+            if (file.size <= maxBytes) {
                 resolve(file);
                 return;
             }
-            
+
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    let quality = 0.7;
                     let width = img.width;
                     let height = img.height;
-                    
-                    // 计算压缩比例
-                    const ratio = Math.sqrt(maxSize / file.size);
-                    width = Math.round(width * ratio);
-                    height = Math.round(height * ratio);
-                    
-                    canvas.width = width;
-                    canvas.height = height;
-                    
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    canvas.toBlob(
-                        (blob) => {
-                            if (blob.size > file.size) {
-                                // 如果压缩后更大，返回原文件
-                                resolve(file);
-                            } else {
-                                // 返回压缩后的文件
-                                resolve(new File([blob], file.name, {
-                                    type: file.type,
-                                    lastModified: Date.now()
-                                }));
-                            }
-                        },
-                        file.type,
-                        0.85
-                    );
+
+                    const tryCompress = () => {
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob(
+                            (blob) => {
+                                if (!blob || blob.size <= maxBytes || quality <= 0.05) {
+                                    resolve(blob && blob.size <= file.size
+                                        ? new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() })
+                                        : file);
+                                    return;
+                                }
+                                if (quality > 0.1) {
+                                    quality -= 0.15;
+                                } else if (width > 400) {
+                                    width = Math.round(width * 0.7);
+                                    height = Math.round(height * 0.7);
+                                    quality = 0.5;
+                                } else {
+                                    resolve(file);
+                                    return;
+                                }
+                                tryCompress();
+                            },
+                            'image/jpeg',
+                            quality
+                        );
+                    };
+
+                    tryCompress();
                 };
                 img.src = e.target.result;
             };

@@ -8,9 +8,14 @@ let showFavoritesOnly = false
 let currentComments = []
 let selectMode = false
 let selectedPhotos = new Set()
-let markedCategories = new Set(JSON.parse(localStorage.getItem('markedCategories') || '[]'))
+let markedCategories = new Set((JSON.parse(localStorage.getItem('markedCategories') || '[]')).map(String))
 let expandedCategories = new Set()
 let expandedInManager = new Set() // 分类管理区域的展开状态
+
+// 分页状态
+const PHOTOS_PER_PAGE = 20
+let currentPage = 1
+let totalPhotos = 0
 
 // Supabase 配置（从外部配置文件读取）
 const APP_CONFIG = window.__APP_CONFIG__ || {}
@@ -318,6 +323,7 @@ async function initApp() {
     let searchTimeout;
     document.getElementById('searchInput').addEventListener('input', () => {
         clearTimeout(searchTimeout);
+        currentPage = 1;
         searchTimeout = setTimeout(loadPhotos, 300);
     });
     
@@ -342,7 +348,7 @@ async function loadCategories() {
         // 清理已删除的标记分类
         if (markedCategories.size > 0) {
             const validCats = [...markedCategories].filter(catId => {
-                return categories.some(c => c.id === catId)
+                return categories.some(c => String(c.id) === catId)
             })
             if (validCats.length !== markedCategories.size) {
                 markedCategories = new Set(validCats)
@@ -363,58 +369,86 @@ async function loadCategories() {
 
 async function loadPhotos() {
     const search = document.getElementById('searchInput').value
-    
+
     try {
-        // 先加载所有照片（不过滤）
+        // 始终先加载 photo_categories 映射（供分类筛选和计数使用）
+        await loadAllPhotoCategories()
+
         let query = supabase
             .from('photos')
-            .select('*')
+            .select('*', { count: 'exact' })
             .order('created_at', { ascending: false })
-        
+
         if (showFavoritesOnly) {
             query = query.eq('is_favorite', true)
         }
-        
+
         if (search) {
             query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
         }
-        
-        const { data, error } = await query
-        
-        if (error) throw error
-        
-        photos = data || []
-        
-        // 先加载所有照片的分类关联
-        await loadAllPhotoCategories()
-        
-        // 如果有分类筛选且有分类数据，才过滤
+
+        // 分类筛选：通过内存映射获取匹配 photo ID，推服务端过滤
         if (currentCategory && currentCategory !== 'all' && categories.length > 0) {
             const categoryIds = getCategoryAndChildrenIds(currentCategory)
             if (categoryIds.length > 0) {
-                photos = photos.filter(p => {
-                    const photoCats = photoCategories[String(p.id)] || []
-                    return categoryIds.some(cid => photoCats.includes(String(cid)))
+                const matchingPhotoIds = new Set()
+                Object.entries(photoCategories).forEach(([photoId, catIds]) => {
+                    if (catIds.some(cid => categoryIds.includes(cid))) {
+                        matchingPhotoIds.add(photoId)
+                    }
                 })
+
+                if (matchingPhotoIds.size > 0) {
+                    query = query.in('id', [...matchingPhotoIds])
+                } else {
+                    // 无匹配照片
+                    photos = []
+                    totalPhotos = 0
+                    renderCategories()
+                    renderPhotos()
+                    updatePhotosTitle()
+                    updateEmptyState()
+                    renderPagination()
+                    return
+                }
             }
         }
-        
+
+        // 服务端分页
+        const from = (currentPage - 1) * PHOTOS_PER_PAGE
+        const to = from + PHOTOS_PER_PAGE - 1
+        query = query.range(from, to)
+
+        const { data, error, count } = await query
+
+        if (error) throw error
+
+        photos = data || []
+        totalPhotos = count || 0
+
         renderCategories()
         renderPhotos()
         updatePhotosTitle()
         updateEmptyState()
+        renderPagination()
     } catch (err) {
         console.error('加载照片失败:', err)
     }
 }
 
 function getCategoryAndChildrenIds(categoryId) {
-    const ids = [categoryId]
+    const strId = String(categoryId)
+    const ids = [strId]
     const children = categories.filter(c => c.parent_id === Number(categoryId))
     children.forEach(child => {
-        ids.push(...getCategoryAndChildrenIds(child.id))
+        ids.push(...getCategoryAndChildrenIds(String(child.id)))
     })
     return ids
+}
+
+function getCategoryPhotoCount(catId) {
+    const strCatId = String(catId)
+    return Object.values(photoCategories).filter(catIds => catIds.includes(strCatId)).length
 }
 
 function updatePhotosTitle() {
@@ -471,10 +505,7 @@ function updateEmptyState() {
                 <div style="text-align:center;padding:30px;">
                     <div style="display:flex;flex-wrap:wrap;gap:15px;justify-content:center;">
                         ${children.map((child, i) => {
-                            const count = photos.filter(p => {
-                                const photoCats = photoCategories[String(p.id)] || []
-                                return photoCats.includes(String(child.id))
-                            }).length
+                            const count = getCategoryPhotoCount(child.id)
                             const color = colors[i % colors.length]
                             return `<span class="category-tag" onclick="window.filterByCategory('${child.id}')" 
                                 style="cursor:pointer;background:${color};color:white;padding:12px 24px;border-radius:25px;font-size:16px;box-shadow:0 3px 10px rgba(0,0,0,0.2);transition:transform 0.2s;"
@@ -494,8 +525,43 @@ function updateEmptyState() {
     if (subcatsEl) subcatsEl.remove()
 }
 
+function renderPagination() {
+    const container = document.getElementById('paginationContainer')
+    if (!container) return
+
+    const totalPages = Math.max(1, Math.ceil(totalPhotos / PHOTOS_PER_PAGE))
+    const hasPrev = currentPage > 1
+    const hasNext = currentPage < totalPages
+
+    container.innerHTML = `
+        <div class="pagination">
+            <button class="pagination-btn" ${hasPrev ? '' : 'disabled'} onclick="${hasPrev ? 'window.prevPage()' : ''}">上一页</button>
+            <span class="pagination-info">第 ${currentPage} / ${totalPages} 页 · 共 ${totalPhotos} 张</span>
+            <button class="pagination-btn" ${hasNext ? '' : 'disabled'} onclick="${hasNext ? 'window.nextPage()' : ''}">下一页</button>
+        </div>
+    `
+}
+
+window.prevPage = function() {
+    if (currentPage > 1) {
+        currentPage--
+        loadPhotos()
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+}
+
+window.nextPage = function() {
+    const totalPages = Math.max(1, Math.ceil(totalPhotos / PHOTOS_PER_PAGE))
+    if (currentPage < totalPages) {
+        currentPage++
+        loadPhotos()
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+}
+
 window.clearCategoryFilter = function() {
     currentCategory = 'all'
+    currentPage = 1
     showFavoritesOnly = false
     // 重置级联选择器
     const container = document.getElementById('filterCategoryCascade')
@@ -507,10 +573,7 @@ window.clearCategoryFilter = function() {
         select.style.cssText = 'padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;'
         select.onchange = () => onFilterCatLevelChange(0)
         select.innerHTML = `<option value="all">全部分类</option>${topLevel.map(cat => {
-            const count = photos.filter(p => {
-                const photoCats = photoCategories[String(p.id)] || []
-                return photoCats.includes(String(cat.id))
-            }).length
+            const count = getCategoryPhotoCount(cat.id)
             return `<option value="${cat.id}">${cat.name} (${count})</option>`
         }).join('')}`
         container.appendChild(select)
@@ -528,6 +591,7 @@ window.onCategoryFilterChange = function() {
 
 window.toggleFavoritesFilter = function() {
     showFavoritesOnly = !showFavoritesOnly
+    currentPage = 1
     const btn = document.getElementById('favoritesFilterBtn')
     if (showFavoritesOnly) {
         btn.classList.add('active')
@@ -608,38 +672,54 @@ window.batchDeletePhotos = async function() {
     }
     
     if (!confirm(`确定删除选中的 ${selectedPhotos.size} 张照片？`)) return
-    
+
+    const photoIds = [...selectedPhotos]
     let successCount = 0
     let failCount = 0
-    
-    for (const photoId of selectedPhotos) {
-        const photo = photos.find(p => p.id === photoId)
-        if (!photo) continue
-        
+
+    // 先从 Supabase 查询所有选中照片的 storage_path
+    let storagePaths = []
+    try {
+        const { data: photoRecords } = await supabase
+            .from('photos')
+            .select('id, storage_path')
+            .in('id', photoIds)
+        if (photoRecords) {
+            storagePaths = photoRecords.map(p => p.storage_path).filter(Boolean)
+        }
+    } catch (e) {
+        console.warn('获取 storage_path 失败:', e)
+    }
+
+    // 批量清理 Storage 文件
+    if (storagePaths.length > 0) {
         try {
-            // 删除存储文件
-            await supabase.storage
-                .from('photo')
-                .remove([photo.storage_path])
-            
+            await supabase.storage.from('photo').remove(storagePaths)
+        } catch (e) {
+            console.warn('Storage 文件清理失败:', e)
+        }
+    }
+
+    for (const photoId of photoIds) {
+        try {
             // 删除关联
             await supabase
                 .from('photo_categories')
                 .delete()
                 .eq('photo_id', photoId)
-            
+
             // 删除留言
             await supabase
                 .from('comments')
                 .delete()
                 .eq('photo_id', photoId)
-            
+
             // 删除记录
             await supabase
                 .from('photos')
                 .delete()
                 .eq('id', photoId)
-            
+
             successCount++
         } catch (err) {
             console.error('删除失败:', photoId, err)
@@ -823,10 +903,7 @@ function renderCategorySelect() {
     select.style.cssText = 'padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;'
     select.onchange = () => onFilterCatLevelChange(0)
     select.innerHTML = `<option value="all">全部分类</option>${topLevel.map(cat => {
-        const count = photos.filter(p => {
-            const photoCats = photoCategories[String(p.id)] || []
-            return photoCats.includes(String(cat.id))
-        }).length
+        const count = getCategoryPhotoCount(cat.id)
         return `<option value="${cat.id}">${cat.name} (${count})</option>`
     }).join('')}`
     container.appendChild(select)
@@ -858,10 +935,7 @@ function rebuildFilterCascade(categoryId) {
         
         const selectedValue = index === path.length - 1 ? catId : ''
         select.innerHTML = `<option value="">选择分类</option>${cats.map(cat => {
-            const count = photos.filter(p => {
-                const photoCats = photoCategories[String(p.id)] || []
-                return photoCats.includes(String(cat.id))
-            }).length
+            const count = getCategoryPhotoCount(cat.id)
             const selected = cat.id === catId ? 'selected' : ''
             return `<option value="${cat.id}" ${selected}>${cat.name} (${count})</option>`
         }).join('')}`
@@ -898,13 +972,15 @@ function onFilterCatLevelChange(level) {
     // 如果选择了"全部分类"，重置为 all
     if (selectedValue === 'all') {
         currentCategory = 'all'
+        currentPage = 1
         loadPhotos() // 重新加载所有照片
         return
     }
-    
+
     // 如果选中了某个分类，显示其子分类作为下一级
     if (selectedValue) {
         currentCategory = selectedValue
+        currentPage = 1
         const children = categories.filter(c => c.parent_id === selectedValue)
         if (children.length > 0) {
             const nextLevel = level + 1
@@ -913,10 +989,7 @@ function onFilterCatLevelChange(level) {
             nextSelect.style.cssText = 'padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;'
             nextSelect.onchange = () => onFilterCatLevelChange(nextLevel)
             nextSelect.innerHTML = `<option value="">选择子分类</option>${children.map(cat => {
-                const count = photos.filter(p => {
-                    const photoCats = photoCategories[String(p.id)] || []
-                    return photoCats.includes(String(cat.id))
-                }).length
+                const count = getCategoryPhotoCount(cat.id)
                 return `<option value="${cat.id}">${cat.name} (${count})</option>`
             }).join('')}`
             container.appendChild(nextSelect)
@@ -934,10 +1007,7 @@ function renderCategoryItem(cat, level) {
     const isMarked = markedCategories.has(cat.id)
     
     // 计算该分类的照片数量
-    const count = photos.filter(p => {
-        const photoCats = photoCategories[String(p.id)] || []
-        return photoCats.includes(String(cat.id))
-    }).length
+    const count = getCategoryPhotoCount(cat.id)
     
     // 获取当前展开状态（使用管理区域的展开状态）
     const isExpanded = expandedInManager.has(cat.id)
@@ -984,6 +1054,7 @@ window.toggleCategoryInManager = function(catId) {
 // 分类管理区域点击分类（只是视觉选中，不筛选照片）
 window.filterByCategoryInManager = function(categoryId) {
     currentCategory = categoryId
+    currentPage = 1
     loadPhotos()
 }
 
@@ -1012,6 +1083,7 @@ window.toggleCategoryChildren = function(catId, event) {
 
 window.filterByCategory = function(categoryId) {
     currentCategory = categoryId
+    currentPage = 1
     rebuildFilterCascade(categoryId)
     loadPhotos()
 }
@@ -1183,26 +1255,31 @@ window.createCategory = async function() {
 
 window.deleteCategory = async function(id) {
     if (!confirm('确定删除该分类？照片不会删除')) return
-    
+
     try {
-        // 删除分类
-        const { error } = await supabase
-            .from('categories')
-            .delete()
-            .eq('id', id)
-        
-        if (error) throw error
-        
-        // 删除该分类的关联
-        await supabase
-            .from('photo_categories')
-            .delete()
-            .eq('category_id', id)
-        
-        if (currentCategory === id) {
+        // 获取该分类及其所有子分类
+        const allIds = getCategoryAndChildrenIds(id)
+
+        // 删除所有关联的 photo_categories
+        for (const catId of allIds) {
+            await supabase
+                .from('photo_categories')
+                .delete()
+                .eq('category_id', catId)
+        }
+
+        // 删除所有分类（从叶子到根，避免外键冲突）
+        for (const catId of allIds.reverse()) {
+            await supabase
+                .from('categories')
+                .delete()
+                .eq('id', catId)
+        }
+
+        if (allIds.includes(String(currentCategory))) {
             currentCategory = 'all'
         }
-        
+
         await loadCategories()
         await loadPhotos()
     } catch (err) {
@@ -1383,52 +1460,44 @@ async function compressImage(file, maxSizeMB) {
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d')
         const img = new Image()
-        
+        const maxBytes = maxSizeMB * 1024 * 1024
+
         img.onload = () => {
-            let quality = 0.9
-            let minQuality = 0.1
+            let quality = 0.7
             let width = img.width
             let height = img.height
-            
-            canvas.width = width
-            canvas.height = height
-            ctx.drawImage(img, 0, 0)
-            
-            // 迭代压缩直到文件小于目标大小
-            const compress = () => {
-                const dataUrl = canvas.toDataURL('image/jpeg', quality)
-                const size = Math.round((dataUrl.length - dataUrl.indexOf(',') - 1) * 0.75)
-                
-                if (size <= maxSizeMB * 1024 * 1024 || quality <= minQuality) {
-                    // 转换为Blob
-                    fetch(dataUrl)
-                        .then(res => res.blob())
-                        .then(blob => {
-                            resolve(new File([blob], file.name, { type: 'image/jpeg' }))
-                        })
-                    return
-                }
-                
-                quality -= 0.1
-                if (quality > minQuality) {
-                    compress()
-                } else {
-                    // 如果还是太大，缩小图片尺寸
-                    if (width > 800) {
-                        width = Math.round(width * 0.8)
-                        height = Math.round(height * 0.8)
-                        canvas.width = width
-                        canvas.height = height
-                        ctx.drawImage(img, 0, 0, width, height)
-                        quality = 0.7
-                    }
-                    compress()
-                }
+
+            const tryCompress = () => {
+                canvas.width = width
+                canvas.height = height
+                ctx.drawImage(img, 0, 0, width, height)
+
+                canvas.toBlob(
+                    (blob) => {
+                        if (!blob || blob.size <= maxBytes || quality <= 0.05) {
+                            resolve(blob && blob.size <= file.size ? new File([blob], file.name, { type: 'image/jpeg' }) : file)
+                            return
+                        }
+                        if (quality > 0.1) {
+                            quality -= 0.15
+                        } else if (width > 400) {
+                            width = Math.round(width * 0.7)
+                            height = Math.round(height * 0.7)
+                            quality = 0.5
+                        } else {
+                            resolve(file)
+                            return
+                        }
+                        tryCompress()
+                    },
+                    'image/jpeg',
+                    quality
+                )
             }
-            
-            compress()
+
+            tryCompress()
         }
-        
+
         img.src = URL.createObjectURL(file)
     })
 }
@@ -1541,35 +1610,19 @@ function renderPhotos() {
     
     grid.style.display = 'grid'
     empty.style.display = 'none'
-    
-    // 如果有照片但还没有加载分类关联，先加载
-    if (Object.keys(photoCategories).length === 0 && photos.length > 0) {
-        loadAllPhotoCategories()
-    }
-    
-    // 根据当前分类过滤照片
-    let filteredPhotos = photos
-    if (currentCategory && currentCategory !== 'all') {
-        filteredPhotos = photos.filter(photo => {
-            const photoCats = photoCategories[String(photo.id)] || []
-            return photoCats.includes(String(currentCategory))
-        })
-    }
-    
+
+    // 分类筛选已在 loadPhotos() 中服务端完成，此处直接使用 photos
     // 如果当前分类下没有照片，但有子分类，显示子分类卡片
+    const filteredPhotos = photos
     if (filteredPhotos.length === 0 && currentCategory && currentCategory !== 'all') {
         const currentCat = categories.find(c => c.id === parseInt(currentCategory))
         const childCategories = categories.filter(c => c.parent_id === parseInt(currentCategory))
         
         if (childCategories.length > 0) {
             grid.innerHTML = childCategories.map(cat => {
-                const catPhotos = photos.filter(photo => {
-                    const photoCats = photoCategories[String(photo.id)] || []
-                    return photoCats.includes(String(cat.id))
-                })
-                const photoCount = catPhotos.length
+                const photoCount = getCategoryPhotoCount(cat.id)
                 return `
-                    <div class="photo-card category-card" onclick="selectCategory(${cat.id})">
+                    <div class="photo-card category-card" onclick="window.filterByCategory('${cat.id}')">
                         <div class="category-icon">📁</div>
                         <div class="category-info">
                             <h3>${cat.name}</h3>
@@ -1637,6 +1690,7 @@ async function loadAllPhotoCategories() {
         const { data } = await supabase
             .from('photo_categories')
             .select('photo_id, category_id')
+            .limit(10000)
         
         if (data) {
             data.forEach(pc => {

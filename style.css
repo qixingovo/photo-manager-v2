@@ -930,3 +930,45 @@ input[type="file"] {
 .cascade-item .category-option span {
     flex: 1;
 }
+
+/* ========================================
+   分页控件
+   ======================================== */
+#paginationContainer {
+    margin-top: 20px;
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px 0;
+}
+
+.pagination-btn {
+    padding: 10px 24px;
+    border: 1px solid #667eea;
+    background: white;
+    color: #667eea;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pagination-btn:hover:not([disabled]) {
+    background: #667eea;
+    color: white;
+}
+
+.pagination-btn[disabled] {
+    border-color: #ddd;
+    color: #ccc;
+    cursor: not-allowed;
+}
+
+.pagination-info {
+    font-size: 14px;
+    color: #666;
+}
