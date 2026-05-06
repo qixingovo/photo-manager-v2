@@ -3530,19 +3530,21 @@ const mobile = {
         let collagePhotos;
         if (catId) {
             const categoryIds = this.getCategoryAndChildrenIds(catId);
-            const { data: pcData, error: pcError } = await supabase
-                .from('photo_categories')
-                .select('photo_id')
-                .in('category_id', categoryIds);
-            if (pcError || !pcData || pcData.length === 0) {
+            // 通过内存中的 photoCategories 筛选匹配的 photo_id
+            const matchingPhotoIds = new Set();
+            Object.entries(this.photoCategories).forEach(([photoId, catIds]) => {
+                if (catIds.some(cid => categoryIds.includes(cid))) {
+                    matchingPhotoIds.add(photoId);
+                }
+            });
+            if (matchingPhotoIds.size === 0) {
                 this.showToast('所选分类下没有照片');
                 return;
             }
-            const matchingIds = [...new Set(pcData.map(r => r.photo_id))];
             const { data } = await supabase
                 .from('photos')
                 .select('*')
-                .in('id', matchingIds)
+                .in('id', [...matchingPhotoIds].slice(0, 200))
                 .order('created_at', { ascending: false })
                 .limit(200);
             collagePhotos = data || [];

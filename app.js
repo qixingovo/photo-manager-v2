@@ -2646,36 +2646,26 @@ window.generateCollage = async function() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    // 获取按分类筛选的照片（级联选择器：最深一级为所选分类）
+    // 通过内存中的 photoCategories 筛选（与主浏览逻辑一致），避开 Supabase 直接查 category_id 的类型问题
     const catId = window.getCollageSelectedCategoryId();
     let collagePhotos;
     if (catId) {
         const categoryIds = getCategoryAndChildrenIds(catId);
-        // 直接查 photo_categories 表获取匹配的 photo_id，不依赖内存变量
-        const { data: pcData, error: pcError } = await supabase
-            .from('photo_categories')
-            .select('photo_id')
-            .in('category_id', categoryIds);
-        if (pcError || !pcData || pcData.length === 0) {
+        const matchingPhotoIds = new Set();
+        Object.entries(photoCategories).forEach(([photoId, catIds]) => {
+            if (catIds.some(cid => categoryIds.includes(cid))) {
+                matchingPhotoIds.add(photoId);
+            }
+        });
+        if (matchingPhotoIds.size === 0) {
             alert('所选分类下没有照片');
             return;
         }
-        const matchingIds = [...new Set(pcData.map(r => r.photo_id))];
-        const { data } = await supabase
-            .from('photos')
-            .select('*')
-            .in('id', matchingIds)
-            .order('created_at', { ascending: false })
-            .limit(200);
-        collagePhotos = data || [];
+        // 从已加载的 photos 中筛选，避免 URL 过长
+        collagePhotos = photos.filter(p => matchingPhotoIds.has(p.id)).slice(0, 200);
     } else {
-        // 未选分类：查全量照片（最多200张用于拼贴）
-        const { data } = await supabase
-            .from('photos')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(200);
-        collagePhotos = data || [];
+        // 未选分类：取已加载照片（最多200张）
+        collagePhotos = photos.slice(0, 200);
     }
 
     if (collagePhotos.length === 0) {
