@@ -2974,7 +2974,9 @@ const mobile = {
                     date: m.date,
                     title: m.title,
                     description: m.description || '',
-                    photoId: m.photo_id || null
+                    photoId: m.photo_id || null,
+                    photoPath: m.photo_path || null,
+                    photoName: m.photo_name || null
                 }));
                 selectOk = true;
             } else if (!error) {
@@ -3027,7 +3029,9 @@ const mobile = {
                 date: m.date,
                 title: m.title,
                 description: m.description || '',
-                photo_id: m.photoId || null
+                photo_id: m.photoId || null,
+                photo_path: m.photoPath || null,
+                photo_name: m.photoName || null
             }));
             const { error } = await supabase.from('milestones').upsert(rows);
             if (error) { this._milestonesSupabaseFailed = true; return; }
@@ -3054,7 +3058,9 @@ const mobile = {
                 date: m.date,
                 title: m.title,
                 description: m.description || '',
-                photo_id: m.photoId || null
+                photo_id: m.photoId || null,
+                photo_path: m.photoPath || null,
+                photo_name: m.photoName || null
             }));
             const { error } = await supabase.from('milestones').upsert(rows);
             if (error) {
@@ -3131,12 +3137,12 @@ const mobile = {
 
             let photoHtml = '';
             if (m.photoId) {
-                const photo = this.photos.find(p => String(p.id) === String(m.photoId));
-                if (photo) {
-                    const url = this.getPhotoUrl(photo.storage_path);
+                const url = m.photoPath ? this.getPhotoUrl(m.photoPath) : '';
+                if (url) {
                     photoHtml = `<img src="${url}"
                         style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:8px;cursor:pointer;"
-                        onclick="mobile.openDetail('${photo.id}')">`;
+                        onclick="mobile.openDetail('${m.photoId}')"
+                        onerror="this.style.display='none'">`;
                 }
             }
 
@@ -3164,6 +3170,7 @@ const mobile = {
     },
 
     openAddMilestoneModal() {
+        this._milestonePhotoData = null;
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
         modal.id = 'mobileMilestoneModal';
@@ -3188,13 +3195,81 @@ const mobile = {
                     <textarea id="mobileMilestoneDesc" rows="2"></textarea>
                 </div>
                 <div class="form-item">
-                    <label>关联照片ID（可选）</label>
-                    <input type="text" id="mobileMilestonePhotoId" placeholder="输入照片ID">
+                    <label>关联照片</label>
+                    <div id="mobileMilestonePhotoPreview"></div>
+                    <button type="button" class="btn-secondary" onclick="mobile.openMobileMilestonePhotoPicker()" style="width:100%;">📷 选择照片</button>
+                    <button type="button" class="btn-secondary" onclick="mobile.clearMobileMilestonePhoto()" id="mobileClearMilestonePhotoBtn" style="display:none;width:100%;">✕ 取消关联</button>
                 </div>
+                <input type="hidden" id="mobileMilestonePhotoId" value="">
                 <button class="btn-primary" onclick="mobile.saveMilestoneMobile()" style="width:100%;">保存</button>
             </div>
         `;
         document.body.appendChild(modal);
+    },
+
+    async openMobileMilestonePhotoPicker() {
+        const supabase = this.initSupabase();
+        const { data } = await supabase
+            .from('photos')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(50);
+        const photoList = data || [];
+
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'mobileMilestonePhotoPicker';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '3000';
+        modal.innerHTML = `
+            <div class="modal-card" style="width:95%;max-width:500px;max-height:80vh;overflow-y:auto;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                    <h3 style="margin:0;">选择关联照片</h3>
+                    <button onclick="document.getElementById('mobileMilestonePhotoPicker').remove()" style="background:none;border:none;font-size:24px;cursor:pointer;">&times;</button>
+                </div>
+                <input type="text" id="mobileMilestonePhotoSearch" placeholder="🔍 搜索照片..."
+                    style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:12px;"
+                    oninput="mobile.filterMobileMilestonePhotos()">
+                <div id="mobileMilestonePhotoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;">
+                    ${photoList.map(p => `
+                        <div class="mobile-ms-photo-item" data-name="${this.escapeHtml(p.name || '')}" style="cursor:pointer;border-radius:8px;overflow:hidden;border:2px solid transparent;"
+                            onclick="mobile.pickMobileMilestonePhoto('${p.id}','${p.storage_path}','${this.escapeHtml(p.name || '').replace(/'/g,"\\'")}')">
+                            <img src="${this.getPhotoUrl(p.storage_path)}" style="width:100%;height:80px;object-fit:cover;" onerror="this.style.display='none'">
+                            <div style="padding:4px;font-size:11px;text-align:center;color:#666;">${this.escapeHtml((p.name || '').substring(0,12))}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                ${photoList.length === 0 ? '<p style="text-align:center;color:#999;">暂无照片</p>' : ''}
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    filterMobileMilestonePhotos() {
+        const query = document.getElementById('mobileMilestonePhotoSearch').value.toLowerCase();
+        document.querySelectorAll('.mobile-ms-photo-item').forEach(el => {
+            el.style.display = el.dataset.name.toLowerCase().includes(query) ? '' : 'none';
+        });
+    },
+
+    pickMobileMilestonePhoto(id, storagePath, name) {
+        this._milestonePhotoData = { id, storage_path: storagePath, name };
+        document.getElementById('mobileMilestonePhotoId').value = id;
+        document.getElementById('mobileMilestonePhotoPreview').innerHTML = `
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;">
+                <img src="${this.getPhotoUrl(storagePath)}" style="width:60px;height:45px;object-fit:cover;border-radius:4px;" onerror="this.style.display='none'">
+                <div style="font-size:13px;">${this.escapeHtml(name || '未命名')}</div>
+            </div>`;
+        document.getElementById('mobileClearMilestonePhotoBtn').style.display = '';
+        const picker = document.getElementById('mobileMilestonePhotoPicker');
+        if (picker) picker.remove();
+    },
+
+    clearMobileMilestonePhoto() {
+        this._milestonePhotoData = null;
+        document.getElementById('mobileMilestonePhotoId').value = '';
+        document.getElementById('mobileMilestonePhotoPreview').innerHTML = '';
+        document.getElementById('mobileClearMilestonePhotoBtn').style.display = 'none';
     },
 
     saveMilestoneMobile() {
@@ -3208,13 +3283,16 @@ const mobile = {
             return;
         }
 
+        const pd = this._milestonePhotoData;
         this.anniversaryMilestones.push({
             id: Date.now().toString(),
-            date,
-            title,
+            date, title,
             description: desc,
-            photoId: photoId || null
+            photoId: photoId || null,
+            photoPath: pd ? pd.storage_path : null,
+            photoName: pd ? pd.name : null
         });
+        this._milestonePhotoData = null;
         this.saveMilestonesToSupabase();
         this.renderTimeline();
         document.getElementById('mobileMilestoneModal').remove();
@@ -3223,6 +3301,14 @@ const mobile = {
     openEditMilestoneModal(id) {
         const m = this.anniversaryMilestones.find(ms => ms.id === id);
         if (!m) return;
+
+        this._milestonePhotoData = m.photoId ? { id: m.photoId, storage_path: m.photoPath || '', name: m.photoName || '' } : null;
+        const pd = this._milestonePhotoData;
+        const previewHtml = pd ? `
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;">
+                <img src="${this.getPhotoUrl(pd.storage_path)}" style="width:60px;height:45px;object-fit:cover;border-radius:4px;" onerror="this.style.display='none'">
+                <div style="font-size:13px;">${this.escapeHtml(pd.name || '未命名')}</div>
+            </div>` : '';
 
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
@@ -3248,9 +3334,13 @@ const mobile = {
                     <textarea id="mobileMilestoneDesc" rows="2">${this.escapeHtml(m.description || '')}</textarea>
                 </div>
                 <div class="form-item">
-                    <label>关联照片ID（可选）</label>
-                    <input type="text" id="mobileMilestonePhotoId" value="${m.photoId || ''}">
+                    <label>关联照片</label>
+                    <div id="mobileMilestonePhotoPreview">${previewHtml}</div>
+                    <button type="button" class="btn-secondary" onclick="mobile.openMobileMilestonePhotoPicker()" style="width:100%;">📷 选择照片</button>
+                    <button type="button" class="btn-secondary" onclick="mobile.clearMobileMilestonePhoto()" id="mobileClearMilestonePhotoBtn"
+                        style="${pd ? '' : 'display:none;'}width:100%;">✕ 取消关联</button>
                 </div>
+                <input type="hidden" id="mobileMilestonePhotoId" value="${m.photoId || ''}">
                 <button class="btn-primary" onclick="mobile.updateMilestoneMobile('${id}')" style="width:100%;">保存</button>
             </div>
         `;
@@ -3265,7 +3355,11 @@ const mobile = {
         m.title = document.getElementById('mobileMilestoneTitle').value.trim();
         m.description = document.getElementById('mobileMilestoneDesc').value.trim();
         m.photoId = document.getElementById('mobileMilestonePhotoId').value.trim() || null;
+        const pd = this._milestonePhotoData;
+        m.photoPath = pd ? pd.storage_path : null;
+        m.photoName = pd ? pd.name : null;
 
+        this._milestonePhotoData = null;
         this.saveMilestonesToSupabase();
         this.renderTimeline();
         document.getElementById('mobileMilestoneModal').remove();

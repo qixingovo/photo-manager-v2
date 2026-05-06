@@ -2038,7 +2038,9 @@ async function loadMilestones() {
                 date: m.date,
                 title: m.title,
                 description: m.description || '',
-                photoId: m.photo_id || null
+                photoId: m.photo_id || null,
+                photoPath: m.photo_path || null,
+                photoName: m.photo_name || null
             }));
             selectOk = true
         } else if (!error) {
@@ -2094,7 +2096,9 @@ async function migrateMilestonesToSupabase() {
             date: m.date,
             title: m.title,
             description: m.description || '',
-            photo_id: m.photoId || null
+            photo_id: m.photoId || null,
+            photo_path: m.photoPath || null,
+            photo_name: m.photoName || null
         }));
         const { error } = await supabase.from('milestones').upsert(rows);
         if (error) { _milestonesSupabaseFailed = true; return; }
@@ -2116,7 +2120,9 @@ async function saveMilestonesToSupabase() {
             date: m.date,
             title: m.title,
             description: m.description || '',
-            photo_id: m.photoId || null
+            photo_id: m.photoId || null,
+            photo_path: m.photoPath || null,
+            photo_name: m.photoName || null
         }));
         const { error } = await supabase.from('milestones').upsert(rows);
         if (error) {
@@ -2190,11 +2196,13 @@ function renderTimeline() {
 
         let photoHtml = '';
         if (m.photoId) {
-            const photo = photos.find(p => String(p.id) === String(m.photoId));
-            if (photo) {
-                photoHtml = `<img src="${getPhotoUrl(photo.storage_path)}"
+            const photoUrl = m.photoPath ? getPhotoUrl(m.photoPath) : '';
+            const displayUrl = photoUrl;
+            if (displayUrl) {
+                photoHtml = `<img src="${displayUrl}"
                     style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:8px;cursor:pointer;"
-                    onclick="window.openPhotoModal('${photo.id}')">`;
+                    onclick="window.openPhotoModal('${m.photoId}')"
+                    onerror="this.style.display='none'">`;
             }
         }
 
@@ -2245,43 +2253,99 @@ window.openAddMilestoneModal = function() {
                 <textarea id="milestoneDesc" rows="2"></textarea>
             </div>
             <div class="form-group">
-                <label>关联照片ID（可选）</label>
-                <input type="text" id="milestonePhotoId" placeholder="输入照片ID">
+                <label>关联照片</label>
+                <div id="milestonePhotoPreview" style="margin-bottom:8px;"></div>
+                <button type="button" class="btn btn-secondary" onclick="window.openMilestonePhotoPicker()">📷 选择照片</button>
+                <button type="button" class="btn btn-secondary" onclick="window.clearMilestonePhoto()" style="display:none;" id="clearMilestonePhotoBtn">✕ 取消关联</button>
             </div>
+            <input type="hidden" id="milestonePhotoId" value="">
             <button class="btn btn-primary" onclick="window.saveMilestone()">保存</button>
         </div>
     `;
     document.body.appendChild(modal);
 };
 
-window.saveMilestone = function() {
-    const date = document.getElementById('milestoneDate').value;
-    const title = document.getElementById('milestoneTitle').value.trim();
-    const desc = document.getElementById('milestoneDesc').value.trim();
-    const photoId = document.getElementById('milestonePhotoId').value.trim() || null;
+window._milestonePhotoData = null;
 
-    if (!date || !title) {
-        alert('请填写日期和标题');
-        return;
-    }
+window.pickMilestonePhoto = function(photo) {
+    window._milestonePhotoData = photo;
+    document.getElementById('milestonePhotoId').value = photo.id;
+    const preview = document.getElementById('milestonePhotoPreview');
+    preview.innerHTML = `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;">
+        <img src="${getPhotoUrl(photo.storage_path)}" style="width:80px;height:60px;object-fit:cover;border-radius:4px;">
+        <div>
+            <div style="font-size:13px;font-weight:500;">${escapeHtml(photo.name || '未命名')}</div>
+            <div style="font-size:11px;color:#999;">ID: ${photo.id}</div>
+        </div>
+    </div>`;
+    document.getElementById('clearMilestonePhotoBtn').style.display = 'inline-block';
+    // 关闭照片选择弹窗
+    const picker = document.getElementById('milestonePhotoPicker');
+    if (picker) picker.remove();
+};
 
-    const newMilestone = {
-        id: Date.now().toString(),
-        date,
-        title,
-        description: desc,
-        photoId: photoId || null
-    };
+window.clearMilestonePhoto = function() {
+    window._milestonePhotoData = null;
+    document.getElementById('milestonePhotoId').value = '';
+    document.getElementById('milestonePhotoPreview').innerHTML = '';
+    document.getElementById('clearMilestonePhotoBtn').style.display = 'none';
+};
 
-    anniversaryMilestones.push(newMilestone);
-    saveMilestonesToSupabase();
-    renderTimeline();
-    document.getElementById('milestoneModal').remove();
+window.openMilestonePhotoPicker = async function() {
+    // 加载照片列表用于选择
+    const { data } = await supabase
+        .from('photos')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+    const photoList = data || [];
+
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'milestonePhotoPicker';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:600px;max-height:80vh;overflow-y:auto;padding:20px;">
+            <span class="modal-close" onclick="document.getElementById('milestonePhotoPicker').remove()">&times;</span>
+            <h3>选择关联照片</h3>
+            <input type="text" id="milestonePhotoSearch" placeholder="🔍 搜索照片..."
+                style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:12px;"
+                oninput="window.filterMilestonePhotos()">
+            <div id="milestonePhotoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;">
+                ${photoList.map(p => `
+                    <div class="milestone-photo-item" data-name="${escapeHtml(p.name || '')}" style="cursor:pointer;border-radius:8px;overflow:hidden;border:2px solid transparent;transition:border .2s;"
+                        onclick="window.pickMilestonePhoto(${JSON.stringify({id:p.id,storage_path:p.storage_path,name:p.name}).replace(/"/g,'&quot;')})">
+                        <img src="${getPhotoUrl(p.storage_path)}" style="width:100%;height:90px;object-fit:cover;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%2290%22><rect fill=%22%23eee%22 width=%22120%22 height=%2290%22/><text x=%2260%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2212%22>无预览</text></svg>'">
+                        <div style="padding:4px;font-size:11px;text-align:center;color:#666;">${escapeHtml((p.name || '').substring(0,15))}</div>
+                    </div>
+                `).join('')}
+            </div>
+            ${photoList.length === 0 ? '<p style="text-align:center;color:#999;">暂无照片</p>' : ''}
+        </div>
+    `;
+    document.body.appendChild(modal);
+};
+
+window.filterMilestonePhotos = function() {
+    const query = document.getElementById('milestonePhotoSearch').value.toLowerCase();
+    document.querySelectorAll('.milestone-photo-item').forEach(el => {
+        el.style.display = el.dataset.name.toLowerCase().includes(query) ? '' : 'none';
+    });
 };
 
 window.openEditMilestoneModal = function(id) {
     const m = anniversaryMilestones.find(ms => ms.id === id);
     if (!m) return;
+
+    window._milestonePhotoData = m.photoId ? { id: m.photoId, storage_path: m.photoPath || '', name: m.photoName || '' } : null;
+
+    const previewHtml = window._milestonePhotoData ? `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;">
+            <img src="${getPhotoUrl(window._milestonePhotoData.storage_path)}" style="width:80px;height:60px;object-fit:cover;border-radius:4px;" onerror="this.style.display='none'">
+            <div>
+                <div style="font-size:13px;font-weight:500;">${escapeHtml(window._milestonePhotoData.name || '未命名')}</div>
+                <div style="font-size:11px;color:#999;">ID: ${window._milestonePhotoData.id}</div>
+            </div>
+        </div>` : '';
 
     const modal = document.createElement('div');
     modal.className = 'modal active';
@@ -2303,13 +2367,45 @@ window.openEditMilestoneModal = function(id) {
                 <textarea id="milestoneDesc" rows="2">${escapeHtml(m.description || '')}</textarea>
             </div>
             <div class="form-group">
-                <label>关联照片ID（可选）</label>
-                <input type="text" id="milestonePhotoId" value="${m.photoId || ''}">
+                <label>关联照片</label>
+                <div id="milestonePhotoPreview" style="margin-bottom:8px;">${previewHtml}</div>
+                <button type="button" class="btn btn-secondary" onclick="window.openMilestonePhotoPicker()">📷 选择照片</button>
+                <button type="button" class="btn btn-secondary" onclick="window.clearMilestonePhoto()" id="clearMilestonePhotoBtn"
+                    style="${window._milestonePhotoData ? '' : 'display:none;'}">✕ 取消关联</button>
             </div>
+            <input type="hidden" id="milestonePhotoId" value="${m.photoId || ''}">
             <button class="btn btn-primary" onclick="window.updateMilestone('${id}')">保存</button>
         </div>
     `;
     document.body.appendChild(modal);
+};
+
+window.saveMilestone = function() {
+    const date = document.getElementById('milestoneDate').value;
+    const title = document.getElementById('milestoneTitle').value.trim();
+    const desc = document.getElementById('milestoneDesc').value.trim();
+    const photoId = document.getElementById('milestonePhotoId').value.trim() || null;
+
+    if (!date || !title) {
+        alert('请填写日期和标题');
+        return;
+    }
+
+    const pd = window._milestonePhotoData;
+    const newMilestone = {
+        id: Date.now().toString(),
+        date, title,
+        description: desc,
+        photoId: photoId || null,
+        photoPath: pd ? pd.storage_path : null,
+        photoName: pd ? pd.name : null
+    };
+
+    anniversaryMilestones.push(newMilestone);
+    window._milestonePhotoData = null;
+    saveMilestonesToSupabase();
+    renderTimeline();
+    document.getElementById('milestoneModal').remove();
 };
 
 window.updateMilestone = function(id) {
@@ -2320,7 +2416,11 @@ window.updateMilestone = function(id) {
     m.title = document.getElementById('milestoneTitle').value.trim();
     m.description = document.getElementById('milestoneDesc').value.trim();
     m.photoId = document.getElementById('milestonePhotoId').value.trim() || null;
+    const pd = window._milestonePhotoData;
+    m.photoPath = pd ? pd.storage_path : null;
+    m.photoName = pd ? pd.name : null;
 
+    window._milestonePhotoData = null;
     saveMilestonesToSupabase();
     renderTimeline();
     document.getElementById('milestoneModal').remove();

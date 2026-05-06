@@ -7,7 +7,9 @@ CREATE TABLE IF NOT EXISTS milestones (
     date DATE NOT NULL,
     title TEXT NOT NULL,
     description TEXT DEFAULT '',
-    photo_id BIGINT
+    photo_id BIGINT,
+    photo_path TEXT,
+    photo_name TEXT
 );
 
 -- 2. 应用设置表（纪念日开始日期等）
