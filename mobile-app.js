@@ -3872,8 +3872,8 @@ const mobile = {
             const selectedClass = this.albumSelectMode && this.albumSelectedPhotos.has(p.id) ? ' selected' : '';
             const imgSrc = this.getPhotoUrl(p.storage_path);
             return `
-            <div class="photo-card${selectedClass}" onclick="${this.albumSelectMode ? `mobile.toggleAlbumPhotoCheck(${p.id})` : `mobile.openDetail(${p.id})`}">
-                ${this.albumSelectMode ? `<div class="photo-checkbox"><input type="checkbox" ${this.albumSelectedPhotos.has(p.id) ? 'checked' : ''} onclick="event.stopPropagation();mobile.toggleAlbumPhotoCheck(${p.id})"></div>` : ''}
+            <div class="photo-card${selectedClass}" onclick="${this.albumSelectMode ? `mobile.toggleAlbumPhotoCheck('${p.id}')` : `mobile.openDetail('${p.id}')`}">
+                ${this.albumSelectMode ? `<div class="photo-checkbox"><input type="checkbox" ${this.albumSelectedPhotos.has(p.id) ? 'checked' : ''} onclick="event.stopPropagation();mobile.toggleAlbumPhotoCheck('${p.id}')"></div>` : ''}
                 <img src="${imgSrc}" alt="">
                 <div class="photo-card-info">
                     <h4>${this.escapeHtml(p.name || '未命名')}</h4>
@@ -3947,7 +3947,7 @@ const mobile = {
         if (checks.length === 0) { this.showToast('请选择要添加的照片'); return; }
         const rows = Array.from(checks).map(cb => ({
             album_id: this.currentAlbum.id,
-            photo_id: parseInt(cb.value)
+            photo_id: cb.value
         }));
         const supabase = this.initSupabase();
         if (!supabase) return;
@@ -4266,7 +4266,7 @@ const mobile = {
             grid.innerHTML = loc.photos.map(p => {
                 const imgSrc = this.getPhotoUrl(p.storage_path);
                 return `
-                <div class="photo-card" onclick="mobile.openDetail(${p.id})">
+                <div class="photo-card" onclick="mobile.openDetail('${p.id}')">
                     <img src="${imgSrc}" alt="" loading="lazy">
                     <div class="photo-card-info">
                         <h4>${this.escapeHtml(p.name || '未命名')}</h4>

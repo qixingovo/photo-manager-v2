@@ -3495,12 +3495,12 @@ function renderAlbumPhotos() {
     grid.innerHTML = albumPhotoObjs.map(p => {
         const selectedClass = albumSelectMode && albumSelectedPhotos.has(p.id) ? ' selected' : ''
         const checkboxHtml = albumSelectMode
-            ? `<div class="photo-checkbox"><input type="checkbox" ${albumSelectedPhotos.has(p.id) ? 'checked' : ''} onclick="event.stopPropagation();window.toggleAlbumPhotoCheck(${p.id})"></div>`
+            ? `<div class="photo-checkbox"><input type="checkbox" ${albumSelectedPhotos.has(p.id) ? 'checked' : ''} onclick="event.stopPropagation();window.toggleAlbumPhotoCheck('${p.id}')"></div>`
             : ''
         const catNames = getPhotoCategoryNames(p.id)
         const imgSrc = getPhotoUrl(p.storage_path)
         return `
-        <div class="photo-card${selectedClass}" onclick="${albumSelectMode ? `window.toggleAlbumPhotoCheck(${p.id})` : `window.openPhotoModal('${p.id}')`}">
+        <div class="photo-card${selectedClass}" onclick="${albumSelectMode ? `window.toggleAlbumPhotoCheck('${p.id}')` : `window.openPhotoModal('${p.id}')`}">
             ${checkboxHtml}
             <img src="${imgSrc}" alt="${escapeHtml(p.name || '')}" loading="lazy">
             <div class="photo-info">
@@ -3577,7 +3577,7 @@ window.addPhotosToAlbum = async function() {
     if (checks.length === 0) { alert('请选择要添加的照片'); return }
     const rows = Array.from(checks).map(cb => ({
         album_id: currentAlbum.id,
-        photo_id: parseInt(cb.value)
+        photo_id: cb.value
     }))
     try {
         const { error } = await supabase.from('album_photos').insert(rows)
