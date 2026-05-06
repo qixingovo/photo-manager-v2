@@ -2040,7 +2040,9 @@ async function loadMilestones() {
                 description: m.description || '',
                 photoId: m.photo_id || null,
                 photoPath: m.photo_path || null,
-                photoName: m.photo_name || null
+                photoName: m.photo_name || null,
+                categoryId: m.category_id || null,
+                categoryName: m.category_name || null
             }));
             selectOk = true
         } else if (!error) {
@@ -2098,7 +2100,9 @@ async function migrateMilestonesToSupabase() {
             description: m.description || '',
             photo_id: m.photoId || null,
             photo_path: m.photoPath || null,
-            photo_name: m.photoName || null
+            photo_name: m.photoName || null,
+            category_id: m.categoryId ? parseInt(m.categoryId) : null,
+            category_name: m.categoryName || null
         }));
         const { error } = await supabase.from('milestones').upsert(rows);
         if (error) { _milestonesSupabaseFailed = true; return; }
@@ -2122,7 +2126,9 @@ async function saveMilestonesToSupabase() {
             description: m.description || '',
             photo_id: m.photoId || null,
             photo_path: m.photoPath || null,
-            photo_name: m.photoName || null
+            photo_name: m.photoName || null,
+            category_id: m.categoryId ? parseInt(m.categoryId) : null,
+            category_name: m.categoryName || null
         }));
         const { error } = await supabase.from('milestones').upsert(rows);
         if (error) {
@@ -2194,6 +2200,14 @@ function renderTimeline() {
 
         const side = i % 2 === 0 ? 'left' : 'right';
 
+        let catHtml = '';
+        if (m.categoryId) {
+            catHtml = `<div style="margin-top:8px;">
+                <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px;"
+                    onclick="window.goToCategory('${m.categoryId}')">📁 ${escapeHtml(m.categoryName || '查看分类')}</button>
+            </div>`;
+        }
+
         let photoHtml = '';
         if (m.photoId) {
             const photoUrl = m.photoPath ? getPhotoUrl(m.photoPath) : '';
@@ -2219,6 +2233,7 @@ function renderTimeline() {
                     <h3>${escapeHtml(m.title)}</h3>
                     ${m.description ? '<p>' + escapeHtml(m.description) + '</p>' : ''}
                     <small style="color:#999;">${timeAgo}</small>
+                    ${catHtml}
                     ${photoHtml}
                     <div class="milestone-actions" style="margin-top:8px;display:flex;gap:8px;">
                         <button class="btn btn-secondary" style="font-size:11px;padding:4px 8px;"
@@ -2232,7 +2247,72 @@ function renderTimeline() {
     }).join('');
 }
 
+function renderFilterCategoryCascadePath(catId) {
+    const container = document.getElementById('filterCategoryCascade');
+    if (!container) return;
+    // 获取从根到目标分类的路径
+    const path = [];
+    let cur = categories.find(c => c.id === catId);
+    while (cur) {
+        path.unshift(cur);
+        cur = cur.parent_id ? categories.find(c => c.id === cur.parent_id) : null;
+    }
+    container.innerHTML = '';
+    let parentId = null;
+    path.forEach((cat, index) => {
+        const level = index;
+        const opts = (index === 0
+            ? categories.filter(c => !c.parent_id)
+            : categories.filter(c => c.parent_id === parentId));
+        const select = document.createElement('select');
+        select.id = `filterCatLevel${level}`;
+        select.style.cssText = 'padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;';
+        select.onchange = () => onFilterCatLevelChange(level);
+        select.innerHTML = `<option value="">选择分类</option>${opts.map(oc => {
+            const sel = oc.id === cat.id ? 'selected' : '';
+            return `<option value="${oc.id}" ${sel}>${oc.name} (${getCategoryPhotoCount(oc.id)})</option>`;
+        }).join('')}`;
+        container.appendChild(select);
+        parentId = cat.id;
+    });
+}
+
+window.goToCategory = function(catId) {
+    currentCategory = String(catId);
+    currentPage = 1;
+    showFavoritesOnly = false;
+    window.toggleSection('photos');
+    loadPhotos();
+    renderFilterCategoryCascadePath(catId);
+    document.getElementById('photoGrid').scrollIntoView({ behavior: 'smooth' });
+};
+
+function buildCategoryOptions(selectedId, indent) {
+    indent = indent || 0;
+    let html = '';
+    const list = categories.filter(c => (indent === 0 ? !c.parent_id : c.parent_id === selectedId));
+    // 如果 selectedId 是选项组的父级ID，改为传整个分类列表并显示缩进
+    return html;
+}
+
+function buildAllCategoryOptions(selectedCatId) {
+    function walk(cats, depth) {
+        let html = '';
+        cats.forEach(cat => {
+            const prefix = '　'.repeat(depth);
+            const sel = String(cat.id) === String(selectedCatId || '') ? 'selected' : '';
+            html += `<option value="${cat.id}" ${sel}>${prefix}${escapeHtml(cat.name)}</option>`;
+            const children = categories.filter(c => c.parent_id === cat.id);
+            if (children.length > 0) html += walk(children, depth + 1);
+        });
+        return html;
+    }
+    const roots = categories.filter(c => !c.parent_id);
+    return walk(roots, 0);
+}
+
 window.openAddMilestoneModal = function() {
+    const catOpts = buildAllCategoryOptions('');
     const modal = document.createElement('div');
     modal.className = 'modal active';
     modal.id = 'milestoneModal';
@@ -2253,7 +2333,14 @@ window.openAddMilestoneModal = function() {
                 <textarea id="milestoneDesc" rows="2"></textarea>
             </div>
             <div class="form-group">
-                <label>关联照片</label>
+                <label>关联类别（可选）</label>
+                <select id="milestoneCategoryId" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;">
+                    <option value="">不关联类别</option>
+                    ${catOpts}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>关联照片（可选）</label>
                 <div id="milestonePhotoPreview" style="margin-bottom:8px;"></div>
                 <button type="button" class="btn btn-secondary" onclick="window.openMilestonePhotoPicker()">📷 选择照片</button>
                 <button type="button" class="btn btn-secondary" onclick="window.clearMilestonePhoto()" style="display:none;" id="clearMilestonePhotoBtn">✕ 取消关联</button>
@@ -2347,6 +2434,8 @@ window.openEditMilestoneModal = function(id) {
             </div>
         </div>` : '';
 
+    const catOpts = buildAllCategoryOptions(m.categoryId || '');
+
     const modal = document.createElement('div');
     modal.className = 'modal active';
     modal.id = 'milestoneModal';
@@ -2367,7 +2456,14 @@ window.openEditMilestoneModal = function(id) {
                 <textarea id="milestoneDesc" rows="2">${escapeHtml(m.description || '')}</textarea>
             </div>
             <div class="form-group">
-                <label>关联照片</label>
+                <label>关联类别（可选）</label>
+                <select id="milestoneCategoryId" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;">
+                    <option value="">不关联类别</option>
+                    ${catOpts}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>关联照片（可选）</label>
                 <div id="milestonePhotoPreview" style="margin-bottom:8px;">${previewHtml}</div>
                 <button type="button" class="btn btn-secondary" onclick="window.openMilestonePhotoPicker()">📷 选择照片</button>
                 <button type="button" class="btn btn-secondary" onclick="window.clearMilestonePhoto()" id="clearMilestonePhotoBtn"
@@ -2385,6 +2481,8 @@ window.saveMilestone = function() {
     const title = document.getElementById('milestoneTitle').value.trim();
     const desc = document.getElementById('milestoneDesc').value.trim();
     const photoId = document.getElementById('milestonePhotoId').value.trim() || null;
+    const catId = document.getElementById('milestoneCategoryId').value || null;
+    const catName = catId ? (categories.find(c => c.id === catId) || {}).name || '' : '';
 
     if (!date || !title) {
         alert('请填写日期和标题');
@@ -2398,7 +2496,9 @@ window.saveMilestone = function() {
         description: desc,
         photoId: photoId || null,
         photoPath: pd ? pd.storage_path : null,
-        photoName: pd ? pd.name : null
+        photoName: pd ? pd.name : null,
+        categoryId: catId || null,
+        categoryName: catName || null
     };
 
     anniversaryMilestones.push(newMilestone);

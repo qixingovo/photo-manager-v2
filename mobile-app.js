@@ -3135,6 +3135,14 @@ const mobile = {
             const years = Math.floor(diffDays / 365);
             const remainDays = diffDays % 365;
 
+            let catHtml = '';
+            if (m.categoryId) {
+                catHtml = `<div style="margin-top:8px;">
+                    <button class="btn-secondary" style="font-size:12px;padding:4px 12px;"
+                        onclick="mobile.goToCategory('${m.categoryId}')">📁 ${this.escapeHtml(m.categoryName || '查看分类')}</button>
+                </div>`;
+            }
+
             let photoHtml = '';
             if (m.photoId) {
                 const url = m.photoPath ? this.getPhotoUrl(m.photoPath) : '';
@@ -3157,6 +3165,7 @@ const mobile = {
                     <h3>${this.escapeHtml(m.title)}</h3>
                     ${m.description ? '<p>' + this.escapeHtml(m.description) + '</p>' : ''}
                     <small style="color:#999;">${timeAgo}</small>
+                    ${catHtml}
                     ${photoHtml}
                     <div style="margin-top:8px;display:flex;gap:8px;">
                         <button class="btn-secondary" style="font-size:11px;padding:4px 8px;"
@@ -3169,8 +3178,34 @@ const mobile = {
         }).join('');
     },
 
+    buildMobileCategoryOptions(selectedId) {
+        function walk(cats, depth) {
+            let html = '';
+            cats.forEach(cat => {
+                const prefix = '　'.repeat(depth);
+                const sel = String(cat.id) === String(selectedId || '') ? 'selected' : '';
+                html += `<option value="${cat.id}" ${sel}>${prefix}${this.escapeHtml(cat.name)}</option>`;
+                const children = this.categories.filter(c => c.parent_id === cat.id);
+                if (children.length > 0) html += walk.call(this, children, depth + 1);
+            });
+            return html;
+        }
+        const roots = this.categories.filter(c => !c.parent_id);
+        return walk.call(this, roots, 0);
+    },
+
+    goToCategory(catId) {
+        this.currentCategory = String(catId);
+        this.currentPage = 1;
+        this.showFavoritesOnly = false;
+        this.switchTab('photos');
+        this.loadPhotos();
+        document.getElementById('mobilePhotoGrid').scrollIntoView({ behavior: 'smooth' });
+    },
+
     openAddMilestoneModal() {
         this._milestonePhotoData = null;
+        const catOpts = this.buildMobileCategoryOptions('');
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
         modal.id = 'mobileMilestoneModal';
@@ -3195,7 +3230,14 @@ const mobile = {
                     <textarea id="mobileMilestoneDesc" rows="2"></textarea>
                 </div>
                 <div class="form-item">
-                    <label>关联照片</label>
+                    <label>关联类别（可选）</label>
+                    <select id="mobileMilestoneCategoryId" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;">
+                        <option value="">不关联类别</option>
+                        ${catOpts}
+                    </select>
+                </div>
+                <div class="form-item">
+                    <label>关联照片（可选）</label>
                     <div id="mobileMilestonePhotoPreview"></div>
                     <button type="button" class="btn-secondary" onclick="mobile.openMobileMilestonePhotoPicker()" style="width:100%;">📷 选择照片</button>
                     <button type="button" class="btn-secondary" onclick="mobile.clearMobileMilestonePhoto()" id="mobileClearMilestonePhotoBtn" style="display:none;width:100%;">✕ 取消关联</button>
@@ -3283,6 +3325,8 @@ const mobile = {
             return;
         }
 
+        const catId = document.getElementById('mobileMilestoneCategoryId').value || null;
+        const catName = catId ? (this.categories.find(c => c.id === catId) || {}).name || '' : '';
         const pd = this._milestonePhotoData;
         this.anniversaryMilestones.push({
             id: Date.now().toString(),
@@ -3290,7 +3334,9 @@ const mobile = {
             description: desc,
             photoId: photoId || null,
             photoPath: pd ? pd.storage_path : null,
-            photoName: pd ? pd.name : null
+            photoName: pd ? pd.name : null,
+            categoryId: catId || null,
+            categoryName: catName || null
         });
         this._milestonePhotoData = null;
         this.saveMilestonesToSupabase();
@@ -3309,6 +3355,8 @@ const mobile = {
                 <img src="${this.getPhotoUrl(pd.storage_path)}" style="width:60px;height:45px;object-fit:cover;border-radius:4px;" onerror="this.style.display='none'">
                 <div style="font-size:13px;">${this.escapeHtml(pd.name || '未命名')}</div>
             </div>` : '';
+
+        const catOpts = this.buildMobileCategoryOptions(m.categoryId || '');
 
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
@@ -3334,7 +3382,14 @@ const mobile = {
                     <textarea id="mobileMilestoneDesc" rows="2">${this.escapeHtml(m.description || '')}</textarea>
                 </div>
                 <div class="form-item">
-                    <label>关联照片</label>
+                    <label>关联类别（可选）</label>
+                    <select id="mobileMilestoneCategoryId" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;">
+                        <option value="">不关联类别</option>
+                        ${catOpts}
+                    </select>
+                </div>
+                <div class="form-item">
+                    <label>关联照片（可选）</label>
                     <div id="mobileMilestonePhotoPreview">${previewHtml}</div>
                     <button type="button" class="btn-secondary" onclick="mobile.openMobileMilestonePhotoPicker()" style="width:100%;">📷 选择照片</button>
                     <button type="button" class="btn-secondary" onclick="mobile.clearMobileMilestonePhoto()" id="mobileClearMilestonePhotoBtn"
@@ -3358,6 +3413,9 @@ const mobile = {
         const pd = this._milestonePhotoData;
         m.photoPath = pd ? pd.storage_path : null;
         m.photoName = pd ? pd.name : null;
+        const catId = document.getElementById('mobileMilestoneCategoryId').value || null;
+        m.categoryId = catId || null;
+        m.categoryName = catId ? (this.categories.find(c => c.id === catId) || {}).name || '' : null;
 
         this._milestonePhotoData = null;
         this.saveMilestonesToSupabase();

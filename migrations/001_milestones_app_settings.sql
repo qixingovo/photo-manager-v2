@@ -22,7 +22,11 @@ CREATE TABLE IF NOT EXISTS app_settings (
 ALTER TABLE milestones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
 
--- 4. RLS 策略：允许所有角色操作（应用层自定义认证）
+-- 4. 添加分类关联字段（如果表已存在，用 ALTER TABLE）
+ALTER TABLE milestones ADD COLUMN IF NOT EXISTS category_id BIGINT;
+ALTER TABLE milestones ADD COLUMN IF NOT EXISTS category_name TEXT;
+
+-- 5. RLS 策略：允许所有角色操作（应用层自定义认证）
 CREATE POLICY "allow_all_milestones"
     ON milestones FOR ALL
     TO anon, authenticated

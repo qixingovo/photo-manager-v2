@@ -3,7 +3,7 @@
    缓存静态资源，支持离线访问
    ======================================== */
 
-const CACHE_NAME = 'photo-manager-v2';
+const CACHE_NAME = 'photo-manager-v3';
 
 // 需要预缓存的静态资源
 const STATIC_ASSETS = [
