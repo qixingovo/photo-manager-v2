@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📷 照片分享</title>
+    <meta name="theme-color" content="#667eea">
+    <link rel="stylesheet" href="style.css?v=16">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
+    <script src="config.js"></script>
+</head>
+<body class="share-page">
+    <div class="share-header">
+        <h1>📷 照片分享</h1>
+        <p id="shareAlbumName">加载中...</p>
+    </div>
+    <div class="share-container">
+        <div id="shareContent">
+            <div class="loading">加载中...</div>
+        </div>
+        <div id="shareError" style="display:none;" class="share-error">
+            <div class="error-icon" id="shareErrorIcon">⚠️</div>
+            <h2 id="shareErrorTitle">出错了</h2>
+            <p id="shareErrorMessage"></p>
+        </div>
+    </div>
+    <script src="share.js?v=16"></script>
+</body>
+</html>

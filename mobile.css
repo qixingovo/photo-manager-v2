@@ -1748,3 +1748,79 @@ mark {
     font-size: 11px;
     color: #888;
 }
+
+/* ========================================
+   相册列表（移动端）
+   ======================================== */
+#albumsPage .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--card);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    box-shadow: var(--shadow);
+}
+
+#albumsPage .menu-item:active {
+    background: var(--bg);
+}
+
+/* ========================================
+   足迹护照（移动端）
+   ======================================== */
+#passportPage .passport-stamps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.passport-stamp.mobile-stamp {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #fffde7, #fff9c4);
+    border: 1.5px solid #c9a94e;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: transform 0.2s;
+    animation: stampIn 0.4s ease forwards;
+    opacity: 0;
+}
+
+.passport-stamp.mobile-stamp:active {
+    transform: scale(0.98);
+}
+
+@keyframes stampIn {
+    from { opacity: 0; transform: translateY(15px) rotate(-2deg); }
+    to { opacity: 1; transform: translateY(0) rotate(0); }
+}
+
+.passport-stamp.mobile-stamp .stamp-emoji {
+    font-size: 32px;
+    width: 48px;
+    height: 48px;
+    background: rgba(201, 169, 78, 0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.passport-stamp.mobile-stamp .stamp-name {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 600;
+    color: #5d4037;
+}
+
+.passport-stamp.mobile-stamp .stamp-count {
+    font-size: 12px;
+    color: #8d6e63;
+}

@@ -29,6 +29,18 @@ let mapPhotos = []
 let anniversaryMilestones = []
 let anniversaryStartDate = null
 
+// 相册状态
+let albums = []
+let albumPhotos = []
+let currentAlbum = null
+let albumSelectMode = false
+let albumSelectedPhotos = new Set()
+
+// 足迹护照状态
+let passportSortByPhotoCount = true
+let passportData = []
+let passportAllPhotos = []
+
 // Supabase 配置（从外部配置文件读取）
 const APP_CONFIG = window.__APP_CONFIG__ || {}
 const SUPABASE_URL = APP_CONFIG.SUPABASE_URL || ''
@@ -389,6 +401,9 @@ window.toggleSection = function(section) {
     const timelineSection = document.getElementById('timelineSection')
     const collageSection = document.getElementById('collageSection')
     const achievementsSection = document.getElementById('achievementsSection')
+    const albumsSection = document.getElementById('albumsSection')
+    const albumDetailSection = document.getElementById('albumDetailSection')
+    const passportSection = document.getElementById('passportSection')
 
     // 辅助：隐藏所有分区
     const hideAll = () => {
@@ -398,6 +413,9 @@ window.toggleSection = function(section) {
         if (timelineSection) timelineSection.style.display = 'none'
         if (collageSection) collageSection.style.display = 'none'
         if (achievementsSection) achievementsSection.style.display = 'none'
+        if (albumsSection) albumsSection.style.display = 'none'
+        if (albumDetailSection) albumDetailSection.style.display = 'none'
+        if (passportSection) passportSection.style.display = 'none'
     }
 
     if (section === 'upload') {
@@ -450,6 +468,24 @@ window.toggleSection = function(section) {
             loadAchievements()
         } else {
             achievementsSection.style.display = 'none'
+        }
+    } else if (section === 'albums') {
+        if (!albumsSection) return
+        if (albumsSection.style.display === 'none' || !albumsSection.style.display) {
+            hideAll()
+            albumsSection.style.display = 'block'
+            loadAlbums()
+        } else {
+            albumsSection.style.display = 'none'
+        }
+    } else if (section === 'passport') {
+        if (!passportSection) return
+        if (passportSection.style.display === 'none' || !passportSection.style.display) {
+            hideAll()
+            passportSection.style.display = 'block'
+            loadPassport()
+        } else {
+            passportSection.style.display = 'none'
         }
     }
 }
@@ -3326,6 +3362,560 @@ document.getElementById('categoryModal').addEventListener('click', (e) => {
 document.getElementById('editCategoryModal').addEventListener('click', (e) => {
     if (e.target.id === 'editCategoryModal') closeEditCategoryModal()
 })
+
+// ========================================
+//   相册功能
+// ========================================
+
+async function loadAlbums() {
+    try {
+        const { data, error } = await supabase
+            .from('albums')
+            .select('*')
+            .order('created_at', { ascending: false })
+        if (error) throw error
+        albums = data || []
+        renderAlbumList()
+    } catch (e) {
+        console.error('加载相册失败:', e)
+        document.getElementById('albumList').innerHTML = '<p class="loading">加载失败</p>'
+    }
+}
+
+function renderAlbumList() {
+    const container = document.getElementById('albumList')
+    const empty = document.getElementById('albumEmpty')
+    if (albums.length === 0) {
+        container.innerHTML = ''
+        empty.style.display = 'block'
+        return
+    }
+    empty.style.display = 'none'
+    container.innerHTML = albums.map(a => {
+        const coverSrc = a.cover_photo_id
+            ? (() => { const p = photos.find(ph => ph.id === a.cover_photo_id); return p ? getPhotoUrl(p.storage_path) : '' })()
+            : ''
+        return `
+        <div class="album-card" onclick="window.openAlbumDetail(${a.id})">
+            <div class="album-cover">
+                ${coverSrc ? `<img src="${coverSrc}" alt="">` : '<div class="album-cover-placeholder">📸</div>'}
+            </div>
+            <div class="album-info">
+                <h3>${escapeHtml(a.name)}</h3>
+                <p>${escapeHtml(a.description || '')}</p>
+            </div>
+        </div>`
+    }).join('')
+}
+
+window.openAddAlbumModal = function() {
+    const modal = document.createElement('div')
+    modal.className = 'modal'
+    modal.style.display = 'flex'
+    modal.id = 'addAlbumModal'
+    modal.innerHTML = `
+        <div class="modal-content modal-small">
+            <span class="modal-close" onclick="document.getElementById('addAlbumModal').remove()">&times;</span>
+            <h3>新建相册</h3>
+            <div class="edit-form">
+                <div class="form-group">
+                    <label>相册名称</label>
+                    <input type="text" id="albumNameInput" placeholder="输入相册名称">
+                </div>
+                <div class="form-group">
+                    <label>描述（可选）</label>
+                    <textarea id="albumDescInput" rows="2" placeholder="描述这个相册"></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="window.createAlbum()">创建</button>
+            </div>
+        </div>
+    `
+    document.body.appendChild(modal)
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove() })
+}
+
+window.createAlbum = async function() {
+    const name = document.getElementById('albumNameInput').value.trim()
+    const description = document.getElementById('albumDescInput').value.trim()
+    if (!name) { alert('请输入相册名称'); return }
+    try {
+        const { data, error } = await supabase
+            .from('albums')
+            .insert([{ name, description }])
+            .select()
+            .single()
+        if (error) throw error
+        albums.unshift(data)
+        renderAlbumList()
+        document.getElementById('addAlbumModal').remove()
+    } catch (e) {
+        console.error('创建相册失败:', e)
+        alert('创建失败: ' + e.message)
+    }
+}
+
+window.openAlbumDetail = async function(albumId) {
+    currentAlbum = albums.find(a => a.id === albumId)
+    if (!currentAlbum) return
+    document.getElementById('albumsSection').style.display = 'none'
+    document.getElementById('albumDetailSection').style.display = 'block'
+    document.getElementById('albumDetailName').textContent = currentAlbum.name
+    document.getElementById('albumDetailDesc').textContent = currentAlbum.description || ''
+    albumSelectMode = false
+    albumSelectedPhotos.clear()
+    updateAlbumToolbar()
+    await loadAlbumPhotos(albumId)
+}
+
+async function loadAlbumPhotos(albumId) {
+    try {
+        const { data, error } = await supabase
+            .from('album_photos')
+            .select('photo_id')
+            .eq('album_id', albumId)
+        if (error) throw error
+        albumPhotos = (data || []).map(r => r.photo_id)
+        document.getElementById('albumPhotoCount').textContent = `共 ${albumPhotos.length} 张照片`
+        renderAlbumPhotos()
+    } catch (e) {
+        console.error('加载相册照片失败:', e)
+    }
+}
+
+function renderAlbumPhotos() {
+    const grid = document.getElementById('albumPhotosGrid')
+    const empty = document.getElementById('albumPhotosEmpty')
+    if (albumPhotos.length === 0) {
+        grid.innerHTML = ''
+        empty.style.display = 'block'
+        return
+    }
+    empty.style.display = 'none'
+    const albumPhotoObjs = photos.filter(p => albumPhotos.includes(p.id))
+    grid.innerHTML = albumPhotoObjs.map(p => {
+        const selectedClass = albumSelectMode && albumSelectedPhotos.has(p.id) ? ' selected' : ''
+        const checkboxHtml = albumSelectMode
+            ? `<div class="photo-checkbox"><input type="checkbox" ${albumSelectedPhotos.has(p.id) ? 'checked' : ''} onclick="event.stopPropagation();window.toggleAlbumPhotoCheck(${p.id})"></div>`
+            : ''
+        const catNames = getPhotoCategoryNames(p.id)
+        const imgSrc = getPhotoUrl(p.storage_path)
+        return `
+        <div class="photo-card${selectedClass}" onclick="${albumSelectMode ? `window.toggleAlbumPhotoCheck(${p.id})` : `window.openPhotoModal('${p.id}')`}">
+            ${checkboxHtml}
+            <img src="${imgSrc}" alt="${escapeHtml(p.name || '')}" loading="lazy">
+            <div class="photo-info">
+                <h3>${escapeHtml(p.name || '未命名')}</h3>
+                <p>${escapeHtml(p.description || '')}</p>
+                <div class="photo-meta">
+                    <span class="photo-category">${escapeHtml(catNames || '未分类')}</span>
+                </div>
+            </div>
+        </div>`
+    }).join('')
+}
+
+window.toggleAlbumPhotoCheck = function(photoId) {
+    if (albumSelectedPhotos.has(photoId)) {
+        albumSelectedPhotos.delete(photoId)
+    } else {
+        albumSelectedPhotos.add(photoId)
+    }
+    renderAlbumPhotos()
+}
+
+window.toggleAlbumPhotoSelectMode = function() {
+    albumSelectMode = !albumSelectMode
+    albumSelectedPhotos.clear()
+    updateAlbumToolbar()
+    renderAlbumPhotos()
+}
+
+function updateAlbumToolbar() {
+    document.getElementById('albumSelectModeBtn').style.display = albumSelectMode ? 'none' : ''
+    document.getElementById('albumAddPhotosBtn').style.display = albumSelectMode ? '' : 'none'
+    document.getElementById('albumRemovePhotosBtn').style.display = albumSelectMode ? '' : 'none'
+    document.getElementById('albumCancelSelectBtn').style.display = albumSelectMode ? '' : 'none'
+}
+
+window.openAddPhotosToAlbumModal = async function() {
+    if (!currentAlbum) return
+    // 获取不在相册中的照片
+    const existingIds = new Set(albumPhotos)
+    const availablePhotos = photos.filter(p => !existingIds.has(p.id))
+    if (availablePhotos.length === 0) {
+        alert('所有照片已在此相册中')
+        return
+    }
+    const modal = document.createElement('div')
+    modal.className = 'modal'
+    modal.style.display = 'flex'
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:600px;padding:24px;max-height:80vh;overflow-y:auto;">
+            <span class="modal-close" style="position:sticky;top:0;float:right;font-size:28px;cursor:pointer;color:#999;" onclick="document.getElementById('addPhotosToAlbumModal').remove()">&times;</span>
+            <h3>添加照片到相册</h3>
+            <div class="category-select-list" style="max-height:50vh;overflow-y:auto;">
+                ${availablePhotos.map(p => {
+                    const imgSrc = getPhotoUrl(p.storage_path)
+                    return `<label class="category-option">
+                        <input type="checkbox" class="add-photo-check" value="${p.id}">
+                        <img src="${imgSrc}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;" loading="lazy">
+                        <span style="font-size:13px;flex:1;">${escapeHtml(p.name || '未命名')}</span>
+                    </label>`
+                }).join('')}
+            </div>
+            <button class="btn btn-primary" onclick="window.addPhotosToAlbum()" style="margin-top:12px;width:100%;">添加到相册</button>
+        </div>
+    `
+    modal.id = 'addPhotosToAlbumModal'
+    document.body.appendChild(modal)
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove() })
+}
+
+window.addPhotosToAlbum = async function() {
+    if (!currentAlbum) return
+    const checks = document.querySelectorAll('.add-photo-check:checked')
+    if (checks.length === 0) { alert('请选择要添加的照片'); return }
+    const rows = Array.from(checks).map(cb => ({
+        album_id: currentAlbum.id,
+        photo_id: parseInt(cb.value)
+    }))
+    try {
+        const { error } = await supabase.from('album_photos').insert(rows)
+        if (error) throw error
+        document.getElementById('addPhotosToAlbumModal').remove()
+        await loadAlbumPhotos(currentAlbum.id)
+        if (currentAlbum.cover_photo_id === null || currentAlbum.cover_photo_id === undefined) {
+            await supabase.from('albums').update({ cover_photo_id: rows[0].photo_id }).eq('id', currentAlbum.id)
+            currentAlbum.cover_photo_id = rows[0].photo_id
+        }
+    } catch (e) {
+        console.error('添加照片失败:', e)
+        alert('添加失败: ' + e.message)
+    }
+}
+
+window.removePhotosFromAlbum = async function() {
+    if (!currentAlbum) return
+    if (albumSelectedPhotos.size === 0) { alert('请先选择要移除的照片'); return }
+    if (!confirm(`确认从相册中移除 ${albumSelectedPhotos.size} 张照片？`)) return
+    try {
+        const { error } = await supabase
+            .from('album_photos')
+            .delete()
+            .eq('album_id', currentAlbum.id)
+            .in('photo_id', [...albumSelectedPhotos])
+        if (error) throw error
+        albumSelectedPhotos.clear()
+        await loadAlbumPhotos(currentAlbum.id)
+    } catch (e) {
+        console.error('移除照片失败:', e)
+        alert('移除失败: ' + e.message)
+    }
+}
+
+window.showAlbumList = function() {
+    document.getElementById('albumDetailSection').style.display = 'none'
+    document.getElementById('albumsSection').style.display = 'block'
+    currentAlbum = null
+    albumSelectMode = false
+    albumSelectedPhotos.clear()
+}
+
+window.openEditAlbumModal = function() {
+    if (!currentAlbum) return
+    const modal = document.createElement('div')
+    modal.className = 'modal'
+    modal.style.display = 'flex'
+    modal.innerHTML = `
+        <div class="modal-content modal-small">
+            <span class="modal-close" onclick="document.getElementById('editAlbumModal').remove()">&times;</span>
+            <h3>编辑相册</h3>
+            <div class="edit-form">
+                <div class="form-group">
+                    <label>相册名称</label>
+                    <input type="text" id="editAlbumNameInput" value="${escapeHtml(currentAlbum.name)}">
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea id="editAlbumDescInput" rows="2">${escapeHtml(currentAlbum.description || '')}</textarea>
+                </div>
+                <button class="btn btn-primary" onclick="window.saveEditAlbum()">保存</button>
+            </div>
+        </div>
+    `
+    modal.id = 'editAlbumModal'
+    document.body.appendChild(modal)
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove() })
+}
+
+window.saveEditAlbum = async function() {
+    if (!currentAlbum) return
+    const name = document.getElementById('editAlbumNameInput').value.trim()
+    const description = document.getElementById('editAlbumDescInput').value.trim()
+    if (!name) { alert('请输入相册名称'); return }
+    try {
+        const { error } = await supabase
+            .from('albums')
+            .update({ name, description })
+            .eq('id', currentAlbum.id)
+        if (error) throw error
+        currentAlbum.name = name
+        currentAlbum.description = description
+        const idx = albums.findIndex(a => a.id === currentAlbum.id)
+        if (idx >= 0) { albums[idx].name = name; albums[idx].description = description }
+        document.getElementById('albumDetailName').textContent = name
+        document.getElementById('albumDetailDesc').textContent = description || ''
+        document.getElementById('editAlbumModal').remove()
+    } catch (e) {
+        console.error('编辑相册失败:', e)
+        alert('编辑失败: ' + e.message)
+    }
+}
+
+window.deleteAlbum = async function() {
+    if (!currentAlbum) return
+    if (!confirm(`确认删除相册"${currentAlbum.name}"？\n相册中的照片不会被删除，仅解散合集。`)) return
+    try {
+        const { error } = await supabase.from('albums').delete().eq('id', currentAlbum.id)
+        if (error) throw error
+        albums = albums.filter(a => a.id !== currentAlbum.id)
+        window.showAlbumList()
+        renderAlbumList()
+    } catch (e) {
+        console.error('删除相册失败:', e)
+        alert('删除失败: ' + e.message)
+    }
+}
+
+// ========================================
+//   分享链接
+// ========================================
+
+function generateShareToken() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID()
+    }
+    const arr = new Uint8Array(16)
+    if (typeof crypto !== 'undefined') {
+        crypto.getRandomValues(arr)
+    } else {
+        for (let i = 0; i < 16; i++) arr[i] = Math.floor(Math.random() * 256)
+    }
+    return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('')
+}
+
+window.openCreateShareModal = function(albumId) {
+    if (!albumId) { alert('请先打开一个相册'); return }
+    const album = albums.find(a => a.id === albumId)
+    if (!album) return
+    const modal = document.createElement('div')
+    modal.className = 'modal'
+    modal.style.display = 'flex'
+    modal.innerHTML = `
+        <div class="modal-content modal-small">
+            <span class="modal-close" onclick="document.getElementById('createShareModal').remove()">&times;</span>
+            <h3>🔗 分享相册</h3>
+            <p style="margin-bottom:12px;font-size:14px;">相册: ${escapeHtml(album.name)}</p>
+            <div class="form-group">
+                <label>有效期</label>
+                <select id="shareExpirySelect" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;">
+                    <option value="1">1 天</option>
+                    <option value="7" selected>7 天</option>
+                    <option value="30">30 天</option>
+                    <option value="0">永久</option>
+                </select>
+            </div>
+            <div id="shareLinkResult" style="display:none;margin-top:12px;">
+                <div style="background:#f0f8f0;padding:12px;border-radius:8px;border:1px solid #c8e6c9;">
+                    <p style="font-size:13px;color:#2e7d32;margin-bottom:8px;">分享链接已生成：</p>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="shareLinkInput" readonly style="flex:1;font-size:12px;padding:8px;border:1px solid #ddd;border-radius:4px;">
+                        <button class="btn btn-primary" onclick="window.copyShareLink()">📋 复制</button>
+                    </div>
+                    <small id="shareExpiryNote" style="color:#666;display:block;margin-top:4px;"></small>
+                </div>
+            </div>
+            <button class="btn btn-primary" id="createShareBtn" onclick="window.createShareLink(${albumId})" style="width:100%;margin-top:12px;">生成分享链接</button>
+        </div>
+    `
+    modal.id = 'createShareModal'
+    document.body.appendChild(modal)
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove() })
+}
+
+window.createShareLink = async function(albumId) {
+    const days = parseInt(document.getElementById('shareExpirySelect').value)
+    const token = generateShareToken()
+    let expiresAt = null
+    if (days > 0) {
+        const d = new Date()
+        d.setDate(d.getDate() + days)
+        expiresAt = d.toISOString()
+    }
+    try {
+        const { data, error } = await supabase
+            .from('share_links')
+            .insert([{ album_id: albumId, token, expires_at: expiresAt }])
+            .select()
+            .single()
+        if (error) throw error
+        const shareUrl = window.location.origin + '/share.html?token=' + token
+        document.getElementById('shareLinkResult').style.display = 'block'
+        document.getElementById('shareLinkInput').value = shareUrl
+        document.getElementById('shareExpiryNote').textContent = days > 0
+            ? `此链接将在 ${days} 天后过期（${new Date(expiresAt).toLocaleDateString('zh-CN')}）`
+            : '永久有效'
+        document.getElementById('createShareBtn').style.display = 'none'
+    } catch (e) {
+        console.error('创建分享链接失败:', e)
+        alert('创建失败: ' + e.message)
+    }
+}
+
+window.copyShareLink = function() {
+    const input = document.getElementById('shareLinkInput')
+    input.select()
+    document.execCommand('copy')
+    alert('链接已复制到剪贴板')
+}
+
+// ========================================
+//   足迹护照
+// ========================================
+
+async function loadPassport() {
+    try {
+        const { data, error } = await supabase
+            .from('photos')
+            .select('id, name, storage_path, location_name, location_lat, location_lng')
+            .not('location_name', 'is', null)
+            .neq('location_name', '')
+            .order('created_at', { ascending: false })
+        if (error) throw error
+        passportAllPhotos = data || []
+        // 按 location_name 分组
+        const grouped = {}
+        for (const p of passportAllPhotos) {
+            if (!grouped[p.location_name]) {
+                grouped[p.location_name] = []
+            }
+            grouped[p.location_name].push(p)
+        }
+        passportData = Object.entries(grouped).map(([name, photos]) => ({
+            name,
+            count: photos.length,
+            photos,
+            coverPhoto: photos[0]
+        }))
+        sortPassportData()
+        renderPassport()
+    } catch (e) {
+        console.error('加载足迹护照失败:', e)
+        document.getElementById('passportStamps').innerHTML = '<p class="loading">加载失败</p>'
+    }
+}
+
+function sortPassportData() {
+    if (passportSortByPhotoCount) {
+        passportData.sort((a, b) => b.count - a.count)
+    } else {
+        passportData.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+    }
+}
+
+function getCityEmoji(locationName) {
+    const name = locationName || ''
+    const map = {
+        '北京': '🏛️', '上海': '🏙️', '广州': '🌆', '深圳': '🏢',
+        '杭州': '🪷', '苏州': '🏯', '南京': '🏛️', '西安': '🏰',
+        '成都': '🐼', '重庆': '🌉', '武汉': '🏗️', '长沙': '🌶️',
+        '昆明': '🌸', '大理': '🏔️', '丽江': '🏘️', '拉萨': '⛰️',
+        '厦门': '🏖️', '青岛': '🍺', '大连': '🌊', '三亚': '🌴',
+        '桂林': '🏞️', '黄山': '⛰️', '张家界': '🏔️', '九寨沟': '💧',
+        '香港': '🌃', '澳门': '🎰', '台北': '🏯', '东京': '🗼',
+        '大阪': '🏯', '首尔': '🏯', '曼谷': '🛕', '新加坡': '🦁',
+        '巴黎': '🗼', '伦敦': '🎡', '纽约': '🗽', '悉尼': '🦘',
+        '故宫': '🏯', '长城': '🧱', '天安门': '🏛️', '西湖': '🪷',
+    }
+    for (const [key, emoji] of Object.entries(map)) {
+        if (name.includes(key)) return emoji
+    }
+    return '📍'
+}
+
+function renderPassport() {
+    const container = document.getElementById('passportStamps')
+    const locationPhotos = document.getElementById('passportLocationPhotos')
+    const empty = document.getElementById('passportEmpty')
+    locationPhotos.style.display = 'none'
+    if (passportData.length === 0) {
+        container.innerHTML = ''
+        empty.style.display = 'block'
+        return
+    }
+    empty.style.display = 'none'
+    container.innerHTML = passportData.map((loc, i) => {
+        const emoji = getCityEmoji(loc.name)
+        const coverSrc = loc.coverPhoto ? getPhotoUrl(loc.coverPhoto.storage_path) : ''
+        return `
+        <div class="passport-stamp" style="animation-delay:${i * 0.05}s" onclick="window.openPassportLocation('${encodeURIComponent(loc.name)}')">
+            <div class="stamp-emoji">${emoji}</div>
+            <div class="stamp-name">${escapeHtml(loc.name)}</div>
+            <div class="stamp-count">${loc.count} 张照片</div>
+            ${coverSrc ? `<div class="stamp-cover"><img src="${coverSrc}" alt=""></div>` : ''}
+        </div>`
+    }).join('')
+}
+
+window.togglePassportSort = function() {
+    passportSortByPhotoCount = !passportSortByPhotoCount
+    document.getElementById('passportSortBtn').textContent = passportSortByPhotoCount ? '🔄 按数量排序' : '🔤 按字母排序'
+    sortPassportData()
+    renderPassport()
+}
+
+window.openPassportLocation = function(encodedName) {
+    const name = decodeURIComponent(encodedName)
+    const loc = passportData.find(l => l.name === name)
+    if (!loc) return
+    document.getElementById('passportStamps').style.display = 'none'
+    document.getElementById('passportEmpty').style.display = 'none'
+    const locationPhotos = document.getElementById('passportLocationPhotos')
+    locationPhotos.style.display = 'block'
+    document.getElementById('passportLocationName').textContent = name
+    const grid = document.getElementById('passportLocationGrid')
+    grid.innerHTML = loc.photos.map(p => {
+        const imgSrc = getPhotoUrl(p.storage_path)
+        return `
+        <div class="photo-card" onclick="window.openPhotoModal('${p.id}')">
+            <img src="${imgSrc}" alt="${escapeHtml(p.name || '')}" loading="lazy">
+            <div class="photo-info">
+                <h3>${escapeHtml(p.name || '未命名')}</h3>
+            </div>
+        </div>`
+    }).join('')
+}
+
+window.closePassportLocation = function() {
+    document.getElementById('passportStamps').style.display = ''
+    const empty = document.getElementById('passportEmpty')
+    if (passportData.length === 0) {
+        empty.style.display = 'block'
+    } else {
+        empty.style.display = 'none'
+    }
+    document.getElementById('passportLocationPhotos').style.display = 'none'
+}
+
+// Helper: get photo category names
+function getPhotoCategoryNames(photoId) {
+    const catIds = photoCategories[photoId]
+    if (!catIds || catIds.length === 0) return ''
+    return catIds.map(id => {
+        const cat = categories.find(c => c.id === id)
+        return cat ? cat.name : ''
+    }).filter(Boolean).join(', ')
+}
 
 document.getElementById('batchCategoryModal').addEventListener('click', (e) => {
     if (e.target.id === 'batchCategoryModal') closeBatchCategoryModal()
