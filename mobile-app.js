@@ -5,24 +5,6 @@
 
 const APP_CONFIG = window.__APP_CONFIG__ || {};
 
-// 爱心轮廓半径辅助函数（用于拼贴墙）
-function heartRadius(angle) {
-    const x = Math.cos(angle);
-    const y = Math.sin(angle);
-    let lo = 0, hi = 2;
-    for (let iter = 0; iter < 20; iter++) {
-        const mid = (lo + hi) / 2;
-        const nx = mid * x;
-        const ny = mid * y;
-        if (Math.pow(nx * nx + ny * ny - 1, 3) - nx * nx * ny * ny * ny <= 0) {
-            lo = mid;
-        } else {
-            hi = mid;
-        }
-    }
-    return lo;
-}
-
 const mobile = {
     // 状态
     currentUser: null,
@@ -3284,13 +3266,11 @@ const mobile = {
         canvas.width = size;
         canvas.height = size;
 
+        // 背景
         ctx.fillStyle = '#fff0f5';
         ctx.fillRect(0, 0, size, size);
 
-        const cx = size / 2;
-        const cy = size / 2 + 10;
-        const scale = size / 3.8;
-
+        // 预加载图片
         const imageCache = new Map();
         const photosToUse = collagePhotos.slice(0, 50);
         await Promise.all(photosToUse.map(async (photo) => {
@@ -3312,23 +3292,44 @@ const mobile = {
             ctx.fillStyle = '#999';
             ctx.font = '16px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('无法加载照片', cx, cy);
+            ctx.fillText('无法加载照片', size / 2, size / 2);
             return;
         }
 
-        const cellSize = 18;
-        const cells = [];
-        for (let y = -scale; y <= scale; y += cellSize) {
-            for (let x = -scale; x <= scale; x += cellSize) {
-                const nx = x / scale;
-                const ny = -y / scale;
-                const heartVal = Math.pow(nx * nx + ny * ny - 1, 3) - nx * nx * ny * ny * ny;
-                if (heartVal <= 0) {
-                    cells.push({ x: cx + x - cellSize / 2, y: cy + y - cellSize / 2, s: cellSize });
-                }
+        // 参数化爱心: x = 16sin³(t), y = 13cos(t)-5cos(2t)-2cos(3t)-cos(4t)
+        const heartScale = size / 34;
+        const hx = size / 2;
+        const hy = size * 0.42;
+
+        function drawHeart() {
+            ctx.beginPath();
+            const pts = 200;
+            for (let i = 0; i <= pts; i++) {
+                const t = (i / pts) * Math.PI * 2;
+                const x = 16 * Math.pow(Math.sin(t), 3);
+                const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+                const px = hx + x * heartScale;
+                const py = hy - y * heartScale;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
             }
+            ctx.closePath();
         }
 
+        // 裁剪到爱心，填充照片网格
+        ctx.save();
+        drawHeart();
+        ctx.clip();
+
+        const cellSize = size / 22;
+        const cols = Math.ceil(size / cellSize);
+        const rows = Math.ceil(size / cellSize);
+        const cells = [];
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                cells.push({ x: col * cellSize, y: row * cellSize, s: cellSize + 1 });
+            }
+        }
         for (let i = cells.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [cells[i], cells[j]] = [cells[j], cells[i]];
@@ -3342,19 +3343,12 @@ const mobile = {
             photoIndex++;
         }
 
-        // 爱心轮廓
+        ctx.restore();
+
+        // 描边
+        drawHeart();
         ctx.strokeStyle = '#ff6b81';
         ctx.lineWidth = 2;
-        ctx.beginPath();
-        const steps = 150;
-        for (let i = 0; i <= steps; i++) {
-            const angle = (i / steps) * Math.PI * 2 - Math.PI;
-            const r = heartRadius(angle);
-            const px = cx + r * Math.cos(angle) * scale * 0.5;
-            const py = cy - r * Math.sin(angle) * scale * 0.48;
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-        }
         ctx.stroke();
     },
 

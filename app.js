@@ -2343,16 +2343,11 @@ window.generateCollage = async function() {
     canvas.width = size;
     canvas.height = size;
 
-    // 清空画布
+    // 背景
     ctx.fillStyle = '#fff0f5';
     ctx.fillRect(0, 0, size, size);
 
-    // 爱心参数
-    const cx = size / 2;
-    const cy = size / 2 + 20;
-    const scale = size / 3.8;
-
-    // 预加载图片
+    // 预加载图片（最多 80 张用于拼贴）
     const imageCache = new Map();
     const photosToUse = collagePhotos.slice(0, 80);
     await Promise.all(photosToUse.map(async (photo) => {
@@ -2366,9 +2361,7 @@ window.generateCollage = async function() {
                 img.src = url;
             });
             imageCache.set(photo.id, img);
-        } catch (e) {
-            // 忽略加载失败的图片
-        }
+        } catch (e) { /* 忽略加载失败 */ }
     }));
 
     const loadedPhotos = photosToUse.filter(p => imageCache.has(p.id));
@@ -2376,31 +2369,51 @@ window.generateCollage = async function() {
         ctx.fillStyle = '#999';
         ctx.font = '24px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('无法加载照片', cx, cy);
+        ctx.fillText('无法加载照片', size / 2, size / 2);
         return;
     }
 
-    // 在爱心内均匀分布照片
-    const cellSize = 40;
-    const cells = [];
-    for (let y = -scale; y <= scale; y += cellSize) {
-        for (let x = -scale; x <= scale; x += cellSize) {
-            const nx = x / scale;
-            const ny = -y / scale; // Y轴反转
-            const heartVal = Math.pow(nx * nx + ny * ny - 1, 3) - nx * nx * ny * ny * ny;
-            if (heartVal <= 0) {
-                cells.push({ x: cx + x - cellSize / 2, y: cy + y - cellSize / 2, s: cellSize });
-            }
+    // 参数化爱心路径: x = 16 sin³(t), y = 13cos(t) - 5cos(2t) - 2cos(3t) - cos(4t)
+    // 范围: x∈[-16,16], y∈[-17,15], 宽32 高约22, 自然中心偏下
+    const heartScale = size / 34;
+    const hx = size / 2;
+    const hy = size * 0.42;
+
+    function drawHeart() {
+        ctx.beginPath();
+        const pts = 200;
+        for (let i = 0; i <= pts; i++) {
+            const t = (i / pts) * Math.PI * 2;
+            const x = 16 * Math.pow(Math.sin(t), 3);
+            const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+            const px = hx + x * heartScale;
+            const py = hy - y * heartScale;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
         }
+        ctx.closePath();
     }
 
-    // 随机打乱 cell 顺序
+    // 裁剪到爱心区域，填充照片
+    ctx.save();
+    drawHeart();
+    ctx.clip();
+
+    const cellSize = size / 22;
+    const cols = Math.ceil(size / cellSize);
+    const rows = Math.ceil(size / cellSize);
+    const cells = [];
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            cells.push({ x: col * cellSize, y: row * cellSize, s: cellSize + 1 });
+        }
+    }
+    // 随机打乱
     for (let i = cells.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [cells[i], cells[j]] = [cells[j], cells[i]];
     }
 
-    // 绘制照片
     let photoIndex = 0;
     for (const cell of cells) {
         const photo = loadedPhotos[photoIndex % loadedPhotos.length];
@@ -2409,41 +2422,14 @@ window.generateCollage = async function() {
         photoIndex++;
     }
 
+    ctx.restore();
+
     // 描边爱心轮廓
+    drawHeart();
     ctx.strokeStyle = '#ff6b81';
     ctx.lineWidth = 3;
-    ctx.beginPath();
-    const steps = 200;
-    for (let i = 0; i <= steps; i++) {
-        const angle = (i / steps) * Math.PI * 2 - Math.PI;
-        const r = heartRadius(angle);
-        const px = cx + r * Math.cos(angle) * scale * 0.5;
-        const py = cy - r * Math.sin(angle) * scale * 0.48;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-    }
     ctx.stroke();
 };
-
-function heartRadius(angle) {
-    // 爱心极坐标近似
-    const x = Math.cos(angle);
-    const y = Math.sin(angle);
-    const val = Math.pow(x * x + y * y - 1, 3) - x * x * y * y * y;
-    // 二分查找r使点落在爱心边界上
-    let lo = 0, hi = 2;
-    for (let iter = 0; iter < 20; iter++) {
-        const mid = (lo + hi) / 2;
-        const nx = mid * x;
-        const ny = mid * y;
-        if (Math.pow(nx * nx + ny * ny - 1, 3) - nx * nx * ny * ny * ny <= 0) {
-            lo = mid;
-        } else {
-            hi = mid;
-        }
-    }
-    return lo;
-}
 
 window.downloadCollage = function() {
     const canvas = document.getElementById('collageCanvas');
