@@ -540,7 +540,7 @@ const mobile = {
             this.initTimeline();
         } else if (tab === 'collage') {
             this.showPage('collage');
-            this.renderMobileCollageCategorySelect();
+            this.loadAllPhotoCategories().then(() => this.renderMobileCollageCategorySelect());
         } else if (tab === 'achievements') {
             this.showPage('achievements');
             this.loadAchievements();
@@ -3592,6 +3592,11 @@ const mobile = {
         const canvas = document.getElementById('mobileCollageCanvas');
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
+
+        // 确保照片-分类映射已加载
+        if (Object.keys(this.photoCategories).length === 0) {
+            await this.loadAllPhotoCategories();
+        }
 
         const supabase = this.initSupabase();
         const catId = this.getMobileCollageSelectedCategoryId();

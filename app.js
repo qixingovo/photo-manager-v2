@@ -470,7 +470,7 @@ window.toggleSection = function(section) {
         if (collageSection.style.display === 'none' || !collageSection.style.display) {
             hideAll()
             collageSection.style.display = 'block'
-            renderCollageCategorySelect()
+            loadAllPhotoCategories().then(() => renderCollageCategorySelect())
         } else {
             collageSection.style.display = 'none'
         }
@@ -2890,6 +2890,11 @@ window.generateCollage = async function() {
     const canvas = document.getElementById('collageCanvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+
+    // 确保照片-分类映射已加载
+    if (Object.keys(photoCategories).length === 0) {
+        await loadAllPhotoCategories();
+    }
 
     const catId = window.getCollageSelectedCategoryId();
     let collagePhotos;
