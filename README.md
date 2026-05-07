@@ -48,26 +48,62 @@
 - **地图**: Leaflet
 - **部署**: Vercel
 
-## 项目结构
+## 文件索引
 
-```
-photo-manager-v2/
-├── index.html              # 桌面版入口
-├── app.js                  # 桌面版 JS（~5000行）
-├── index-mobile.html       # 手机版入口
-├── mobile-app.js           # 手机版 JS（~5300行）
-├── mobile.css              # 手机版样式（~2300行）
-├── style.css               # 桌面版样式（~1800行）
-├── share.html / share.js   # 分享页面
-├── config.example.js       # 配置模板
-├── manifest.json / sw.js   # PWA
-├── migrations/             # 数据库迁移 SQL
-│   ├── 001_milestones_app_settings.sql
-│   ├── 002_cascade_categories.sql
-│   └── 003_couple_features.sql
-├── icons/                  # PWA 图标
-└── scripts/                # 辅助脚本
-```
+### 入口页面
+
+| 文件 | 用途 |
+|------|------|
+| `index.html` | 桌面版入口，侧边栏导航 + 主内容区 |
+| `index-mobile.html` | 手机版入口，Suki 风格首页 + 底部导航 + 功能页 |
+| `share.html` | 相册分享独立页面，无需登录即可浏览 |
+
+### 核心 JS
+
+| 文件 | 行数 | 职责 |
+|------|------|------|
+| `app.js` | ~5000 | 桌面版全部逻辑：照片流/分类/地图/情侣打卡/纪念日/心情日记/每日叨叨/亲密记录/拼贴墙/相册/足迹护照/回忆成就 |
+| `mobile-app.js` | ~5500 | 手机版全部逻辑：同上 + 首页情侣横幅/RPG成就系统/头像上传 |
+| `share.js` | ~300 | 分享页面：加载相册照片、密码验证 |
+| `sw.js` | ~50 | Service Worker：离线缓存、PWA 安装 |
+
+### 样式
+
+| 文件 | 行数 | 职责 |
+|------|------|------|
+| `style.css` | ~1800 | 桌面版全部样式：侧边栏/照片网格/模态框/表单/地图/成就 |
+| `mobile.css` | ~2600 | 手机版全部样式：Suki 暖粉主题/卡片布局/底部导航/RPG 系统 |
+
+### 数据库迁移 (`migrations/`)
+
+按顺序在 Supabase SQL Editor 中执行：
+
+| 文件 | 内容 |
+|------|------|
+| `001_milestones_app_settings.sql` | 纪念日表、应用设置表 |
+| `002_albums_share_links.sql` | 相册表、分享链接表、照片-相册关联表 |
+| `003_couple_features.sql` | 心情日记/每日叨叨/亲密记录/情侣打卡表 |
+| `004_rpg_achievements.sql` | RPG 进度表（XP/等级/任务/称号/奖励） |
+
+### 配置 & 构建
+
+| 文件 | 用途 |
+|------|------|
+| `config.example.js` | Supabase 配置模板，复制为 `config.js` 填入密钥 |
+| `package.json` | npm 依赖（仅 vite 用于构建时注入配置） |
+| `vite.config.js` | Vite 构建配置：注入 `__APP_CONFIG__` 全局变量 |
+| `vercel.json` | Vercel 部署配置：SPA 路由重写 + 安全头 |
+| `scripts/build-config.js` | 构建脚本：从环境变量生成 `config.js` |
+| `manifest.json` | PWA 清单：应用名/图标/主题色 |
+| `BRANCHES.md` | 分支命名规范 |
+
+### 静态资源
+
+| 路径 | 用途 |
+|------|------|
+| `icons/icon-192.png` | PWA 小图标 |
+| `icons/icon-512.png` | PWA 大图标 |
+| `qr.png` | 手机端扫码入口二维码 |
 
 ## 本地开发
 
