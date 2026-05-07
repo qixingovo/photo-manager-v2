@@ -937,6 +937,7 @@ window.toggleSelectMode = function() {
     const batchCategoryBtn = document.getElementById('batchCategoryBtn')
     const batchLocationBtn = document.getElementById('batchLocationBtn')
     const batchExportBtn = document.getElementById('batchExportBtn')
+    const batchDateBtn = document.getElementById('batchDateBtn')
     const batchBtn = document.getElementById('batchDeleteBtn')
 
     if (selectMode) {
@@ -945,6 +946,7 @@ window.toggleSelectMode = function() {
         selectAllBtn.style.display = 'inline-block'
         batchCategoryBtn.style.display = 'inline-block'
         if (batchLocationBtn) batchLocationBtn.style.display = 'inline-block'
+        if (batchDateBtn) batchDateBtn.style.display = 'inline-block'
         if (batchExportBtn) batchExportBtn.style.display = 'inline-block'
         batchBtn.style.display = 'inline-block'
     } else {
@@ -953,6 +955,7 @@ window.toggleSelectMode = function() {
         selectAllBtn.style.display = 'none'
         batchCategoryBtn.style.display = 'none'
         if (batchLocationBtn) batchLocationBtn.style.display = 'none'
+        if (batchDateBtn) batchDateBtn.style.display = 'none'
         if (batchExportBtn) batchExportBtn.style.display = 'none'
         batchBtn.style.display = 'none'
     }
@@ -1305,6 +1308,124 @@ window.saveBatchLocation = async function() {
         alert(`成功为 ${photoIds.length} 张照片设置位置: ${locationName || '已定位'}`);
     } catch (err) {
         alert('批量设置位置失败: ' + err.message);
+    }
+};
+
+// ========================================
+// 批量调整日期
+// ========================================
+
+window.openBatchDateModal = function() {
+    if (selectedPhotos.size === 0) { alert('请先选择照片'); return; }
+    const modal = document.getElementById('batchDateModal');
+    document.getElementById('batchDateCount').textContent = '已选 ' + selectedPhotos.size + ' 张照片';
+    document.querySelector('input[name="batchDateMode"][value="unified"]').checked = true;
+    window.onBatchDateModeChange();
+    modal.style.display = 'flex';
+};
+
+window.onBatchDateModeChange = function() {
+    const mode = document.querySelector('input[name="batchDateMode"]:checked').value;
+    document.getElementById('batchDateUnified').style.display = mode === 'unified' ? 'block' : 'none';
+    document.getElementById('batchDateOffsetRow').style.display = mode === 'offset' ? 'flex' : 'none';
+    window._calcBatchDatePreview();
+};
+
+window.applyOffset = function(days) {
+    const inp = document.getElementById('batchOffsetInput');
+    inp.value = parseInt(inp.value || 0) + days;
+    document.querySelector('input[name="batchDateMode"][value="offset"]').checked = true;
+    window.onBatchDateModeChange();
+};
+
+window._calcBatchDatePreview = function() {
+    const preview = document.getElementById('batchDatePreview');
+    const mode = document.querySelector('input[name="batchDateMode"]:checked').value;
+    const photoIds = [...selectedPhotos].slice(0, 5);
+    const selectedPhotosArr = photos.filter(p => selectedPhotos.has(p.id));
+
+    if (mode === 'unified') {
+        const newDate = document.getElementById('batchDateUnified').value;
+        if (!newDate) { preview.innerHTML = '<span style="color:#999;">请选择日期</span>'; return; }
+        preview.innerHTML = selectedPhotosArr.slice(0, 5).map(function(p) {
+            const oldDate = (p.taken_at || p.created_at) ? new Date(p.taken_at || p.created_at).toLocaleString('zh-CN') : '无日期';
+            const newD = new Date(newDate).toLocaleString('zh-CN');
+            return '<div>' + escapeHtml(p.name || p.original_name) + ': ' + oldDate + ' → <strong>' + newD + '</strong></div>';
+        }).join('');
+    } else if (mode === 'offset') {
+        const days = parseInt(document.getElementById('batchOffsetInput').value) || 0;
+        preview.innerHTML = selectedPhotosArr.slice(0, 5).map(function(p) {
+            const oldDt = new Date(p.taken_at || p.created_at);
+            const oldStr = isNaN(oldDt.getTime()) ? '无日期' : oldDt.toLocaleString('zh-CN');
+            const newDt = new Date(oldDt.getTime() + days * 86400000);
+            const newStr = isNaN(newDt.getTime()) ? '无日期' : newDt.toLocaleString('zh-CN');
+            return '<div>' + escapeHtml(p.name || p.original_name) + ': ' + oldStr + ' → <strong>' + newStr + '</strong></div>';
+        }).join('');
+    } else if (mode === 'filename') {
+        preview.innerHTML = selectedPhotosArr.slice(0, 5).map(function(p) {
+            const name = p.original_name || p.name || '';
+            const m = name.match(/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/);
+            if (m) {
+                const inferred = m[1] + '-' + m[2] + '-' + m[3];
+                return '<div>' + escapeHtml(name) + ' → <strong>' + inferred + '</strong></div>';
+            }
+            return '<div>' + escapeHtml(name) + ' → <span style="color:#999;">无法推断</span></div>';
+        }).join('');
+    }
+};
+
+window.execBatchDateUpdate = async function() {
+    const mode = document.querySelector('input[name="batchDateMode"]:checked').value;
+    const photoIds = [...selectedPhotos];
+    if (photoIds.length === 0) return;
+
+    let updates = [];
+    const selectedPhotosArr = photos.filter(p => selectedPhotos.has(p.id));
+
+    if (mode === 'unified') {
+        const newDate = document.getElementById('batchDateUnified').value;
+        if (!newDate) { alert('请选择日期'); return; }
+        updates = photoIds.map(function(id) { return { id: id, taken_at: newDate }; });
+    } else if (mode === 'offset') {
+        const days = parseInt(document.getElementById('batchOffsetInput').value) || 0;
+        updates = selectedPhotosArr.map(function(p) {
+            const oldDt = new Date(p.taken_at || p.created_at);
+            const newDt = new Date(oldDt.getTime() + days * 86400000);
+            return { id: p.id, taken_at: newDt.toISOString() };
+        });
+    } else if (mode === 'filename') {
+        updates = [];
+        selectedPhotosArr.forEach(function(p) {
+            const name = p.original_name || p.name || '';
+            const m = name.match(/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/);
+            if (m) {
+                updates.push({ id: p.id, taken_at: m[1] + '-' + m[2] + '-' + m[3] + 'T12:00:00Z' });
+            }
+        });
+    }
+
+    if (updates.length === 0) { alert('无可执行的更新'); return; }
+
+    try {
+        // 分批更新，每批 50 张
+        const batch = updates.slice(0, 50);
+        const { error } = await supabase
+            .from('photos')
+            .upsert(batch, { onConflict: 'id' });
+        if (error) throw error;
+
+        // 更新本地缓存
+        const updateMap = {};
+        updates.forEach(function(u) { updateMap[u.id] = u.taken_at; });
+        photos.forEach(function(p) {
+            if (updateMap[p.id]) p.taken_at = updateMap[p.id];
+        });
+
+        document.getElementById('batchDateModal').style.display = 'none';
+        renderPhotos();
+        alert('成功更新 ' + updates.length + ' 张照片的日期');
+    } catch (err) {
+        alert('批量调整日期失败: ' + err.message);
     }
 };
 

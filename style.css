@@ -1935,3 +1935,11 @@ mark {
     resize: vertical;
     font-family: inherit;
 }
+
+/* 批量调整日期 */
+.btn-mini-offset {
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+}
+
+#batchDateOffsetRow { flex-wrap: wrap; }

@@ -1241,6 +1241,173 @@ const mobile = {
         }
     },
 
+    // 批量调整日期
+    openBatchDateModal() {
+        if (this.selectedPhotos.size === 0) { this.showToast('请先选择照片'); return; }
+        const self = this;
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'mobileBatchDateModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '1000';
+        modal.innerHTML = '<div class="modal-card" style="max-width:95vw;padding:16px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+                '<h3 style="margin:0;">📅 调整日期</h3>' +
+                '<button class="icon-btn" onclick="document.getElementById(\'mobileBatchDateModal\').remove()">×</button>' +
+            '</div>' +
+            '<div style="font-size:12px;color:#888;margin-bottom:10px;">已选 ' + self.selectedPhotos.size + ' 张</div>' +
+            '<label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;"><input type="radio" name="mBatchDateMode" value="unified" checked onchange="mobile._updateDatePreview()"> 统一设置</label>' +
+            '<input type="datetime-local" id="mBatchDateUnified" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:10px;">' +
+            '<label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;"><input type="radio" name="mBatchDateMode" value="offset" onchange="mobile._updateDatePreview()"> 偏移调整</label>' +
+            '<div id="mBatchOffsetRow" style="display:none;flex-wrap:wrap;gap:4px;margin-bottom:10px;">' +
+                '<button class="btn-secondary" style="padding:4px 8px;font-size:12px;" onclick="mobile._applyOffset(-7)">-7天</button>' +
+                '<button class="btn-secondary" style="padding:4px 8px;font-size:12px;" onclick="mobile._applyOffset(-1)">-1天</button>' +
+                '<input type="number" id="mBatchOffsetInput" value="0" style="width:60px;padding:6px;border:1px solid #ddd;border-radius:6px;text-align:center;">' +
+                '<span style="font-size:12px;color:#666;">天</span>' +
+                '<button class="btn-secondary" style="padding:4px 8px;font-size:12px;" onclick="mobile._applyOffset(1)">+1天</button>' +
+                '<button class="btn-secondary" style="padding:4px 8px;font-size:12px;" onclick="mobile._applyOffset(7)">+7天</button>' +
+            '</div>' +
+            '<div style="font-size:12px;margin-bottom:8px;"><strong>预览（前5张）：</strong></div>' +
+            '<div id="mBatchDatePreview" style="max-height:150px;overflow-y:auto;font-size:11px;margin-bottom:10px;"></div>' +
+            '<div style="display:flex;gap:8px;">' +
+                '<button class="btn-secondary" onclick="document.getElementById(\'mobileBatchDateModal\').remove()" style="flex:1;">取消</button>' +
+                '<button class="btn-primary" onclick="mobile.execBatchDateUpdate()" style="flex:1;">确认修改</button>' +
+            '</div></div>';
+        document.body.appendChild(modal);
+        this._updateDatePreview();
+    },
+
+    _updateDatePreview() {
+        const self = this;
+        const mode = document.querySelector('input[name="mBatchDateMode"]:checked')?.value || 'unified';
+        document.getElementById('mBatchDateUnified').style.display = mode === 'unified' ? 'block' : 'none';
+        document.getElementById('mBatchOffsetRow').style.display = mode === 'offset' ? 'flex' : 'none';
+        const preview = document.getElementById('mBatchDatePreview');
+        const selectedArr = this.photos.filter(function(p) { return self.selectedPhotos.has(p.id); }).slice(0, 5);
+
+        if (mode === 'unified') {
+            const newDate = document.getElementById('mBatchDateUnified').value;
+            if (!newDate) { preview.innerHTML = '<span style="color:#999;">请选择日期</span>'; return; }
+            preview.innerHTML = selectedArr.map(function(p) {
+                const old = (p.taken_at || p.created_at) ? new Date(p.taken_at || p.created_at).toLocaleString('zh-CN') : '无';
+                return '<div>' + self.escapeHtml(p.name || '') + ': ' + old + ' → <strong>' + new Date(newDate).toLocaleString('zh-CN') + '</strong></div>';
+            }).join('');
+        } else if (mode === 'offset') {
+            const days = parseInt(document.getElementById('mBatchOffsetInput').value) || 0;
+            preview.innerHTML = selectedArr.map(function(p) {
+                const oldDt = new Date(p.taken_at || p.created_at);
+                const oldStr = isNaN(oldDt.getTime()) ? '无' : oldDt.toLocaleString('zh-CN');
+                const newDt = new Date(oldDt.getTime() + days * 86400000);
+                return '<div>' + self.escapeHtml(p.name || '') + ': ' + oldStr + ' → <strong>' + newDt.toLocaleString('zh-CN') + '</strong></div>';
+            }).join('');
+        }
+    },
+
+    _applyOffset(days) {
+        const inp = document.getElementById('mBatchOffsetInput');
+        inp.value = parseInt(inp.value || 0) + days;
+        document.querySelector('input[name="mBatchDateMode"][value="offset"]').checked = true;
+        this._updateDatePreview();
+    },
+
+    async execBatchDateUpdate() {
+        const mode = document.querySelector('input[name="mBatchDateMode"]:checked')?.value || 'unified';
+        const photoIds = [...this.selectedPhotos];
+        if (photoIds.length === 0) return;
+        const self = this;
+        const selectedArr = this.photos.filter(function(p) { return self.selectedPhotos.has(p.id); });
+
+        let updates = [];
+        if (mode === 'unified') {
+            const newDate = document.getElementById('mBatchDateUnified').value;
+            if (!newDate) { this.showToast('请选择日期'); return; }
+            updates = photoIds.map(function(id) { return { id: id, taken_at: newDate }; });
+        } else if (mode === 'offset') {
+            const days = parseInt(document.getElementById('mBatchOffsetInput').value) || 0;
+            updates = selectedArr.map(function(p) {
+                const oldDt = new Date(p.taken_at || p.created_at);
+                return { id: p.id, taken_at: new Date(oldDt.getTime() + days * 86400000).toISOString() };
+            });
+        }
+
+        if (updates.length === 0) return;
+        try {
+            const supabase = this.initSupabase();
+            const { error } = await supabase.from('photos').upsert(updates.slice(0, 50), { onConflict: 'id' });
+            if (error) throw error;
+            const updateMap = {};
+            updates.forEach(function(u) { updateMap[u.id] = u.taken_at; });
+            this.photos.forEach(function(p) { if (updateMap[p.id]) p.taken_at = updateMap[p.id]; });
+            document.getElementById('mobileBatchDateModal').remove();
+            this.selectedPhotos.clear(); this.selectMode = false; this.updateSelectModeUI(); this.renderPhotos();
+            this.showToast('已更新 ' + updates.length + ' 张照片的日期');
+        } catch (e) { this.showToast('失败: ' + e.message); }
+    },
+
+    // 批量改分类 (移动端)
+    openBatchCategoryModal() {
+        if (this.selectedPhotos.size === 0) { this.showToast('请先选择照片'); return; }
+        const self = this;
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'mobileBatchCategoryModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '1000';
+        modal.innerHTML = '<div class="modal-card" style="max-width:90vw;padding:16px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+                '<h3 style="margin:0;">📁 批量管理分类</h3>' +
+                '<button class="icon-btn" onclick="document.getElementById(\'mobileBatchCategoryModal\').remove()">×</button>' +
+            '</div>' +
+            '<div style="font-size:12px;color:#888;margin-bottom:10px;">已选 ' + self.selectedPhotos.size + ' 张</div>' +
+            '<div id="mBatchCatList" style="max-height:240px;overflow-y:auto;margin-bottom:10px;font-size:13px;"></div>' +
+            '<div style="display:flex;gap:6px;">' +
+                '<button class="btn-secondary" style="flex:1;" onclick="mobile.batchAddCategories()">追加分类</button>' +
+                '<button class="btn-danger" style="flex:1;" onclick="mobile.batchRemoveCategories()">移除分类</button>' +
+            '</div></div>';
+        document.body.appendChild(modal);
+
+        const list = document.getElementById('mBatchCatList');
+        const cats = this.categories || [];
+        if (cats.length === 0) {
+            list.innerHTML = '<span style="color:#999;">暂无分类</span>';
+        } else {
+            list.innerHTML = cats.map(function(c) {
+                return '<label style="display:flex;align-items:center;gap:6px;padding:6px 0;cursor:pointer;">' +
+                    '<input type="checkbox" value="' + c.id + '" class="mBatchCatCheck"> ' + self.escapeHtml(c.name) + '</label>';
+            }).join('');
+        }
+    },
+
+    async batchAddCategories() {
+        const self = this;
+        const checked = [...document.querySelectorAll('.mBatchCatCheck:checked')].map(function(cb) { return cb.value; });
+        if (checked.length === 0) { this.showToast('请选择分类'); return; }
+        try {
+            const supabase = this.initSupabase();
+            const rows = [];
+            this.selectedPhotos.forEach(function(pid) {
+                checked.forEach(function(cid) { rows.push({ photo_id: pid, category_id: cid }); });
+            });
+            await supabase.from('photo_categories').upsert(rows, { onConflict: 'photo_id,category_id', ignoreDuplicates: true });
+            document.getElementById('mobileBatchCategoryModal').remove();
+            await this.loadAllPhotoCategories();
+            this.showToast('已为 ' + this.selectedPhotos.size + ' 张照片追加分类');
+        } catch (e) { this.showToast('失败: ' + e.message); }
+    },
+
+    async batchRemoveCategories() {
+        const checked = [...document.querySelectorAll('.mBatchCatCheck:checked')].map(function(cb) { return cb.value; });
+        if (checked.length === 0) { this.showToast('请选择分类'); return; }
+        try {
+            const supabase = this.initSupabase();
+            const photoIds = [...this.selectedPhotos];
+            await supabase.from('photo_categories').delete().in('photo_id', photoIds).in('category_id', checked);
+            document.getElementById('mobileBatchCategoryModal').remove();
+            await this.loadAllPhotoCategories();
+            this.showToast('已从 ' + photoIds.length + ' 张照片移除分类');
+        } catch (e) { this.showToast('失败: ' + e.message); }
+    },
+
     // ========================================
     // 上传相关
     // ========================================

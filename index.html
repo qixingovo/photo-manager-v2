@@ -11,7 +11,7 @@
         window.location.href = 'index-mobile.html';
     }
     </script>
-    <link rel="stylesheet" href="style.css?v=30">
+    <link rel="stylesheet" href="style.css?v=31">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -357,6 +357,7 @@
                     <button id="selectAllBtn" onclick="window.selectAllPhotos()" class="btn btn-secondary" style="display:none;">全选</button>
                     <button id="batchCategoryBtn" onclick="window.openBatchCategoryModal()" class="btn btn-secondary" style="display:none;">📁 批量改分类</button>
                     <button id="batchLocationBtn" onclick="window.openBatchLocationModal()" class="btn btn-secondary" style="display:none;">📍 批量设位置</button>
+                    <button id="batchDateBtn" onclick="window.openBatchDateModal()" class="btn btn-secondary" style="display:none;">📅 调整日期</button>
                     <button id="batchExportBtn" onclick="window.exportSelectedPhotos()" class="btn btn-secondary" style="display:none;">📦 导出选中</button>
                     <button id="batchDeleteBtn" onclick="window.batchDeletePhotos()" class="btn btn-danger" style="display:none;">🗑️ 删除 (<span id="selectedCount">0</span>)</button>
                     <button id="favoritesFilterBtn" onclick="window.toggleFavoritesFilter()" class="btn btn-secondary">❤️ 收藏</button>
@@ -490,7 +491,50 @@
         </div>
     </div>
 
+    <!-- 批量调整日期弹窗 -->
+    <div id="batchDateModal" class="modal" style="display:none;">
+        <div class="modal-content modal-small" style="max-width:600px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <h3 style="margin:0;">📅 批量调整日期</h3>
+                <button onclick="document.getElementById('batchDateModal').style.display='none'" class="btn-secondary" style="padding:4px 10px;">×</button>
+            </div>
+            <div id="batchDateCount" style="font-size:13px;color:#888;margin-bottom:12px;"></div>
+            <div style="margin-bottom:12px;">
+                <label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;cursor:pointer;">
+                    <input type="radio" name="batchDateMode" value="unified" checked onchange="window.onBatchDateModeChange()"> 统一设置为
+                </label>
+                <input type="datetime-local" id="batchDateUnified" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;">
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;cursor:pointer;">
+                    <input type="radio" name="batchDateMode" value="offset" onchange="window.onBatchDateModeChange()"> 偏移调整
+                </label>
+                <div id="batchDateOffsetRow" style="display:flex;gap:6px;align-items:center;">
+                    <button class="btn-secondary btn-mini-offset" onclick="window.applyOffset(-365)">-1年</button>
+                    <button class="btn-secondary btn-mini-offset" onclick="window.applyOffset(-30)">-30天</button>
+                    <button class="btn-secondary btn-mini-offset" onclick="window.applyOffset(-7)">-7天</button>
+                    <button class="btn-secondary btn-mini-offset" onclick="window.applyOffset(-1)">-1天</button>
+                    <input type="number" id="batchOffsetInput" value="0" style="width:70px;padding:6px;border:1px solid #ddd;border-radius:6px;text-align:center;">
+                    <span style="font-size:13px;color:#666;">天</span>
+                </div>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                    <input type="radio" name="batchDateMode" value="filename" onchange="window.onBatchDateModeChange()"> 从文件名推断（如 IMG_20240101_xxx）
+                </label>
+            </div>
+            <div style="margin-bottom:12px;">
+                <strong style="font-size:13px;">预览（前5张）：</strong>
+                <div id="batchDatePreview" style="max-height:200px;overflow-y:auto;font-size:12px;margin-top:4px;"></div>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button onclick="document.getElementById('batchDateModal').style.display='none'" class="btn-secondary" style="flex:1;">取消</button>
+                <button onclick="window.execBatchDateUpdate()" class="btn btn-primary" style="flex:1;">确认修改</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="app.js?v=34"></script>
+    <script type="module" src="app.js?v=35"></script>
 </body>
 </html>
