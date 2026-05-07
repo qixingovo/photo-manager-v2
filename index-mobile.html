@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=42">
+    <link rel="stylesheet" href="mobile.css?v=43">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -314,15 +314,28 @@
         <p style="text-align:center;color:#999;font-size:13px;padding:8px;">选择分类后点击"生成拼贴"，照片将排列成爱心形状</p>
     </div>
 
-    <!-- ========== 回忆成就页面 ========== -->
+    <!-- ========== 恋爱成就 RPG 页面 ========== -->
     <div id="achievementsPage" class="page">
         <header class="top-bar">
             <div class="logo">
                 <span>🏆</span>
-                <span>回忆成就</span>
+                <span>恋爱成就</span>
             </div>
         </header>
-        <div id="mobileAchievementsGrid" style="padding:16px;display:flex;flex-wrap:wrap;gap:12px;justify-content:center;"></div>
+        <div class="rpg-page" style="flex:1;overflow-y:auto;padding:12px;">
+            <!-- 等级条 -->
+            <div id="rpgLevelBar" class="rpg-level-section"></div>
+            <!-- 每日任务 -->
+            <div id="rpgDailyQuests" class="rpg-quests-section"></div>
+            <!-- 本周任务 -->
+            <div id="rpgWeeklyQuests" class="rpg-quests-section"></div>
+            <!-- 称号收藏 -->
+            <div id="rpgTitles" class="rpg-section"></div>
+            <!-- 自定义奖励 -->
+            <div id="rpgRewards" class="rpg-section"></div>
+            <!-- 里程碑成就 -->
+            <div id="mobileAchievementsGrid" class="rpg-section"></div>
+        </div>
     </div>
 
     <!-- ========== 相册列表页 ========== -->
@@ -654,7 +667,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=42"></script>
+    <script type="module" src="mobile-app.js?v=43"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;

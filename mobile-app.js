@@ -74,6 +74,12 @@ const mobile = {
     coupleCheckins: [],
     currentTaskTab: 'tasks',
 
+    // RPG 成就系统状态
+    rpgData: null,        // { xp, daily_quests, weekly_quests, unlocked_titles, active_title, custom_rewards, login_streak, last_login_date }
+    _rpgXpToday: 0,       // 今日已获 XP（用于每日上限）
+    _rpgXpDate: '',        // XP 日期标记
+    RPG_DAILY_XP_CAP: 200,
+
     // Supabase 配置（从外部配置文件读取）
     SUPABASE_URL: APP_CONFIG.SUPABASE_URL || '',
     SUPABASE_KEY: APP_CONFIG.SUPABASE_ANON_KEY || '',
@@ -1222,6 +1228,7 @@ const mobile = {
             this.updateSelectModeUI();
             this.renderPhotos();
             this.showToast(`已为 ${photoIds.length} 张照片设置位置`);
+            this.addXP(20, 'location');
         } catch (err) {
             this.showToast('批量设置位置失败: ' + err.message);
         }
@@ -1379,6 +1386,8 @@ const mobile = {
         if (lngEl) lngEl.value = '';
         this.renderUploadCategoryCascade();
         this.showToast(`成功上传 ${successCount} 张照片`);
+        for (let i = 0; i < successCount; i++) this.addXP(5, 'upload');
+        if (latitude && longitude) this.addXP(20, 'location');
 
         // 记住本次使用的分类
         if (categoryId) {
@@ -1726,6 +1735,7 @@ const mobile = {
             this.renderCategories();
             this.closeAddCategory();
             this.showToast('分类已添加');
+            this.addXP(15, 'category');
         } catch (err) {
             this.showToast('添加失败: ' + err.message);
         }
@@ -2823,6 +2833,8 @@ const mobile = {
 
             if (error) throw error;
 
+            const hadLocation = !!(photo.latitude && photo.longitude);
+
             photo.name = name;
             photo.description = desc;
             photo.latitude = latitude;
@@ -2834,6 +2846,7 @@ const mobile = {
             this.closeEditModal();
             this.renderPhotos();
             this.showToast('已保存');
+            if (!hadLocation && latitude && longitude) this.addXP(20, 'location');
         } catch (err) {
             console.error('保存编辑失败:', err);
             this.showToast('保存失败，请重试');
@@ -3813,6 +3826,8 @@ const mobile = {
         ctx.strokeStyle = '#ff6b81';
         ctx.lineWidth = 2;
         ctx.stroke();
+
+        this.addXP(25, 'collage');
     },
 
     downloadCollage() {
@@ -3825,67 +3840,421 @@ const mobile = {
     },
 
     // ========================================
-    // 回忆成就
+    // ========================================
+    // 恋爱成就 RPG 系统
+    // ========================================
+
+    // 等级计算：到达 level 所需总 XP
+    _rpgTotalXPForLevel(level) {
+        let total = 0;
+        for (let i = 1; i < level; i++) {
+            total += 30 + Math.floor(i / 5);
+        }
+        return total;
+    },
+
+    // 从 XP 反算等级
+    _rpgLevelFromXP(xp) {
+        let level = 1;
+        while (xp >= this._rpgTotalXPForLevel(level + 1)) level++;
+        return Math.min(level, 999);
+    },
+
+    // 当前等级进度 (0-100)
+    _rpgLevelProgress(xp) {
+        const level = this._rpgLevelFromXP(xp);
+        const currentLvlXP = this._rpgTotalXPForLevel(level);
+        const nextLvlXP = this._rpgTotalXPForLevel(level + 1);
+        return Math.floor((xp - currentLvlXP) / (nextLvlXP - currentLvlXP) * 100);
+    },
+
+    // 等级称号
+    _rpgTitleForLevel(level) {
+        const tiers = [
+            [1, '🐣 初识·怦然心动'], [5, '🌱 萌芽·小鹿乱撞'], [15, '💕 甜蜜·如胶似漆'],
+            [30, '🔥 热恋·难舍难分'], [50, '💍 笃定·此生有你'], [80, '🏡 归宿·老夫老妻'],
+            [150, '🌟 传奇·情深似海'], [300, '👑 永恒·三生三世'], [666, '💎 神话·至死不渝']
+        ];
+        let title = tiers[0][1];
+        for (const [lvl, t] of tiers) { if (level >= lvl) title = t; }
+        return title;
+    },
+
+    // 加载 RPG 数据
+    async loadRPGData() {
+        const uname = this.currentUser?.username || 'default';
+        const supabase = this.initSupabase();
+        if (!supabase) { this._initLocalRPG(); return; }
+
+        try {
+            const { data } = await supabase.from('rpg_progress').select('*').eq('user_name', uname).single();
+            if (data) {
+                this.rpgData = data;
+                this._checkLoginStreak();
+            } else {
+                await supabase.from('rpg_progress').insert({ user_name: uname, xp: 0, last_login_date: new Date().toISOString().slice(0, 10), login_streak: 1 }).select('*').single().then(r => { this.rpgData = r.data; });
+            }
+        } catch (e) {
+            this._initLocalRPG();
+        }
+        this._refreshDailyQuests();
+        this._refreshWeeklyQuests();
+    },
+
+    _initLocalRPG() {
+        this.rpgData = { xp: 0, daily_quests: [], weekly_quests: [], unlocked_titles: [], active_title: '', custom_rewards: [], login_streak: 1, last_login_date: new Date().toISOString().slice(0, 10) };
+        this._refreshDailyQuests();
+        this._refreshWeeklyQuests();
+    },
+
+    async _saveRPGData() {
+        if (!this.rpgData) return;
+        const supabase = this.initSupabase();
+        if (!supabase) return;
+        try {
+            await supabase.from('rpg_progress').upsert({
+                user_name: this.currentUser?.username || 'default',
+                xp: this.rpgData.xp,
+                daily_quests: this.rpgData.daily_quests,
+                weekly_quests: this.rpgData.weekly_quests,
+                unlocked_titles: this.rpgData.unlocked_titles,
+                active_title: this.rpgData.active_title,
+                custom_rewards: this.rpgData.custom_rewards,
+                login_streak: this.rpgData.login_streak,
+                last_login_date: this.rpgData.last_login_date,
+                updated_at: new Date().toISOString()
+            });
+        } catch (e) { /* 静默 */ }
+    },
+
+    _checkLoginStreak() {
+        if (!this.rpgData) return;
+        const today = new Date().toISOString().slice(0, 10);
+        const lastDate = this.rpgData.last_login_date;
+        if (lastDate === today) return;
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        if (lastDate === yesterday) {
+            this.rpgData.login_streak = (this.rpgData.login_streak || 0) + 1;
+        } else {
+            this.rpgData.login_streak = 1;
+        }
+        this.rpgData.last_login_date = today;
+        this._saveRPGData();
+    },
+
+    // 添加 XP
+    async addXP(amount, reason) {
+        if (!this.rpgData) await this.loadRPGData();
+        const today = new Date().toISOString().slice(0, 10);
+        if (this._rpgXpDate !== today) { this._rpgXpToday = 0; this._rpgXpDate = today; }
+
+        const streakBonus = (this.rpgData.login_streak >= 7) ? 1.5 : (this.rpgData.login_streak >= 3 ? 1.2 : 1.0);
+        let earned = Math.floor(amount * streakBonus);
+
+        if (this._rpgXpToday + earned > this.RPG_DAILY_XP_CAP) {
+            earned = Math.max(0, this.RPG_DAILY_XP_CAP - this._rpgXpToday);
+        }
+        if (earned <= 0) return;
+
+        this._rpgXpToday += earned;
+        const oldLevel = this._rpgLevelFromXP(this.rpgData.xp);
+        this.rpgData.xp += earned;
+        const newLevel = this._rpgLevelFromXP(this.rpgData.xp);
+
+        // 检查称号解锁
+        const title = this._rpgTitleForLevel(newLevel);
+        if (!this.rpgData.unlocked_titles.includes(title)) {
+            this.rpgData.unlocked_titles.push(title);
+            if (newLevel > oldLevel) {
+                this.showToast('🎉 解锁称号: ' + title);
+            }
+        }
+
+        await this._saveRPGData();
+        this._checkQuestProgress(reason);
+        if (newLevel > oldLevel) {
+            this.showToast('⬆️ 升级！Lv.' + newLevel + ' ' + title);
+        }
+    },
+
+    // 每日任务模板
+    _dailyQuestTemplates: [
+        { id: 'dq_mood', label: '写一篇心情日记', xp: 15, check: function() { return true; } },
+        { id: 'dq_photo3', label: '上传 3 张照片', xp: 20, target: 3, check: function() { return true; } },
+        { id: 'dq_photo1', label: '上传 1 张照片', xp: 10, target: 1, check: function() { return true; } },
+        { id: 'dq_chatter', label: '发一条每日叨叨', xp: 10, check: function() { return true; } },
+        { id: 'dq_checkin', label: '完成一个情侣打卡', xp: 25, check: function() { return true; } },
+        { id: 'dq_fav3', label: '收藏 3 张照片', xp: 15, target: 3, check: function() { return true; } },
+        { id: 'dq_location', label: '标记一个地点', xp: 20, check: function() { return true; } },
+        { id: 'dq_category', label: '创建一个分类', xp: 15, check: function() { return true; } },
+    ],
+
+    _refreshDailyQuests() {
+        const today = new Date().toISOString().slice(0, 10);
+        if (this.rpgData.daily_quests_date === today && this.rpgData.daily_quests?.length > 0) return;
+
+        const pool = [...this._dailyQuestTemplates];
+        for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+        this.rpgData.daily_quests = pool.slice(0, 3).map(function(q) {
+            return { id: q.id, label: q.label, xp: q.xp, target: q.target || 1, progress: 0, done: false };
+        });
+        this.rpgData.daily_quests_date = today;
+        this._saveRPGData();
+    },
+
+    _weeklyQuestTemplates: [
+        { id: 'wq_checkin3', label: '完成 3 个情侣打卡', xp: 60, target: 3 },
+        { id: 'wq_photo10', label: '上传 10 张照片', xp: 80, target: 10 },
+        { id: 'wq_mood5', label: '写 5 篇心情日记', xp: 50, target: 5 },
+        { id: 'wq_location', label: '在地图标记一个地点', xp: 40, target: 1 },
+        { id: 'wq_daily3', label: '完成全部每日任务 3 天', xp: 100, target: 3 },
+        { id: 'wq_chatter5', label: '发 5 条每日叨叨', xp: 40, target: 5 },
+        { id: 'wq_collage', label: '制作一张拼贴墙', xp: 60, target: 1 },
+        { id: 'wq_album', label: '创建一个相册', xp: 50, target: 1 },
+    ],
+
+    _refreshWeeklyQuests() {
+        const weekKey = this._getWeekKey();
+        if (this.rpgData.weekly_quests_week === weekKey && this.rpgData.weekly_quests?.length > 0) return;
+
+        const pool = [...this._weeklyQuestTemplates];
+        for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+        this.rpgData.weekly_quests = pool.slice(0, 5).map(function(q) {
+            return { id: q.id, label: q.label, xp: q.xp, target: q.target, progress: 0, done: false };
+        });
+        this.rpgData.weekly_quests_week = weekKey;
+        this._saveRPGData();
+    },
+
+    _getWeekKey() {
+        const d = new Date();
+        const day = d.getDay() || 7;
+        d.setDate(d.getDate() - day + 1);
+        return d.toISOString().slice(0, 10);
+    },
+
+    // 任务进度检查
+    _checkQuestProgress(reason) {
+        if (!this.rpgData) return;
+        const today = new Date().toISOString().slice(0, 10);
+        let bonusXP = 0;
+
+        // 每日任务
+        (this.rpgData.daily_quests || []).forEach(function(q) {
+            if (q.done) return;
+            if (reason === 'mood' && q.id === 'dq_mood') q.progress++;
+            if (reason === 'upload' && (q.id === 'dq_photo3' || q.id === 'dq_photo1')) q.progress++;
+            if (reason === 'chatter' && q.id === 'dq_chatter') q.progress++;
+            if (reason === 'checkin' && q.id === 'dq_checkin') q.progress++;
+            if (reason === 'favorite' && q.id === 'dq_fav3') q.progress++;
+            if (reason === 'location' && q.id === 'dq_location') q.progress++;
+            if (reason === 'category' && q.id === 'dq_category') q.progress++;
+            if (q.progress >= q.target) { q.done = true; bonusXP += q.xp; }
+        });
+
+        // 每日全勤奖励
+        const allDone = (this.rpgData.daily_quests || []).every(function(q) { return q.done; });
+        if (allDone && this.rpgData.daily_all_done_date !== today) {
+            this.rpgData.daily_all_done_date = today;
+            bonusXP += 30;
+            // 周常：完成全部每日任务 N 天
+            this.rpgData.weekly_daily_done_days = (this.rpgData.weekly_daily_done_days || 0) + 1;
+        }
+
+        // 周常任务
+        (this.rpgData.weekly_quests || []).forEach(function(q) {
+            if (q.done) return;
+            if (reason === 'checkin' && q.id === 'wq_checkin3') q.progress++;
+            if (reason === 'upload' && q.id === 'wq_photo10') q.progress++;
+            if (reason === 'mood' && q.id === 'wq_mood5') q.progress++;
+            if (reason === 'location' && q.id === 'wq_location') q.progress++;
+            if (reason === 'chatter' && q.id === 'wq_chatter5') q.progress++;
+            if (reason === 'collage' && q.id === 'wq_collage') q.progress++;
+            if (reason === 'album' && q.id === 'wq_album') q.progress++;
+            if (q.progress >= q.target) { q.done = true; bonusXP += q.xp; }
+        });
+        // 周常每日全勤
+        const wq = (this.rpgData.weekly_quests || []).find(function(q) { return q.id === 'wq_daily3'; });
+        if (wq && !wq.done && (this.rpgData.weekly_daily_done_days || 0) >= wq.target) {
+            wq.done = true; bonusXP += wq.xp;
+        }
+
+        if (bonusXP > 0) {
+            this._saveRPGData();
+            this.showToast('✨ 任务奖励 +' + bonusXP + ' XP');
+        }
+    },
+
+    // 称号管理
+    unlockTitle(title) {
+        if (!this.rpgData) return;
+        if (!this.rpgData.unlocked_titles.includes(title)) {
+            this.rpgData.unlocked_titles.push(title);
+            this._saveRPGData();
+            this.showToast('🏅 解锁称号: ' + title);
+        }
+    },
+
+    equipTitle(title) {
+        if (!this.rpgData) return;
+        this.rpgData.active_title = title;
+        this._saveRPGData();
+        this.showToast('已佩戴称号: ' + title);
+    },
+
+    // 自定义奖励
+    addCustomReward(name, levelRequired) {
+        if (!this.rpgData) return;
+        this.rpgData.custom_rewards.push({ name: name, level: levelRequired, done: false });
+        this._saveRPGData();
+        this.showToast('已添加奖励: ' + name);
+    },
+
+    toggleRewardDone(index) {
+        if (!this.rpgData) return;
+        const r = this.rpgData.custom_rewards[index];
+        if (r) { r.done = !r.done; this._saveRPGData(); }
+    },
+
+    deleteReward(index) {
+        if (!this.rpgData) return;
+        this.rpgData.custom_rewards.splice(index, 1);
+        this._saveRPGData();
+    },
+
+    // ========================================
+    // 成就页渲染
     // ========================================
     async loadAchievements() {
-        let firstLaunch = localStorage.getItem('app_first_launch_date');
-        if (!firstLaunch) {
-            firstLaunch = new Date().toISOString().slice(0, 10);
-            localStorage.setItem('app_first_launch_date', firstLaunch);
-        }
-        const daysSinceFirst = Math.floor((new Date() - new Date(firstLaunch)) / (1000 * 60 * 60 * 24));
-
-        let photoCount = 0, categoryCount = 0, commentCount = 0, favoriteCount = 0, locationCount = 0;
+        if (!this.rpgData) await this.loadRPGData();
+        let photoCount = 0, categoryCount = 0, favoriteCount = 0, locationCount = 0;
         try {
             const supabase = this.initSupabase();
             if (supabase) {
-                const [{ count: pc }, { count: cc }, { count: coc }, { count: fc }, { count: lc }] = await Promise.all([
+                const results = await Promise.all([
                     supabase.from('photos').select('*', { count: 'exact', head: true }),
                     supabase.from('categories').select('*', { count: 'exact', head: true }),
-                    supabase.from('comments').select('*', { count: 'exact', head: true }),
                     supabase.from('photos').select('*', { count: 'exact', head: true }).eq('is_favorite', true),
                     supabase.from('photos').select('*', { count: 'exact', head: true }).not('location_name', 'is', null),
                 ]);
-                photoCount = pc || 0;
-                categoryCount = cc || 0;
-                commentCount = coc || 0;
-                favoriteCount = fc || 0;
-                locationCount = lc || 0;
+                photoCount = results[0].count || 0;
+                categoryCount = results[1].count || 0;
+                favoriteCount = results[2].count || 0;
+                locationCount = results[3].count || 0;
             }
-        } catch (e) {
-            console.warn('加载成就统计失败:', e);
-        }
-
-        const stats = { photoCount, categoryCount, commentCount, favoriteCount, locationCount, daysSinceFirst };
-        this.renderAchievements(stats);
+        } catch (e) { /* 静默 */ }
+        this._renderAchievementsPage({ photoCount, categoryCount, favoriteCount, locationCount });
     },
 
-    renderAchievements(stats) {
+    _renderAchievementsPage(stats) {
+        if (!this.rpgData) return;
+        const xp = this.rpgData.xp || 0;
+        const level = this._rpgLevelFromXP(xp);
+        const progress = this._rpgLevelProgress(xp);
+        const nextXP = this._rpgTotalXPForLevel(level + 1) - xp;
+        const title = this._rpgTitleForLevel(level);
+        const streakBonus = (this.rpgData.login_streak >= 7) ? '1.5x' : (this.rpgData.login_streak >= 3 ? '1.2x' : '1.0x');
+
+        // 等级条
+        const levelBarEl = document.getElementById('rpgLevelBar');
+        if (levelBarEl) {
+            levelBarEl.innerHTML = [
+                '<div class="rpg-level-badge">Lv.' + level + '</div>',
+                '<div class="rpg-title-display">' + title + '</div>',
+                '<div class="rpg-xp-bar-container"><div class="rpg-xp-bar-fill" style="width:' + progress + '%"></div></div>',
+                '<div class="rpg-xp-text">' + xp + ' XP  |  升级还需 ' + nextXP + ' XP  |  连签 ' + (this.rpgData.login_streak || 0) + '天 (' + streakBonus + ')</div>',
+            ].join('');
+        }
+
+        // 每日任务
+        const dailyEl = document.getElementById('rpgDailyQuests');
+        if (dailyEl) {
+            const dq = this.rpgData.daily_quests || [];
+            const allDone = dq.length > 0 && dq.every(function(q) { return q.done; });
+            dailyEl.innerHTML = '<h3>📋 今日任务' + (allDone ? ' ✅ 全勤!' : '') + '</h3>' + dq.map(function(q) {
+                return '<div class="rpg-quest-item' + (q.done ? ' done' : '') + '">' +
+                    '<span class="rpg-quest-check">' + (q.done ? '✅' : '☐') + '</span>' +
+                    '<span class="rpg-quest-label">' + q.label + '</span>' +
+                    (q.target > 1 ? '<span class="rpg-quest-progress">(' + q.progress + '/' + q.target + ')</span>' : '') +
+                    '<span class="rpg-quest-xp">+' + q.xp + ' XP</span>' +
+                    '</div>';
+            }).join('') + (allDone ? '<div class="rpg-quest-bonus">🎁 全部完成 +30 XP</div>' : '');
+        }
+
+        // 本周任务
+        const weeklyEl = document.getElementById('rpgWeeklyQuests');
+        if (weeklyEl) {
+            const wq = this.rpgData.weekly_quests || [];
+            weeklyEl.innerHTML = '<h3>📅 本周任务</h3>' + wq.map(function(q) {
+                return '<div class="rpg-quest-item' + (q.done ? ' done' : '') + '">' +
+                    '<span class="rpg-quest-check">' + (q.done ? '✅' : '☐') + '</span>' +
+                    '<span class="rpg-quest-label">' + q.label + '</span>' +
+                    (q.target > 1 ? '<span class="rpg-quest-progress">(' + q.progress + '/' + q.target + ')</span>' : '') +
+                    '<span class="rpg-quest-xp">+' + q.xp + ' XP</span>' +
+                    '</div>';
+            }).join('');
+        }
+
+        // 称号收藏
+        const titlesEl = document.getElementById('rpgTitles');
+        if (titlesEl) {
+            const titles = this.rpgData.unlocked_titles || [];
+            const active = this.rpgData.active_title || '';
+            titlesEl.innerHTML = '<h3>🏅 称号收藏</h3><div class="rpg-titles-grid">' +
+                (titles.length === 0 ? '<span style="color:#999;">还没有解锁称号</span>' : '') +
+                titles.map(function(t) {
+                    return '<div class="rpg-title-chip' + (t === active ? ' active' : '') + '" onclick="mobile.equipTitle(\'' + t.replace(/'/g, "\\'") + '\')">' + t + (t === active ? ' ✅' : '') + '</div>';
+                }).join('') + '</div>';
+        }
+
+        // 里程碑成就（保留旧版）
         const grid = document.getElementById('mobileAchievementsGrid');
-        if (!grid) return;
+        if (grid) {
+            const achievements = [
+                { id: 'first_photo', icon: '🐣', name: '初出茅庐', desc: '上传第 1 张照片', check: function(s) { return s.photoCount >= 1; } },
+                { id: 'collector', icon: '📸', name: '记忆收集者', desc: '累计 100 张照片', check: function(s) { return s.photoCount >= 100; } },
+                { id: 'master', icon: '🏆', name: '回忆大师', desc: '累计 500 张照片', check: function(s) { return s.photoCount >= 500; } },
+                { id: 'organizer', icon: '📁', name: '整理达人', desc: '创建 5 个分类', check: function(s) { return s.categoryCount >= 5; } },
+                { id: 'collector_20', icon: '⭐', name: '收藏家', desc: '收藏 20 张照片', check: function(s) { return s.favoriteCount >= 20; } },
+                { id: 'collector_50', icon: '❤️', name: '真爱印记', desc: '收藏 50 张照片', check: function(s) { return s.favoriteCount >= 50; } },
+                { id: 'explorer', icon: '🗺️', name: '足迹遍布', desc: '标记 10 个地点', check: function(s) { return s.locationCount >= 10; } },
+                { id: 'explorer_30', icon: '🌍', name: '环球旅行', desc: '标记 30 个地点', check: function(s) { return s.locationCount >= 30; } },
+            ];
+            grid.innerHTML = '<h3>🏆 里程碑成就</h3><div class="achievement-grid">' + achievements.map(function(a) {
+                const unlocked = a.check(stats);
+                return '<div class="achievement-badge' + (unlocked ? ' unlocked' : ' locked') + '">' +
+                    '<span class="achievement-icon">' + a.icon + '</span>' +
+                    '<span class="achievement-name">' + a.name + '</span>' +
+                    '<span class="achievement-desc">' + (unlocked ? a.desc : '???') + '</span>' +
+                    '</div>';
+            }).join('') + '</div>';
+        }
 
-        const achievements = [
-            { id: 'first_photo', icon: '🐣', name: '初出茅庐', desc: '上传第 1 张照片', check: (s) => s.photoCount >= 1 },
-            { id: 'collector', icon: '📸', name: '记忆收集者', desc: '累计 100 张照片', check: (s) => s.photoCount >= 100 },
-            { id: 'master', icon: '🏆', name: '回忆大师', desc: '累计 500 张照片', check: (s) => s.photoCount >= 500 },
-            { id: 'organizer', icon: '📁', name: '整理达人', desc: '创建 5 个分类', check: (s) => s.categoryCount >= 5 },
-            { id: 'commenter', icon: '💬', name: '留言能手', desc: '发表 10 条留言', check: (s) => s.commentCount >= 10 },
-            { id: 'collector_20', icon: '⭐', name: '收藏家', desc: '收藏 20 张照片', check: (s) => s.favoriteCount >= 20 },
-            { id: 'collector_50', icon: '❤️', name: '真爱印记', desc: '收藏 50 张照片', check: (s) => s.favoriteCount >= 50 },
-            { id: 'witness', icon: '📅', name: '岁月见证', desc: '使用超过 365 天', check: (s) => s.daysSinceFirst >= 365 },
-            { id: 'explorer', icon: '🗺️', name: '足迹遍布', desc: '标记 10 个地点', check: (s) => s.locationCount >= 10 },
-        ];
+        // 自定义奖励
+        const rewardsEl = document.getElementById('rpgRewards');
+        if (rewardsEl) {
+            const rewards = this.rpgData.custom_rewards || [];
+            rewardsEl.innerHTML = '<h3>🎁 自定义奖励' +
+                ' <button class="btn-mini" onclick="mobile.showAddRewardModal()" style="font-size:12px;">+</button></h3>' +
+                rewards.map(function(r, i) {
+                    const reached = level >= r.level;
+                    return '<div class="rpg-reward-item' + (r.done ? ' done' : '') + (reached ? ' reached' : '') + '">' +
+                        '<span class="rpg-reward-check" onclick="mobile.toggleRewardDone(' + i + ')">' + (r.done ? '✅' : (reached ? '🎯' : '🔒')) + '</span>' +
+                        '<span class="rpg-reward-name">' + r.name + '</span>' +
+                        '<span class="rpg-reward-level">Lv.' + r.level + '</span>' +
+                        '<span class="rpg-reward-del" onclick="event.stopPropagation();mobile.deleteReward(' + i + ')" style="cursor:pointer;">✕</span>' +
+                        '</div>';
+                }).join('');
+        }
+    },
 
-        grid.innerHTML = achievements.map(a => {
-            const unlocked = a.check(stats);
-            return `
-                <div class="achievement-badge ${unlocked ? 'unlocked' : 'locked'}">
-                    <span class="achievement-icon">${a.icon}</span>
-                    <span class="achievement-name">${a.name}</span>
-                    <span class="achievement-desc">${unlocked ? a.desc : '???'}</span>
-                </div>
-            `;
-        }).join('');
+    showAddRewardModal() {
+        const name = prompt('奖励名称（如："一起去旅行"）');
+        if (!name) return;
+        const levelStr = prompt('需要的等级（如：20）', '10');
+        const level = parseInt(levelStr) || 10;
+        this.addCustomReward(name, Math.min(999, Math.max(1, level)));
+        this._renderAchievementsPage({});
     },
 
     // ========================================
@@ -3977,6 +4346,7 @@ const mobile = {
             this.renderAlbumList();
             document.getElementById('mobileAddAlbumModal').remove();
             this.showToast('相册已创建');
+            this.addXP(15, 'album');
         } catch (e) {
             console.error('创建相册失败:', e);
             this.showToast('创建失败: ' + e.message);
@@ -4574,6 +4944,7 @@ const mobile = {
             document.getElementById('moodDiaryModal').remove();
             this.loadMoodDiary();
             this.showToast('已保存');
+            this.addXP(10, 'mood');
         } catch (e) {
             this.showToast('保存失败: ' + e.message);
         }
@@ -4775,6 +5146,7 @@ const mobile = {
             document.getElementById('checkinModal').remove();
             this.loadCoupleTasks();
             this.showToast('打卡成功');
+            this.addXP(30, 'checkin');
         } catch (e) { this.showToast('打卡失败: ' + e.message); }
     },
 
@@ -4987,6 +5359,7 @@ const mobile = {
             document.getElementById('intimateRecordModal').remove();
             this.loadIntimateRecords();
             this.showToast('已保存');
+            this.addXP(10, 'intimate');
         } catch (e) { this.showToast('保存失败: ' + e.message); }
     },
 
@@ -5195,6 +5568,7 @@ const mobile = {
             document.getElementById('dailyChatterModal').remove();
             this.loadDailyChatter();
             this.showToast('已发布');
+            this.addXP(5, 'chatter');
         } catch (e) {
             this.showToast('发布失败: ' + e.message);
         }

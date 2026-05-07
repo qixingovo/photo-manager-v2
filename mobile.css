@@ -2339,3 +2339,251 @@ mark {
 .generic-photo-item:active {
     border-color: var(--primary);
 }
+
+/* ========================================
+   恋爱成就 RPG 系统 (移动端)
+   ======================================== */
+.rpg-level-section {
+    background: linear-gradient(135deg, #fff5f5, #fff0f5);
+    border-radius: 16px;
+    padding: 20px 16px;
+    margin-bottom: 16px;
+    text-align: center;
+    box-shadow: 0 2px 12px rgba(255, 150, 150, 0.15);
+}
+
+.rpg-level-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #ff6b81, #ff9a9e);
+    color: #fff;
+    font-size: 28px;
+    font-weight: 700;
+    padding: 8px 24px;
+    border-radius: 24px;
+    margin-bottom: 8px;
+    box-shadow: 0 4px 15px rgba(255, 107, 129, 0.4);
+}
+
+.rpg-title-display {
+    font-size: 16px;
+    color: #ff6b81;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.rpg-xp-bar-container {
+    width: 100%;
+    height: 14px;
+    background: #ffe0e5;
+    border-radius: 7px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.rpg-xp-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff6b81, #ff9a9e);
+    border-radius: 7px;
+    transition: width 0.5s ease;
+    min-width: 2px;
+}
+
+.rpg-xp-text {
+    font-size: 12px;
+    color: #999;
+}
+
+/* 任务区域 */
+.rpg-quests-section {
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+}
+
+.rpg-quests-section h3 {
+    font-size: 15px;
+    color: #333;
+    margin: 0 0 12px 0;
+}
+
+.rpg-quest-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+    background: #fafafa;
+    transition: all 0.2s;
+}
+
+.rpg-quest-item.done {
+    background: #f0fff0;
+    opacity: 0.75;
+}
+
+.rpg-quest-check {
+    font-size: 16px;
+    min-width: 22px;
+    text-align: center;
+}
+
+.rpg-quest-label {
+    flex: 1;
+    font-size: 14px;
+    color: #333;
+}
+
+.rpg-quest-item.done .rpg-quest-label {
+    text-decoration: line-through;
+    color: #999;
+}
+
+.rpg-quest-progress {
+    font-size: 12px;
+    color: #ff6b81;
+    font-weight: 600;
+}
+
+.rpg-quest-xp {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ff6b81;
+    min-width: 50px;
+    text-align: right;
+}
+
+.rpg-quest-bonus {
+    text-align: center;
+    padding: 8px;
+    margin-top: 4px;
+    background: linear-gradient(135deg, #fff9c4, #fff176);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #e65100;
+}
+
+/* 称号网格 */
+.rpg-titles-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.rpg-title-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    border-radius: 16px;
+    font-size: 13px;
+    background: #f5f5f5;
+    border: 2px solid #eee;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.rpg-title-chip:active {
+    transform: scale(0.95);
+}
+
+.rpg-title-chip.active {
+    background: linear-gradient(135deg, #fff5f5, #ffe0e5);
+    border-color: #ff6b81;
+    color: #ff6b81;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(255,107,129,0.25);
+}
+
+/* 奖励项 */
+.rpg-reward-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+    background: #fafafa;
+}
+
+.rpg-reward-item.reached {
+    background: #fffef5;
+}
+
+.rpg-reward-item.done {
+    background: #f0fff0;
+}
+
+.rpg-reward-check {
+    font-size: 18px;
+    cursor: pointer;
+    min-width: 24px;
+    text-align: center;
+}
+
+.rpg-reward-name {
+    flex: 1;
+    font-size: 14px;
+    color: #333;
+}
+
+.rpg-reward-item.done .rpg-reward-name {
+    text-decoration: line-through;
+    color: #999;
+}
+
+.rpg-reward-level {
+    font-size: 11px;
+    color: #ff6b81;
+    font-weight: 600;
+    background: #fff0f5;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.rpg-reward-del {
+    font-size: 14px;
+    color: #ccc;
+    padding: 4px;
+}
+
+.rpg-reward-del:hover {
+    color: #ff4444;
+}
+
+/* 通用区段 */
+.rpg-section {
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+}
+
+.rpg-section h3 {
+    font-size: 15px;
+    color: #333;
+    margin: 0 0 12px 0;
+}
+
+/* 迷你按钮 */
+.btn-mini {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 13px;
+    border: 2px solid #ff6b81;
+    background: #fff;
+    color: #ff6b81;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    vertical-align: middle;
+    margin-left: 6px;
+}
