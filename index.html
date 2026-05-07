@@ -11,7 +11,7 @@
         window.location.href = 'index-mobile.html';
     }
     </script>
-    <link rel="stylesheet" href="style.css?v=29">
+    <link rel="stylesheet" href="style.css?v=30">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -104,6 +104,11 @@
             <div class="nav-section" onclick="window.toggleSection('coupleTasks')" title="情侣打卡">
                 <span class="nav-icon">✅</span>
                 <span class="nav-text">情侣打卡</span>
+            </div>
+            <div class="nav-divider"></div>
+            <div class="nav-section" onclick="window.toggleSection('partnerProfile')" title="对方喜好档案">
+                <span class="nav-icon">💝</span>
+                <span class="nav-text">对方喜好</span>
             </div>
             <div class="nav-divider"></div>
             <div class="nav-section" onclick="window.refreshData()" title="刷新">
@@ -333,6 +338,15 @@
 
         <button onclick="window.handleLogout()" class="btn btn-secondary" style="position:fixed;top:20px;right:20px;z-index:100;">退出登录</button>
 
+        <!-- 对方喜好档案 -->
+        <section id="partnerProfileSection" style="display:none;" class="feature-section">
+            <h2>💝 对方喜好档案</h2>
+            <div class="feature-toolbar">
+                <button class="btn btn-primary" id="partnerProfileEditBtn" onclick="window.togglePartnerProfileEdit()">✏️ 编辑</button>
+            </div>
+            <div id="partnerProfileContent"></div>
+        </section>
+
         <!-- 照片浏览 -->
         <section class="photos-section">
             <div class="photos-header">
@@ -477,6 +491,6 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="app.js?v=33"></script>
+    <script type="module" src="app.js?v=34"></script>
 </body>
 </html>

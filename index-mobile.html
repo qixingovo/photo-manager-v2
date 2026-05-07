@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=46">
+    <link rel="stylesheet" href="mobile.css?v=47">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -338,6 +338,20 @@
         </div>
     </div>
 
+    <!-- ========== 对方喜好档案 ========== -->
+    <div id="partnerProfilePage" class="page">
+        <header class="top-bar">
+            <div class="logo">
+                <span>💝</span>
+                <span>对方喜好档案</span>
+            </div>
+            <div class="top-actions">
+                <button class="icon-btn" id="mobilePartnerProfileEditBtn" onclick="mobile.togglePartnerProfileEdit()">✏️</button>
+            </div>
+        </header>
+        <div id="mobilePartnerProfileContent" style="flex:1;overflow-y:auto;padding:12px;"></div>
+    </div>
+
     <!-- ========== 相册列表页 ========== -->
     <div id="albumsPage" class="page">
         <header class="top-bar">
@@ -521,6 +535,11 @@
                 <span class="menu-text">回忆成就</span>
                 <span class="menu-arrow">›</span>
             </div>
+            <div class="menu-item" onclick="mobile.switchTab('partnerProfile')">
+                <span class="menu-icon">💝</span>
+                <span class="menu-text">对方喜好档案</span>
+                <span class="menu-arrow">›</span>
+            </div>
             <div class="menu-item" onclick="mobile.switchTab('intimateRecords')">
                 <span class="menu-icon">🔒</span>
                 <span class="menu-text">亲密记录</span>
@@ -667,7 +686,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=46"></script>
+    <script type="module" src="mobile-app.js?v=47"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;

@@ -414,6 +414,7 @@ window.toggleSection = function(section) {
     const albumsSection = document.getElementById('albumsSection')
     const albumDetailSection = document.getElementById('albumDetailSection')
     const passportSection = document.getElementById('passportSection')
+    const partnerProfileSection = document.getElementById('partnerProfileSection')
 
     // 辅助：隐藏所有分区
     const hideAll = () => {
@@ -430,6 +431,7 @@ window.toggleSection = function(section) {
         if (document.getElementById('dailyChatterSection')) document.getElementById('dailyChatterSection').style.display = 'none'
         if (document.getElementById('intimateRecordsSection')) document.getElementById('intimateRecordsSection').style.display = 'none'
         if (document.getElementById('coupleTasksSection')) document.getElementById('coupleTasksSection').style.display = 'none'
+        if (partnerProfileSection) partnerProfileSection.style.display = 'none'
     }
 
     if (section === 'upload') {
@@ -540,6 +542,15 @@ window.toggleSection = function(section) {
             loadCoupleTasks()
         } else {
             sec.style.display = 'none'
+        }
+    } else if (section === 'partnerProfile') {
+        if (!partnerProfileSection) return
+        if (partnerProfileSection.style.display === 'none' || !partnerProfileSection.style.display) {
+            hideAll()
+            partnerProfileSection.style.display = 'block'
+            loadPartnerProfile()
+        } else {
+            partnerProfileSection.style.display = 'none'
         }
     }
 }
@@ -4977,6 +4988,194 @@ function getPhotoCategoryNames(photoId) {
 document.getElementById('batchCategoryModal').addEventListener('click', (e) => {
     if (e.target.id === 'batchCategoryModal') closeBatchCategoryModal()
 })
+
+// ========================================
+// 对方喜好档案
+// ========================================
+window.partnerProfileData = null;
+window._partnerProfileEditing = false;
+
+const DEFAULT_PROFILE = {
+    updated_by: '', updated_at: '',
+    categories: {
+        food:    { label: '食物', icon: '🍔', likes: [], dislikes: [] },
+        drinks:  { label: '饮品', icon: '🧋', likes: [], dislikes: [] },
+        colors:  { label: '颜色', icon: '🎨', likes: [], dislikes: [] },
+        movies:  { label: '电影/剧', icon: '🎬', likes: [], dislikes: [] },
+        music:   { label: '音乐', icon: '🎵', likes: [], dislikes: [] },
+        brands:  { label: '品牌', icon: '🛍', likes: [], dislikes: [] },
+        restaurants: { label: '餐厅', icon: '🍽', likes: [], dislikes: [] },
+        gifts:   { label: '想要的礼物', icon: '🎁', likes: [], dislikes: [] },
+        other:   { label: '其他备忘', icon: '📌', notes: '' }
+    }
+};
+
+async function loadPartnerProfile() {
+    try {
+        const { data } = await supabase.from('app_settings').select('value').eq('key', 'partner_profile').single();
+        if (data && data.value) {
+            window.partnerProfileData = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        } else {
+            window.partnerProfileData = JSON.parse(JSON.stringify(DEFAULT_PROFILE));
+        }
+    } catch (e) {
+        window.partnerProfileData = JSON.parse(JSON.stringify(DEFAULT_PROFILE));
+    }
+    renderPartnerProfile();
+}
+
+function renderPartnerProfile() {
+    const container = document.getElementById('partnerProfileContent');
+    if (!container) return;
+    const p = window.partnerProfileData;
+    if (!p) { container.innerHTML = '<div class="empty-state">加载中...</div>'; return; }
+
+    const cats = p.categories || {};
+    const editBtn = document.getElementById('partnerProfileEditBtn');
+    if (editBtn) editBtn.textContent = window._partnerProfileEditing ? '💾 保存' : '✏️ 编辑';
+    if (editBtn) editBtn.onclick = function() {
+        if (window._partnerProfileEditing) { savePartnerProfile(); } else { window.togglePartnerProfileEdit(); }
+    };
+
+    const updatedInfo = p.updated_at
+        ? '<div class="profile-updated">' + (p.updated_by || '') + ' 更新于 ' + new Date(p.updated_at).toLocaleString('zh-CN') + '</div>'
+        : '';
+
+    if (window._partnerProfileEditing) {
+        container.innerHTML = updatedInfo + Object.entries(cats).map(function([key, c]) {
+            const likesStr = (c.likes || []).join(', ');
+            const dislikesStr = (c.dislikes || []).join(', ');
+            const notesStr = c.notes || '';
+            const catHeader = '<div class="profile-cat-header">' +
+                '<span class="profile-cat-icon">' + (c.icon || '') + '</span>' +
+                '<span class="profile-cat-label">' + (c.label || key) + '</span>' +
+                '<button class="btn-mini btn-danger" onclick="window.removeProfileCategory(\'' + key + '\')" title="删除分类">×</button>' +
+                '</div>';
+            if (key === 'other') {
+                return '<div class="profile-cat-card">' + catHeader +
+                    '<textarea class="profile-notes" data-key="' + key + '" placeholder="备忘...">' + escapeHtml(notesStr) + '</textarea></div>';
+            }
+            return '<div class="profile-cat-card">' + catHeader +
+                '<label class="profile-tag-label">喜欢</label>' +
+                '<div class="profile-tag-input"><input value="' + escapeHtml(likesStr) + '" data-key="' + key + '" data-type="likes" placeholder="逗号分隔，如: 火锅, 日料"><button class="btn-mini" onclick="window.addProfileTag(this)">+</button></div>' +
+                '<div class="profile-tag-list" data-key="' + key + '" data-type="likes">' + (c.likes || []).map(function(t, i) { return '<span class="profile-tag">' + escapeHtml(t) + '<span class="profile-tag-x" onclick="window.removeProfileTag(this,\'' + key + '\',\'likes\',' + i + ')">×</span></span>'; }).join('') + '</div>' +
+                '<label class="profile-tag-label">不喜欢</label>' +
+                '<div class="profile-tag-input"><input value="' + escapeHtml(dislikesStr) + '" data-key="' + key + '" data-type="dislikes" placeholder="逗号分隔，如: 香菜, 苦瓜"><button class="btn-mini" onclick="window.addProfileTag(this)">+</button></div>' +
+                '<div class="profile-tag-list" data-key="' + key + '" data-type="dislikes">' + (c.dislikes || []).map(function(t, i) { return '<span class="profile-tag">' + escapeHtml(t) + '<span class="profile-tag-x" onclick="window.removeProfileTag(this,\'' + key + '\',\'dislikes\',' + i + ')">×</span></span>'; }).join('') + '</div>' +
+                '</div>';
+        }).join('') + '<button class="btn btn-secondary" onclick="window.addProfileCategory()" style="width:100%;margin-top:8px;">+ 添加分类</button>';
+    } else {
+        // 查看模式
+        const emptyCount = Object.values(cats).filter(function(c) {
+            return (!c.likes || c.likes.length === 0) && (!c.dislikes || c.dislikes.length === 0) && (!c.notes);
+        }).length;
+        if (emptyCount === Object.keys(cats).length) {
+            container.innerHTML = updatedInfo + '<div class="empty-state"><span style="font-size:48px;">💝</span><p>还没有记录对方的喜好</p><small>点击上方编辑按钮开始记录</small></div>';
+            return;
+        }
+        container.innerHTML = updatedInfo + Object.entries(cats).map(function([key, c]) {
+            const likes = (c.likes || []).length > 0 ? '<div class="profile-row"><span class="profile-row-label">喜欢</span><span>' + c.likes.map(escapeHtml).join('、') + '</span></div>' : '';
+            const dislikes = (c.dislikes || []).length > 0 ? '<div class="profile-row"><span class="profile-row-label">不喜欢</span><span>' + c.dislikes.map(escapeHtml).join('、') + '</span></div>' : '';
+            const notes = c.notes ? '<div class="profile-row"><span class="profile-row-label">备忘</span><span>' + escapeHtml(c.notes) + '</span></div>' : '';
+            const body = likes + dislikes + notes;
+            if (!body) return '';
+            return '<div class="profile-cat-card">' +
+                '<div class="profile-cat-header"><span class="profile-cat-icon">' + (c.icon || '') + '</span><span class="profile-cat-label">' + (c.label || key) + '</span></div>' +
+                body + '</div>';
+        }).join('');
+    }
+}
+
+window.togglePartnerProfileEdit = function() {
+    window._partnerProfileEditing = true;
+    renderPartnerProfile();
+};
+
+async function savePartnerProfile() {
+    const p = window.partnerProfileData;
+    p.updated_by = currentUser?.username || '';
+    p.updated_at = new Date().toISOString();
+
+    // 从编辑表单收集数据
+    document.querySelectorAll('.profile-tag-list').forEach(function(list) {
+        const key = list.dataset.key;
+        const type = list.dataset.type;
+        const tags = [];
+        list.querySelectorAll('.profile-tag').forEach(function(tag) {
+            const text = tag.textContent.replace('×', '').trim();
+            if (text) tags.push(text);
+        });
+        if (p.categories[key]) {
+            if (type === 'likes' || type === 'dislikes') p.categories[key][type] = tags;
+        }
+    });
+    // 从输入框解析新的逗号分隔标签
+    document.querySelectorAll('.profile-tag-input input').forEach(function(input) {
+        const key = input.dataset.key;
+        const type = input.dataset.type;
+        const raw = input.value.trim();
+        if (raw) {
+            const newTags = raw.split(/[,，]/).map(function(s) { return s.trim(); }).filter(Boolean);
+            if (p.categories[key] && (type === 'likes' || type === 'dislikes')) {
+                newTags.forEach(function(t) { if (!p.categories[key][type].includes(t)) p.categories[key][type].push(t); });
+            }
+        }
+    });
+    // 备注
+    document.querySelectorAll('.profile-notes').forEach(function(ta) {
+        const key = ta.dataset.key;
+        if (p.categories[key]) p.categories[key].notes = ta.value.trim();
+    });
+
+    try {
+        await supabase.from('app_settings').upsert({ key: 'partner_profile', value: JSON.stringify(p) });
+        window._partnerProfileEditing = false;
+        renderPartnerProfile();
+        showToast('已保存');
+    } catch (e) { showToast('保存失败: ' + e.message); }
+}
+
+window.addProfileTag = function(btn) {
+    const input = btn.previousElementSibling;
+    const key = input.dataset.key;
+    const type = input.dataset.type;
+    const raw = input.value.trim();
+    if (!raw || !key || !type) return;
+    const tags = raw.split(/[,，]/).map(function(s) { return s.trim(); }).filter(Boolean);
+    const list = document.querySelector('.profile-tag-list[data-key="' + key + '"][data-type="' + type + '"]');
+    tags.forEach(function(t) {
+        const span = document.createElement('span');
+        span.className = 'profile-tag';
+        span.innerHTML = escapeHtml(t) + '<span class="profile-tag-x" onclick="window.removeProfileTag(this,\'' + key + '\',\'' + type + '\',' + (window.partnerProfileData.categories[key][type].length) + ')">×</span>';
+        list.appendChild(span);
+        window.partnerProfileData.categories[key][type].push(t);
+    });
+    input.value = '';
+};
+
+window.removeProfileTag = function(btn, key, type, index) {
+    btn.parentElement.remove();
+    if (window.partnerProfileData.categories[key] && window.partnerProfileData.categories[key][type]) {
+        window.partnerProfileData.categories[key][type].splice(index, 1);
+    }
+};
+
+window.addProfileCategory = function() {
+    const key = prompt('分类英文标识（如: sports）');
+    if (!key) return;
+    const label = prompt('分类中文名（如: 运动）');
+    if (!label) return;
+    const icon = prompt('图标（emoji，如: ⚽）');
+    if (window.partnerProfileData.categories[key]) { showToast('该分类已存在'); return; }
+    window.partnerProfileData.categories[key] = { label: label, icon: icon || '📌', likes: [], dislikes: [] };
+    renderPartnerProfile();
+};
+
+window.removeProfileCategory = function(key) {
+    if (!confirm('删除分类 "' + (window.partnerProfileData.categories[key]?.label || key) + '" ？')) return;
+    delete window.partnerProfileData.categories[key];
+    renderPartnerProfile();
+};
 
 // 点击外部收起已标记浮窗
 document.addEventListener('click', (e) => {
