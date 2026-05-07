@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=38">
+    <link rel="stylesheet" href="mobile.css?v=39">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -489,16 +489,6 @@
                 <span class="menu-text">已标记分类</span>
                 <span class="menu-arrow">›</span>
             </div>
-            <div class="menu-item" onclick="mobile.switchTab('map')">
-                <span class="menu-icon">🗺️</span>
-                <span class="menu-text">我们的地图</span>
-                <span class="menu-arrow">›</span>
-            </div>
-            <div class="menu-item" onclick="mobile.switchTab('timeline')">
-                <span class="menu-icon">💝</span>
-                <span class="menu-text">纪念日时间线</span>
-                <span class="menu-arrow">›</span>
-            </div>
             <div class="menu-item" onclick="mobile.switchTab('collage')">
                 <span class="menu-icon">❤️</span>
                 <span class="menu-text">照片拼贴墙</span>
@@ -509,34 +499,9 @@
                 <span class="menu-text">回忆成就</span>
                 <span class="menu-arrow">›</span>
             </div>
-            <div class="menu-item" onclick="mobile.switchTab('albums')">
-                <span class="menu-icon">📸</span>
-                <span class="menu-text">相册</span>
-                <span class="menu-arrow">›</span>
-            </div>
-            <div class="menu-item" onclick="mobile.switchTab('passport')">
-                <span class="menu-icon">🛂</span>
-                <span class="menu-text">足迹护照</span>
-                <span class="menu-arrow">›</span>
-            </div>
-            <div class="menu-item" onclick="mobile.switchTab('moodDiary')">
-                <span class="menu-icon">📝</span>
-                <span class="menu-text">心情日记</span>
-                <span class="menu-arrow">›</span>
-            </div>
-            <div class="menu-item" onclick="mobile.switchTab('dailyChatter')">
-                <span class="menu-icon">💬</span>
-                <span class="menu-text">每日叨叨</span>
-                <span class="menu-arrow">›</span>
-            </div>
             <div class="menu-item" onclick="mobile.switchTab('intimateRecords')">
                 <span class="menu-icon">🔒</span>
                 <span class="menu-text">亲密记录</span>
-                <span class="menu-arrow">›</span>
-            </div>
-            <div class="menu-item" onclick="mobile.switchTab('coupleTasks')">
-                <span class="menu-icon">✅</span>
-                <span class="menu-text">情侣打卡</span>
                 <span class="menu-arrow">›</span>
             </div>
             <div class="menu-item" onclick="mobile.showSettings()">
@@ -680,7 +645,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=38"></script>
+    <script type="module" src="mobile-app.js?v=39"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;
