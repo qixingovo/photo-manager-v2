@@ -2886,6 +2886,19 @@ window.getCollageSelectedCategoryId = function() {
     return null;
 };
 
+// 拼贴墙专用：从 Supabase 拉取匹配的照片（不依赖分页的 photos 数组）
+async function fetchPhotosForCollage(matchingPhotoIds) {
+    const idList = [...matchingPhotoIds].slice(0, 200);
+    if (idList.length === 0) return [];
+    const { data } = await supabase
+        .from('photos')
+        .select('*')
+        .in('id', idList)
+        .order('created_at', { ascending: false })
+        .limit(200);
+    return data || [];
+}
+
 window.generateCollage = async function() {
     const canvas = document.getElementById('collageCanvas');
     if (!canvas) return;
@@ -2945,9 +2958,15 @@ window.generateCollage = async function() {
             alert(msg);
             return;
         }
-        collagePhotos = photos.filter(p => matchingPhotoIds.has(p.id)).slice(0, 200);
+        collagePhotos = await fetchPhotosForCollage(matchingPhotoIds);
     } else {
-        collagePhotos = photos.slice(0, 200);
+        // 全部照片：直接从数据库拉取
+        const { data: allPhotos } = await supabase
+            .from('photos')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(200);
+        collagePhotos = allPhotos || [];
     }
 
     if (collagePhotos.length === 0) {
