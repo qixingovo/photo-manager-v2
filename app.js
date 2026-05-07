@@ -674,7 +674,7 @@ async function loadPhotos() {
 function getCategoryAndChildrenIds(categoryId) {
     const strId = String(categoryId)
     const ids = [strId]
-    const children = categories.filter(c => c.parent_id === Number(categoryId))
+    const children = categories.filter(c => String(c.parent_id) === String(categoryId))
     children.forEach(child => {
         ids.push(...getCategoryAndChildrenIds(String(child.id)))
     })
@@ -1363,7 +1363,7 @@ function onFilterCatLevelChange(level) {
     if (selectedValue) {
         currentCategory = selectedValue
         currentPage = 1
-        const children = categories.filter(c => c.parent_id === Number(selectedValue))
+        const children = categories.filter(c => String(c.parent_id) === String(selectedValue))
         if (children.length > 0) {
             const nextLevel = level + 1
             const nextSelect = document.createElement('select')
@@ -1523,7 +1523,7 @@ window.onParentLevelChange = function(level) {
     
     // 如果选中了某个分类，显示其子分类作为下一级
     if (selectedValue) {
-        const children = categories.filter(c => c.parent_id === Number(selectedValue))
+        const children = categories.filter(c => String(c.parent_id) === String(selectedValue))
         if (children.length > 0) {
             const nextLevel = level + 1
             const nextSelect = document.createElement('select')
@@ -1583,7 +1583,7 @@ window.onUploadCatLevelChange = function(level) {
     
     // 如果选中了某个分类，显示其子分类作为下一级
     if (selectedValue) {
-        const children = categories.filter(c => c.parent_id === Number(selectedValue))
+        const children = categories.filter(c => String(c.parent_id) === String(selectedValue))
         if (children.length > 0) {
             const nextLevel = level + 1
             const nextSelect = document.createElement('select')
@@ -2635,7 +2635,7 @@ window.onCollageCatLevelChange = function(level) {
 
     // 如果选中了某个分类，显示其子分类
     if (selectedValue) {
-        const children = categories.filter(c => c.parent_id === Number(selectedValue));
+        const children = categories.filter(c => String(c.parent_id) === String(selectedValue));
         if (children.length > 0) {
             const nextLevel = level + 1;
             const nextSelect = document.createElement('select');

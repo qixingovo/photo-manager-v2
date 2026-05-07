@@ -1889,11 +1889,11 @@ const mobile = {
         if (!categoryId || categoryId === 'all') return [];
         
         const path = [];
-        let currentId = Number(categoryId);
+        let currentId = String(categoryId);
 
         // 不断向上查找父类，直到找不到为止
         while (currentId) {
-            const cat = this.categories.find(c => c.id === currentId);
+            const cat = this.categories.find(c => String(c.id) === currentId);
             if (!cat) break;
             path.unshift(cat.name); // 每次都插入到数组开头，保证顺序是从父到子
             currentId = cat.parent_id;
@@ -3513,7 +3513,7 @@ const mobile = {
         });
 
         if (selectedValue) {
-            const children = this.categories.filter(c => c.parent_id === Number(selectedValue));
+            const children = this.categories.filter(c => String(c.parent_id) === String(selectedValue));
             if (children.length > 0) {
                 const nextLevel = level + 1;
                 const nextSelect = document.createElement('select');
