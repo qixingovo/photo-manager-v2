@@ -224,24 +224,6 @@ body {
     margin-bottom: 12px;
 }
 
-.feature-cards-3col {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-}
-
-.feature-cards-3col .feature-card {
-    padding: 12px 8px;
-    text-align: center;
-    gap: 2px;
-}
-
-.feature-cards-3col .feature-icon {
-    font-size: 24px;
-}
-
-.feature-cards-3col .feature-title {
-    font-size: 13px;
-}
 
 .feature-card {
     border-radius: var(--radius);
