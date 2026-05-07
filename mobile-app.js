@@ -484,6 +484,20 @@ const mobile = {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(page + 'Page').classList.add('active');
 
+        // 为非主页添加返回按钮
+        if (page !== 'home' && page !== 'login') {
+            const pageEl = document.getElementById(page + 'Page');
+            const topBar = pageEl ? pageEl.querySelector('.top-bar') : null;
+            if (topBar && !topBar.querySelector('.back-btn')) {
+                const backBtn = document.createElement('button');
+                backBtn.className = 'icon-btn back-btn';
+                backBtn.innerHTML = '←';
+                backBtn.title = '返回首页';
+                backBtn.onclick = function(e) { e.stopPropagation(); mobile.switchTab('home'); };
+                topBar.insertBefore(backBtn, topBar.firstChild);
+            }
+        }
+
         // 更新底部导航
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.toggle('active', item.dataset.page === page);
