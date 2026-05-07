@@ -624,6 +624,7 @@ const mobile = {
         if (tab === 'home') {
             this.showPage('home');
             this.renderCoupleBanner();
+            this.checkIncomingBottles();
         } else if (tab === 'photos') {
             this.showPage('photos');
             this.renderPhotos();
@@ -5849,6 +5850,136 @@ const mobile = {
     },
 
     // ========================================
+    // ========================================
+    // 照片漂流瓶 (移动端)
+    // ========================================
+
+    _incomingBottle: null,
+
+    openThrowBottleModal() {
+        const photo = this.currentPhoto;
+        if (!photo) return;
+        const self = this;
+        const url = this.getPhotoUrl(photo.storage_path);
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'mobileThrowBottleModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '1000';
+        modal.innerHTML = '<div class="modal-card" style="max-width:90vw;padding:16px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+                '<h3 style="margin:0;">🍾 扔一个漂流瓶</h3>' +
+                '<button class="icon-btn" onclick="document.getElementById(\'mobileThrowBottleModal\').remove()">×</button>' +
+            '</div>' +
+            '<div style="text-align:center;margin-bottom:10px;">' +
+                '<img src="' + url + '" style="max-width:100px;max-height:100px;border-radius:8px;object-fit:cover;">' +
+                '<div style="font-size:11px;color:#888;margin-top:4px;">' + self.escapeHtml(photo.name || '') + '</div>' +
+            '</div>' +
+            '<textarea id="mThrowMsg" placeholder="想说的话（200字内）..." maxlength="200" style="width:100%;height:60px;padding:8px;border:1px solid #ddd;border-radius:8px;resize:none;font-size:13px;font-family:inherit;box-sizing:border-box;"></textarea>' +
+            '<div style="margin:10px 0;font-size:13px;">' +
+                '<label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;cursor:pointer;"><input type="radio" name="mDriftTime" value="random" checked> 🌊 1-7天随机</label>' +
+                '<label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;cursor:pointer;"><input type="radio" name="mDriftTime" value="custom"> 📅 指定日期</label>' +
+                '<input type="date" id="mThrowCustomDate" style="display:none;width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;margin-bottom:6px;">' +
+                '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="mDriftTime" value="anniversary"> 🎂 下个纪念日</label>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;">' +
+                '<button class="btn-secondary" onclick="document.getElementById(\'mobileThrowBottleModal\').remove()" style="flex:1;">取消</button>' +
+                '<button class="btn-primary" onclick="mobile.throwBottle()" style="flex:1;">扔进海里🌊</button>' +
+            '</div></div>';
+        document.body.appendChild(modal);
+        document.querySelectorAll('input[name="mDriftTime"]').forEach(function(r) {
+            r.onchange = function() {
+                document.getElementById('mThrowCustomDate').style.display = r.value === 'custom' ? 'block' : 'none';
+            };
+        });
+    },
+
+    async throwBottle() {
+        const photo = this.currentPhoto;
+        if (!photo || !this.currentUser) return;
+        const message = document.getElementById('mThrowMsg').value.trim();
+        const timeMode = document.querySelector('input[name="mDriftTime"]:checked')?.value || 'random';
+        const toUser = this.currentUser.username === 'laoda' ? 'xiaodi' : 'laoda';
+        let revealAt;
+        if (timeMode === 'custom') {
+            const d = document.getElementById('mThrowCustomDate').value;
+            if (!d) { this.showToast('请选择日期'); return; }
+            revealAt = new Date(d + 'T12:00:00Z').toISOString();
+        } else if (timeMode === 'anniversary') {
+            const start = new Date(this.anniversaryStartDate);
+            const now = new Date();
+            let next = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+            while (next <= now) next.setFullYear(next.getFullYear() + 1);
+            revealAt = next.toISOString();
+        } else {
+            revealAt = new Date(Date.now() + (1 + Math.floor(Math.random() * 7)) * 86400000).toISOString();
+        }
+        try {
+            const supabase = this.initSupabase();
+            await supabase.from('drift_bottles').insert({
+                from_user: this.currentUser.username, to_user: toUser,
+                photo_id: photo.id, message: message, reveal_at: revealAt
+            });
+            document.getElementById('mobileThrowBottleModal').remove();
+            this.showToast('瓶子已扔进海里 🌊');
+        } catch (e) { this.showToast('扔瓶子失败: ' + e.message); }
+    },
+
+    async checkIncomingBottles() {
+        if (!this.currentUser) return;
+        try {
+            const supabase = this.initSupabase();
+            if (!supabase) return;
+            const { data } = await supabase
+                .from('drift_bottles')
+                .select('id, message, photo_id, thrown_at, photos(storage_path, name)')
+                .eq('to_user', this.currentUser.username)
+                .eq('status', 'drifting')
+                .lte('reveal_at', new Date().toISOString())
+                .order('reveal_at', { ascending: true })
+                .limit(1);
+            if (data && data.length > 0) {
+                this._incomingBottle = data[0];
+                const alertEl = document.getElementById('mobileDriftBottleAlert');
+                if (alertEl) alertEl.style.display = 'flex';
+            }
+        } catch (e) { /* 静默 */ }
+    },
+
+    async openReceivedBottle() {
+        const bottle = this._incomingBottle;
+        if (!bottle) return;
+        const self = this;
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'mobileReceivedBottleModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '1000';
+        let photoHtml = '';
+        if (bottle.photos) {
+            const url = this.getPhotoUrl(bottle.photos.storage_path);
+            photoHtml = '<img src="' + url + '" style="width:100%;max-height:220px;border-radius:12px;object-fit:cover;margin-bottom:10px;">';
+        }
+        const days = Math.floor((Date.now() - new Date(bottle.thrown_at).getTime()) / 86400000);
+        modal.innerHTML = '<div class="modal-card" style="max-width:90vw;padding:16px;text-align:center;">' +
+            '<h2 style="margin:0 0 6px;">🍾 漂流瓶</h2>' +
+            '<div style="font-size:11px;color:#999;margin-bottom:10px;">' + days + '天前扔进海里的</div>' +
+            photoHtml +
+            '<div style="background:#fff5f5;border-radius:12px;padding:14px;font-size:14px;color:#555;margin-bottom:10px;line-height:1.6;">' + (bottle.message ? '"' + self.escapeHtml(bottle.message) + '"' : '（只有一张照片）') + '</div>' +
+            '<button onclick="document.getElementById(\'mobileReceivedBottleModal\').remove();mobile.closeIncomingBottle()" class="btn-primary" style="width:100%;">💝 收藏这份惊喜</button>' +
+            '</div>';
+        document.body.appendChild(modal);
+    },
+
+    async closeIncomingBottle() {
+        const bottle = this._incomingBottle;
+        if (!bottle) return;
+        const supabase = this.initSupabase();
+        await supabase.from('drift_bottles').update({ status: 'revealed', revealed_at: new Date().toISOString() }).eq('id', bottle.id);
+        this._incomingBottle = null;
+        document.getElementById('mobileDriftBottleAlert').style.display = 'none';
+    },
+
     // 对方喜好档案 (移动端)
     // ========================================
 

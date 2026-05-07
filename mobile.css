@@ -2735,3 +2735,27 @@ mark {
     resize: vertical;
     font-family: inherit;
 }
+
+/* 漂流瓶提示条 */
+.drift-bottle-alert {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    margin: 8px 12px;
+    background: linear-gradient(135deg, #e0f7ff, #b3e5fc);
+    border: 2px dashed #4fc3f7;
+    border-radius: 12px;
+    cursor: pointer;
+    animation: bottle-bob 2s ease-in-out infinite;
+    font-size: 13px;
+    color: #0277bd;
+    font-weight: 500;
+}
+
+.drift-bottle-alert .bottle-icon { font-size: 22px; }
+
+@keyframes bottle-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}

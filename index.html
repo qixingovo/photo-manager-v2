@@ -11,7 +11,7 @@
         window.location.href = 'index-mobile.html';
     }
     </script>
-    <link rel="stylesheet" href="style.css?v=31">
+    <link rel="stylesheet" href="style.css?v=32">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -364,6 +364,10 @@
                 </div>
                 <h2 id="photosTitle">照片浏览</h2>
             </div>
+            <div id="driftBottleAlert" class="drift-bottle-alert" style="display:none;" onclick="window.openReceivedBottle()">
+                <span>🍾</span>
+                <span>一个漂流瓶漂到了...</span>
+            </div>
             <div id="photoGrid" class="photo-grid"></div>
             <div id="paginationContainer"></div>
             <div id="emptyState" class="empty-state" style="display:none;">
@@ -393,6 +397,7 @@
                         <a id="modalDownloadBtn" href="" download class="btn btn-primary">⬇️ 下载</a>
                         <button onclick="window.openEditModal()" class="btn btn-secondary">✏️ 编辑</button>
                         <button onclick="window.openCategoryModal()" class="btn btn-secondary">📁 改分类</button>
+                        <button onclick="window.openThrowBottleModal()" class="btn btn-secondary">🍾 扔进海里</button>
                     </div>
                     <div class="modal-comments">
                         <h4>留言</h4>
@@ -535,6 +540,6 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="app.js?v=35"></script>
+    <script type="module" src="app.js?v=36"></script>
 </body>
 </html>
