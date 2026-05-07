@@ -4330,6 +4330,7 @@ function renderDailyChatter() {
                 <div class="timeline-header">
                     <span class="timeline-user">${escapeHtml(e.user_name)}</span>
                     <span class="timeline-time">${relTime}</span>
+                    <button class="btn-delete" style="margin-left:auto;padding:2px 6px;font-size:11px;" onclick="event.stopPropagation();window.deleteDailyChatter(${e.id})">🗑️</button>
                 </div>
                 <div class="timeline-content">${escapeHtml(e.content)}</div>
                 ${photoHtml}
@@ -4397,6 +4398,12 @@ window.saveDailyChatter = async function() {
     } catch (e) {
         alert('发布失败: ' + e.message)
     }
+}
+
+window.deleteDailyChatter = async function(id) {
+    if (!confirm('确定删除这条叨叨吗？')) return
+    await supabase.from('daily_chatter').delete().eq('id', id)
+    loadDailyChatter()
 }
 
 // ========================================

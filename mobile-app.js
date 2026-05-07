@@ -5005,6 +5005,7 @@ const mobile = {
                     '<div class="timeline-header">' +
                         '<span class="timeline-user">' + this.escapeHtml(e.user_name) + '</span>' +
                         '<span class="timeline-time">' + relTime + '</span>' +
+                        '<button class="btn-delete" style="margin-left:auto;padding:2px 6px;font-size:11px;" onclick="event.stopPropagation();mobile.deleteDailyChatter(' + e.id + ')">🗑️</button>' +
                     '</div>' +
                     '<div class="timeline-content">' + this.escapeHtml(e.content) + '</div>' +
                     photoHtml +
@@ -5076,6 +5077,19 @@ const mobile = {
             this.showToast('已发布');
         } catch (e) {
             this.showToast('发布失败: ' + e.message);
+        }
+    },
+
+    async deleteDailyChatter(id) {
+        if (!confirm('确定删除这条叨叨吗？')) return;
+        const supabase = this.initSupabase();
+        if (!supabase) { this.showToast('数据库未连接'); return; }
+        try {
+            await supabase.from('daily_chatter').delete().eq('id', id);
+            this.loadDailyChatter();
+            this.showToast('已删除');
+        } catch (e) {
+            this.showToast('删除失败: ' + e.message);
         }
     },
 
