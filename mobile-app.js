@@ -3554,7 +3554,7 @@ const mobile = {
                 }
             });
             if (matchingPhotoIds.size === 0) {
-                this.showToast('所选分类下没有照片');
+                this.showToast('所选分类下没有照片 调试:选中ID=' + catId + ' 子类=' + categoryIds.length + '个 pcMap有' + Object.keys(this.photoCategories).length + '条');
                 return;
             }
             const { data } = await supabase

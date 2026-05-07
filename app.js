@@ -2664,25 +2664,23 @@ window.generateCollage = async function() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    // 通过内存中的 photoCategories 筛选（与主浏览逻辑一致），避开 Supabase 直接查 category_id 的类型问题
     const catId = window.getCollageSelectedCategoryId();
     let collagePhotos;
     if (catId) {
         const categoryIds = getCategoryAndChildrenIds(catId);
         const matchingPhotoIds = new Set();
-        Object.entries(photoCategories).forEach(([photoId, catIds]) => {
+        const pcEntries = Object.entries(photoCategories);
+        pcEntries.forEach(([photoId, catIds]) => {
             if (catIds.some(cid => categoryIds.includes(cid))) {
                 matchingPhotoIds.add(photoId);
             }
         });
         if (matchingPhotoIds.size === 0) {
-            alert('所选分类下没有照片');
+            alert('所选分类下没有照片\n\n调试：选中分类ID=' + catId + '，含子类=' + categoryIds.length + '个，内存photoCategories有' + pcEntries.length + '条记录');
             return;
         }
-        // 从已加载的 photos 中筛选，避免 URL 过长
         collagePhotos = photos.filter(p => matchingPhotoIds.has(p.id)).slice(0, 200);
     } else {
-        // 未选分类：取已加载照片（最多200张）
         collagePhotos = photos.slice(0, 200);
     }
 
