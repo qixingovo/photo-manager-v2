@@ -499,7 +499,11 @@ const mobile = {
     },
 
     // 渲染 Suki 风格情侣横幅
-    renderCoupleBanner() {
+    async renderCoupleBanner() {
+        if (!this._startDateLoaded) {
+            await this._loadStartDate();
+            this._startDateLoaded = true;
+        }
         const startDate = this.anniversaryStartDate || '2020-06-15';
         const start = new Date(startDate);
         const today = new Date();
