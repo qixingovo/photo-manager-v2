@@ -2156,7 +2156,7 @@ async function migrateMilestonesToSupabase() {
             photo_id: m.photoId || null,
             photo_path: m.photoPath || null,
             photo_name: m.photoName || null,
-            category_id: m.categoryId ? parseInt(m.categoryId) : null,
+            category_id: m.categoryId || null,
             category_name: m.categoryName || null
         }));
         const { error } = await supabase.from('milestones').upsert(rows);
@@ -2182,7 +2182,7 @@ async function saveMilestonesToSupabase() {
             photo_id: m.photoId || null,
             photo_path: m.photoPath || null,
             photo_name: m.photoName || null,
-            category_id: m.categoryId ? parseInt(m.categoryId) : null,
+            category_id: m.categoryId || null,
             category_name: m.categoryName || null
         }));
         const { error } = await supabase.from('milestones').upsert(rows);
@@ -2976,8 +2976,8 @@ function renderPhotos() {
     // 如果当前分类下没有照片，但有子分类，显示子分类卡片
     const filteredPhotos = photos
     if (filteredPhotos.length === 0 && currentCategory && currentCategory !== 'all') {
-        const currentCat = categories.find(c => c.id === parseInt(currentCategory))
-        const childCategories = categories.filter(c => c.parent_id === parseInt(currentCategory))
+        const currentCat = categories.find(c => String(c.id) === String(currentCategory))
+        const childCategories = categories.filter(c => String(c.parent_id) === String(currentCategory))
         
         if (childCategories.length > 0) {
             grid.innerHTML = childCategories.map(cat => {

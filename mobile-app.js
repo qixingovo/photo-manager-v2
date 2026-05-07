@@ -3070,7 +3070,7 @@ const mobile = {
                 photo_id: m.photoId || null,
                 photo_path: m.photoPath || null,
                 photo_name: m.photoName || null,
-                category_id: m.categoryId ? parseInt(m.categoryId) : null,
+                category_id: m.categoryId || null,
                 category_name: m.categoryName || null
             }));
             const { error } = await supabase.from('milestones').upsert(rows);
@@ -3101,7 +3101,7 @@ const mobile = {
                 photo_id: m.photoId || null,
                 photo_path: m.photoPath || null,
                 photo_name: m.photoName || null,
-                category_id: m.categoryId ? parseInt(m.categoryId) : null,
+                category_id: m.categoryId || null,
                 category_name: m.categoryName || null
             }));
             const { error } = await supabase.from('milestones').upsert(rows);
