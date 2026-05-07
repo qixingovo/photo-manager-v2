@@ -4294,6 +4294,68 @@ const mobile = {
         if (locationPhotos) locationPhotos.style.display = 'none';
     },
 
+    // ========================================
+    // 通用照片选择器
+    // ========================================
+
+    async openPhotoPicker(callback) {
+        const supabase = this.initSupabase();
+        if (!supabase) { this.showToast('数据库未连接'); return; }
+        const { data } = await supabase
+            .from('photos')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(200);
+        const photoList = data || [];
+
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'genericPhotoPicker';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '1000';
+        modal.innerHTML = `
+            <div class="modal-card" style="max-width:90vw;max-height:85vh;overflow-y:auto;padding:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="margin:0;">选择照片</h3>
+                    <button class="icon-btn" onclick="document.getElementById('genericPhotoPicker').remove()">×</button>
+                </div>
+                <input type="text" id="genericPhotoSearch" placeholder="🔍 搜索照片..."
+                    style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:12px;font-size:14px;"
+                    oninput="mobile.filterGenericPhotos()">
+                <div id="genericPhotoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;">
+                    ${photoList.map(p => `
+                        <div class="generic-photo-item" data-name="${this.escapeHtml(p.name || '')}"
+                            style="cursor:pointer;border-radius:8px;overflow:hidden;border:2px solid transparent;"
+                            onclick="mobile.pickGenericPhoto('${p.id}', '${(p.storage_path||'').replace(/'/g, "\\'")}', '${(p.name||'').replace(/'/g, "\\'")}')">
+                            <img src="${this.getPhotoUrl(p.storage_path)}" style="width:100%;height:75px;object-fit:cover;" onerror="this.style.display='none'">
+                            <div style="padding:3px;font-size:10px;text-align:center;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml((p.name || '').substring(0, 12))}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                ${photoList.length === 0 ? '<p style="text-align:center;color:#999;">暂无照片</p>' : ''}
+                <button class="btn-secondary" style="margin-top:12px;width:100%;border-radius:8px;" onclick="document.getElementById('genericPhotoPicker').remove()">取消</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        this._photoPickerCallback = callback;
+    },
+
+    filterGenericPhotos() {
+        const query = document.getElementById('genericPhotoSearch').value.toLowerCase();
+        document.querySelectorAll('.generic-photo-item').forEach(el => {
+            el.style.display = el.dataset.name.toLowerCase().includes(query) ? '' : 'none';
+        });
+    },
+
+    pickGenericPhoto(id, storagePath, name) {
+        if (this._photoPickerCallback) {
+            this._photoPickerCallback({ id, storage_path: storagePath, name });
+            this._photoPickerCallback = null;
+        }
+        const picker = document.getElementById('genericPhotoPicker');
+        if (picker) picker.remove();
+    },
+
 };
 
 // 页面加载完成后初始化

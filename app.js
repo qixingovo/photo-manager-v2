@@ -3904,6 +3904,61 @@ window.closePassportLocation = function() {
     document.getElementById('passportLocationPhotos').style.display = 'none'
 }
 
+// ========================================
+// 通用照片选择器
+// ========================================
+
+window.openPhotoPicker = async function(callback) {
+    const { data } = await supabase
+        .from('photos')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+    const photoList = data || [];
+
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'genericPhotoPicker';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:700px;max-height:85vh;overflow-y:auto;padding:20px;">
+            <span class="modal-close" onclick="document.getElementById('genericPhotoPicker').remove()">&times;</span>
+            <h3>选择照片</h3>
+            <input type="text" id="genericPhotoSearch" placeholder="🔍 搜索照片..."
+                style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:12px;"
+                oninput="window.filterGenericPhotos()">
+            <div id="genericPhotoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;">
+                ${photoList.map(p => `
+                    <div class="generic-photo-item" data-name="${escapeHtml(p.name || '')}"
+                        style="cursor:pointer;border-radius:8px;overflow:hidden;border:2px solid transparent;transition:border .2s;"
+                        onclick="window.pickGenericPhoto('${p.id}', '${(p.storage_path||'').replace(/'/g, "\\'")}', '${(p.name||'').replace(/'/g, "\\'")}')">
+                        <img src="${getPhotoUrl(p.storage_path)}" style="width:100%;height:90px;object-fit:cover;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%2290%22><rect fill=%22%23eee%22 width=%22120%22 height=%2290%22/><text x=%2260%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2212%22>无预览</text></svg>'">
+                        <div style="padding:4px;font-size:11px;text-align:center;color:#666;">${escapeHtml((p.name || '').substring(0, 15))}</div>
+                    </div>
+                `).join('')}
+            </div>
+            ${photoList.length === 0 ? '<p style="text-align:center;color:#999;">暂无照片</p>' : ''}
+            <button class="btn btn-secondary" style="margin-top:12px;width:100%;" onclick="document.getElementById('genericPhotoPicker').remove()">取消</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    window._photoPickerCallback = callback;
+};
+
+window.filterGenericPhotos = function() {
+    const query = document.getElementById('genericPhotoSearch').value.toLowerCase();
+    document.querySelectorAll('.generic-photo-item').forEach(el => {
+        el.style.display = el.dataset.name.toLowerCase().includes(query) ? '' : 'none';
+    });
+};
+
+window.pickGenericPhoto = function(id, storagePath, name) {
+    if (window._photoPickerCallback) {
+        window._photoPickerCallback({ id, storage_path: storagePath, name });
+        window._photoPickerCallback = null;
+    }
+    document.getElementById('genericPhotoPicker').remove();
+};
+
 // Helper: get photo category names
 function getPhotoCategoryNames(photoId) {
     const catIds = photoCategories[photoId]
