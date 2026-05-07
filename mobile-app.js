@@ -498,9 +498,31 @@ const mobile = {
         }
     },
 
+    // 渲染 Suki 风格情侣横幅
+    renderCoupleBanner() {
+        const startDate = this.anniversaryStartDate || '2020-06-15';
+        const start = new Date(startDate);
+        const today = new Date();
+        const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+        const daysEl = document.getElementById('coupleDays');
+        const name1El = document.getElementById('coupleName1');
+        const name2El = document.getElementById('coupleName2');
+
+        if (daysEl) {
+            daysEl.textContent = '在一起的第 ' + diffDays + ' 天';
+        }
+        if (name1El && this.currentUser) {
+            name1El.textContent = this.currentUser.isLaoda ? '老大' : '小弟';
+        }
+        if (name2El && this.currentUser) {
+            name2El.textContent = this.currentUser.isLaoda ? '小弟' : '老大';
+        }
+    },
+
     switchTab(tab) {
         if (tab === 'home') {
             this.showPage('home');
+            this.renderCoupleBanner();
             this.renderPhotos();
         } else if (tab === 'upload') {
             this.showPage('upload');

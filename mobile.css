@@ -141,6 +141,147 @@ body {
 }
 
 /* ========================================
+   Suki 风格首页 - 情侣横幅
+   ======================================== */
+.couple-banner {
+    text-align: center;
+    padding: 20px 16px 16px;
+    background: linear-gradient(180deg, var(--card) 0%, var(--bg) 100%);
+}
+
+.couple-avatars {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.couple-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #FFE0E6, #FFD4DD);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    box-shadow: 0 4px 12px rgba(255,180,190,0.3);
+    animation: avatarPulse 3s ease-in-out infinite;
+}
+
+.couple-avatar:last-child {
+    background: linear-gradient(135deg, #E0F0FF, #CCE5FF);
+    box-shadow: 0 4px 12px rgba(180,210,240,0.3);
+    animation-delay: 1.5s;
+}
+
+@keyframes avatarPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+}
+
+.couple-heart {
+    font-size: 22px;
+    animation: heartBeat 1.2s ease-in-out infinite;
+}
+
+@keyframes heartBeat {
+    0%, 100% { transform: scale(1); }
+    15% { transform: scale(1.25); }
+    30% { transform: scale(1); }
+}
+
+.couple-names {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+.couple-and {
+    color: var(--accent);
+    margin: 0 4px;
+}
+
+.couple-days {
+    font-size: 28px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #FF9B9B, #FFB5C2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ========================================
+   Suki 风格首页 - 功能入口卡片
+   ======================================== */
+.feature-cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 0 12px;
+    margin-bottom: 12px;
+}
+
+.feature-card {
+    border-radius: var(--radius);
+    padding: 14px 12px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.feature-card:active {
+    transform: scale(0.97);
+    opacity: 0.85;
+}
+
+.feature-icon {
+    font-size: 28px;
+}
+
+.feature-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.feature-sub {
+    font-size: 11px;
+    color: var(--text-light);
+}
+
+/* 照片区域标题 */
+.photo-section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    padding: 8px 16px 4px;
+}
+
+/* 更新照片卡片为 Suki 风格 */
+.photo-feed {
+    padding: 0 12px;
+    gap: 10px;
+}
+
+.photo-card {
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.photo-card:active {
+    transform: scale(0.97);
+}
+
+/* ========================================
    登录页面 - Typeform 风格卡片
    ======================================== */
 .login-card {

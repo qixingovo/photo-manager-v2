@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=29">
+    <link rel="stylesheet" href="mobile.css?v=30">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -35,19 +35,49 @@
         </div>
     </div>
 
-    <!-- ========== 主页 - 照片流 ========== -->
+    <!-- ========== 主页 - Suki 风格 ========== -->
     <div id="homePage" class="page">
-        <!-- 顶部栏 -->
-        <header class="top-bar">
-            <div class="logo">
-                <span>📷</span>
-                <span>回忆</span>
+        <!-- 情侣横幅 -->
+        <div id="coupleBanner" class="couple-banner">
+            <div class="couple-avatars">
+                <div class="couple-avatar">🧑🏻</div>
+                <div class="couple-heart">💕</div>
+                <div class="couple-avatar">👩🏻</div>
             </div>
-            <div class="top-actions">
-                <button class="icon-btn" onclick="mobile.refreshData()">🔄</button>
-                <button class="icon-btn" onclick="mobile.toggleSearch()">🔍</button>
+            <div class="couple-names">
+                <span id="coupleName1">老大</span>
+                <span class="couple-and">&</span>
+                <span id="coupleName2">小弟</span>
             </div>
-        </header>
+            <div id="coupleDays" class="couple-days">在一起的每一天</div>
+        </div>
+
+        <!-- 功能入口卡片 -->
+        <div class="feature-cards">
+            <div class="feature-card" onclick="mobile.switchTab('moodDiary')" style="background:linear-gradient(135deg,#FFE0E6,#FFD4DD);">
+                <span class="feature-icon">📝</span>
+                <span class="feature-title">心情日记</span>
+                <span class="feature-sub">记录每一天的心情</span>
+            </div>
+            <div class="feature-card" onclick="mobile.switchTab('dailyChatter')" style="background:linear-gradient(135deg,#E0F0FF,#CCE5FF);">
+                <span class="feature-icon">💬</span>
+                <span class="feature-title">每日叨叨</span>
+                <span class="feature-sub">想说什么就说什么</span>
+            </div>
+            <div class="feature-card" onclick="mobile.switchTab('intimateRecords')" style="background:linear-gradient(135deg,#F0E6FF,#E0D4F5);">
+                <span class="feature-icon">🔒</span>
+                <span class="feature-title">亲密记录</span>
+                <span class="feature-sub">只属于我们的秘密</span>
+            </div>
+            <div class="feature-card" onclick="mobile.switchTab('coupleTasks')" style="background:linear-gradient(135deg,#FFF3E0,#FFE8CC);">
+                <span class="feature-icon">✅</span>
+                <span class="feature-title">情侣打卡</span>
+                <span class="feature-sub">一起完成100件事</span>
+            </div>
+        </div>
+
+        <!-- 照片区域标题 -->
+        <div class="photo-section-title">📸 最新回忆</div>
 
         <!-- 分类路径显示 -->
         <div id="categoryPathDisplay" class="category-path-display" style="display:none;"></div>
@@ -623,7 +653,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=29"></script>
+    <script type="module" src="mobile-app.js?v=30"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;
