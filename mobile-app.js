@@ -3476,59 +3476,64 @@ const mobile = {
     // 照片拼贴墙
     // ========================================
     renderMobileCollageCategorySelect() {
-        try {
-            const container = document.getElementById('mobileCollageCategoryCascade');
-            if (!container) return;
-            container.innerHTML = '';
+        const container = document.getElementById('mobileCollageCategoryCascade');
+        if (!container) return;
+        container.innerHTML = '';
 
-            const cats = this.categories || [];
-            if (cats.length === 0) {
-                container.innerHTML = '<p style="color:#999;font-size:14px;">暂无分类</p>';
-                return;
+        const topLevel = this.categories.filter(c => !c.parent_id);
+        if (topLevel.length === 0) {
+            container.innerHTML = '<p style="color:#999;font-size:14px;">暂无分类</p>';
+            return;
+        }
+
+        const select = document.createElement('select');
+        select.id = 'mobileCollageCatLevel0';
+        select.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:4px;';
+        select.onchange = () => this.onMobileCollageCatLevelChange(0);
+        select.innerHTML = `<option value="">全部照片</option>${topLevel.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
+        container.appendChild(select);
+
+        const hint = document.createElement('p');
+        hint.style.cssText = 'font-size:12px;color:#888;margin:4px 0 0 0;';
+        hint.textContent = '提示：选择父分类并留空子分类下拉，将自动包含所有子分类的照片';
+        container.appendChild(hint);
+    },
+
+    onMobileCollageCatLevelChange(level) {
+        const container = document.getElementById('mobileCollageCategoryCascade');
+        if (!container) return;
+        const select = document.getElementById(`mobileCollageCatLevel${level}`);
+        if (!select) return;
+
+        const selectedValue = select.value;
+
+        const selects = container.querySelectorAll('select');
+        selects.forEach((s, i) => {
+            if (i > level) s.remove();
+        });
+
+        if (selectedValue) {
+            const children = this.categories.filter(c => c.parent_id === Number(selectedValue));
+            if (children.length > 0) {
+                const nextLevel = level + 1;
+                const nextSelect = document.createElement('select');
+                nextSelect.id = `mobileCollageCatLevel${nextLevel}`;
+                nextSelect.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:4px;';
+                nextSelect.onchange = () => this.onMobileCollageCatLevelChange(nextLevel);
+                nextSelect.innerHTML = `<option value="">包含所有子分类</option>${children.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
+                container.appendChild(nextSelect);
             }
-
-            var self = this;
-            var optionsHtml = '';
-            function walk(parentId, depth) {
-                var children = cats.filter(function(c) {
-                    if (parentId === null || parentId === undefined) return !c.parent_id;
-                    return String(c.parent_id) === String(parentId);
-                });
-                children.forEach(function(cat) {
-                    var indent = '';
-                    for (var i = 0; i < depth; i++) indent += '\u00A0\u00A0\u00A0\u00A0';
-                    var hasChildren = cats.some(function(child) {
-                        return String(child.parent_id) === String(cat.id);
-                    });
-                    optionsHtml += '<option value="' + cat.id + '">' + indent + self.escapeHtml(cat.name) + (hasChildren ? ' \uD83D\uDCC1' : '') + '</option>';
-                    walk(cat.id, depth + 1);
-                });
-            }
-            walk(null, 0);
-
-            var select = document.createElement('select');
-            select.id = 'mobileCollageCatSelect';
-            select.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;';
-            select.innerHTML = '<option value="">\u5168\u90E8\u7167\u7247</option>' + optionsHtml;
-            container.appendChild(select);
-
-            var hint = document.createElement('p');
-            hint.style.cssText = 'font-size:12px;color:#888;margin:4px 0 0 0;';
-            hint.textContent = '\uD83D\uDCA1 \u9009\u62E9\u4EFB\u610F\u5206\u7C7B\u5C06\u81EA\u52A8\u5305\u542B\u5176\u6240\u6709\u5B50\u5206\u7C7B\u7684\u7167\u7247';
-            container.appendChild(hint);
-        } catch (e) {
-            console.error('渲染拼贴墙分类选择器失败:', e);
         }
     },
 
-    onMobileCollageCatLevelChange() {
-        // 已废弃，保留空函数防止旧引用报错
-    },
-
     getMobileCollageSelectedCategoryId() {
-        const select = document.getElementById('mobileCollageCatSelect');
-        if (!select) return null;
-        return select.value || null;
+        const container = document.getElementById('mobileCollageCategoryCascade');
+        if (!container) return null;
+        const selects = container.querySelectorAll('select');
+        for (let i = selects.length - 1; i >= 0; i--) {
+            if (selects[i].value) return selects[i].value;
+        }
+        return null;
     },
 
     async generateCollage() {

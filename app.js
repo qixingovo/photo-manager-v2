@@ -2595,59 +2595,68 @@ window.deleteMilestone = function(id) {
 // 照片拼贴墙
 // ========================================
 window.renderCollageCategorySelect = function() {
-    try {
-        const container = document.getElementById('collageCategoryCascade');
-        if (!container) return;
-        container.innerHTML = '';
+    const container = document.getElementById('collageCategoryCascade');
+    if (!container) return;
+    container.innerHTML = '';
 
-        const cats = categories || [];
-        if (cats.length === 0) {
-            container.innerHTML = '<p style="color:#999;font-size:14px;">暂无分类</p>';
-            return;
+    const topLevel = categories.filter(c => !c.parent_id);
+    if (topLevel.length === 0) {
+        container.innerHTML = '<p style="color:#999;font-size:14px;">暂无分类</p>';
+        return;
+    }
+
+    const select = document.createElement('select');
+    select.id = 'collageCatLevel0';
+    select.className = 'category-select';
+    select.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:8px;';
+    select.onchange = () => window.onCollageCatLevelChange(0);
+    select.innerHTML = `<option value="">全部照片</option>${topLevel.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
+    container.appendChild(select);
+
+    const hint = document.createElement('p');
+    hint.style.cssText = 'font-size:12px;color:#888;margin:4px 0 0 0;';
+    hint.textContent = '提示：选择父分类并留空子分类下拉，将自动包含所有子分类的照片';
+    container.appendChild(hint);
+};
+
+window.onCollageCatLevelChange = function(level) {
+    const container = document.getElementById('collageCategoryCascade');
+    if (!container) return;
+    const select = document.getElementById(`collageCatLevel${level}`);
+    if (!select) return;
+
+    const selectedValue = select.value;
+
+    // 删除高于当前级别的选择器
+    const selects = container.querySelectorAll('select');
+    selects.forEach((s, i) => {
+        if (i > level) s.remove();
+    });
+
+    // 如果选中了某个分类，显示其子分类
+    if (selectedValue) {
+        const children = categories.filter(c => c.parent_id === Number(selectedValue));
+        if (children.length > 0) {
+            const nextLevel = level + 1;
+            const nextSelect = document.createElement('select');
+            nextSelect.id = `collageCatLevel${nextLevel}`;
+            nextSelect.className = 'category-select';
+            nextSelect.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:8px;';
+            nextSelect.onchange = () => window.onCollageCatLevelChange(nextLevel);
+            nextSelect.innerHTML = `<option value="">包含所有子分类</option>${children.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('')}`;
+            container.appendChild(nextSelect);
         }
-
-        // 递归构建缩进选项
-        var optionsHtml = '';
-        function walk(parentId, depth) {
-            var children = cats.filter(function(c) {
-                if (parentId === null || parentId === undefined) return !c.parent_id;
-                return String(c.parent_id) === String(parentId);
-            });
-            children.forEach(function(cat) {
-                var indent = '';
-                for (var i = 0; i < depth; i++) indent += '\u00A0\u00A0\u00A0\u00A0';
-                var hasChildren = cats.some(function(child) {
-                    return String(child.parent_id) === String(cat.id);
-                });
-                optionsHtml += '<option value="' + cat.id + '">' + indent + escapeHtml(cat.name) + (hasChildren ? ' \uD83D\uDCC1' : '') + '</option>';
-                walk(cat.id, depth + 1);
-            });
-        }
-        walk(null, 0);
-
-        var select = document.createElement('select');
-        select.id = 'collageCatSelect';
-        select.className = 'category-select';
-        select.style.cssText = 'width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;';
-        select.innerHTML = '<option value="">\u5168\u90E8\u7167\u7247</option>' + optionsHtml;
-        container.appendChild(select);
-
-        var hint = document.createElement('p');
-        hint.style.cssText = 'font-size:12px;color:#888;margin:4px 0 0 0;';
-        hint.textContent = '\uD83D\uDCA1 \u9009\u62E9\u4EFB\u610F\u5206\u7C7B\u5C06\u81EA\u52A8\u5305\u542B\u5176\u6240\u6709\u5B50\u5206\u7C7B\u7684\u7167\u7247';
-        container.appendChild(hint);
-    } catch (e) {
-        console.error('渲染拼贴墙分类选择器失败:', e);
     }
 };
 
-// onCollageCatLevelChange 已废弃，保留空函数防止旧引用报错
-window.onCollageCatLevelChange = function() {};
-
 window.getCollageSelectedCategoryId = function() {
-    const select = document.getElementById('collageCatSelect');
-    if (!select) return null;
-    return select.value || null;
+    const container = document.getElementById('collageCategoryCascade');
+    if (!container) return null;
+    const selects = container.querySelectorAll('select');
+    for (let i = selects.length - 1; i >= 0; i--) {
+        if (selects[i].value) return selects[i].value;
+    }
+    return null;
 };
 
 window.generateCollage = async function() {
