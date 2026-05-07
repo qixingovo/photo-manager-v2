@@ -4165,12 +4165,19 @@ function renderMoodDiary() {
                 <div class="timeline-header">
                     <span class="timeline-user">${escapeHtml(e.user_name)}</span>
                     <span class="timeline-time">${dateStr}</span>
+                    <button class="btn-delete" style="margin-left:auto;padding:2px 6px;font-size:11px;" onclick="event.stopPropagation();window.deleteMoodDiary(${e.id})">🗑️</button>
                 </div>
                 ${e.content ? `<div class="timeline-content">${escapeHtml(e.content)}</div>` : ''}
                 ${photoHtml}
             </div>
         </div>`
     }).join('')
+}
+
+window.deleteMoodDiary = async function(id) {
+    if (!confirm('确定删除这条心情记录吗？')) return
+    await supabase.from('mood_diary').delete().eq('id', id)
+    loadMoodDiary()
 }
 
 window.openMoodDiaryModal = function(editEntry) {

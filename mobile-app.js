@@ -4358,6 +4358,7 @@ const mobile = {
                     <div class="timeline-header">
                         <span class="timeline-user">${this.escapeHtml(e.user_name)}</span>
                         <span class="timeline-time">${dateStr}</span>
+                        <button class="btn-delete" style="margin-left:auto;padding:2px 6px;font-size:11px;" onclick="event.stopPropagation();mobile.deleteMoodDiary(${e.id})">🗑️</button>
                     </div>
                     ${e.content ? `<div class="timeline-content">${this.escapeHtml(e.content)}</div>` : ''}
                     ${photoHtml}
@@ -4455,6 +4456,19 @@ const mobile = {
             this.showToast('已保存');
         } catch (e) {
             this.showToast('保存失败: ' + e.message);
+        }
+    },
+
+    async deleteMoodDiary(id) {
+        if (!confirm('确定删除这条心情记录吗？')) return;
+        const supabase = this.initSupabase();
+        if (!supabase) { this.showToast('数据库未连接'); return; }
+        try {
+            await supabase.from('mood_diary').delete().eq('id', id);
+            this.loadMoodDiary();
+            this.showToast('已删除');
+        } catch (e) {
+            this.showToast('删除失败: ' + e.message);
         }
     },
 
