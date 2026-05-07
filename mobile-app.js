@@ -3573,7 +3573,8 @@ const mobile = {
         this.showFavoritesOnly = false;
         this.switchTab('photos');
         this.loadPhotos();
-        document.getElementById('mobilePhotoGrid').scrollIntoView({ behavior: 'smooth' });
+        const feed = document.getElementById('photoFeed');
+        if (feed) feed.scrollIntoView({ behavior: 'smooth' });
     },
 
     openAddMilestoneModal() {
