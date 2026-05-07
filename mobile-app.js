@@ -3893,7 +3893,7 @@ const mobile = {
                 this.rpgData = data;
                 this._checkLoginStreak();
             } else {
-                const { data: inserted, error: insertErr } = await supabase.from('rpg_progress').upsert({ user_name: uname, xp: 0, last_login_date: new Date().toISOString().slice(0, 10), login_streak: 1 }).select('*').single();
+                const { data: inserted, error: insertErr } = await supabase.from('rpg_progress').upsert({ user_name: uname, xp: 0, last_login_date: new Date().toISOString().slice(0, 10), login_streak: 1 }, { onConflict: 'user_name' }).select('*').single();
                 if (insertErr) throw insertErr;
                 this.rpgData = inserted;
             }
@@ -3927,7 +3927,7 @@ const mobile = {
                 login_streak: this.rpgData.login_streak,
                 last_login_date: this.rpgData.last_login_date,
                 updated_at: new Date().toISOString()
-            });
+            }, { onConflict: 'user_name' });
         } catch (e) { /* 静默 */ }
     },
 
