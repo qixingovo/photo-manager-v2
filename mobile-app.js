@@ -3887,14 +3887,18 @@ const mobile = {
         if (!supabase) { this._initLocalRPG(); return; }
 
         try {
-            const { data } = await supabase.from('rpg_progress').select('*').eq('user_name', uname).single();
+            const { data, error } = await supabase.from('rpg_progress').select('*').eq('user_name', uname).maybeSingle();
+            if (error) throw error;
             if (data) {
                 this.rpgData = data;
                 this._checkLoginStreak();
             } else {
-                await supabase.from('rpg_progress').insert({ user_name: uname, xp: 0, last_login_date: new Date().toISOString().slice(0, 10), login_streak: 1 }).select('*').single().then(r => { this.rpgData = r.data; });
+                const { data: inserted, error: insertErr } = await supabase.from('rpg_progress').upsert({ user_name: uname, xp: 0, last_login_date: new Date().toISOString().slice(0, 10), login_streak: 1 }).select('*').single();
+                if (insertErr) throw insertErr;
+                this.rpgData = inserted;
             }
         } catch (e) {
+            console.warn('RPG Supabase 不可用，使用本地存储:', e.message);
             this._initLocalRPG();
         }
         this._refreshDailyQuests();
