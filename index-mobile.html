@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=41">
+    <link rel="stylesheet" href="mobile.css?v=42">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -40,9 +40,15 @@
         <!-- 情侣横幅 -->
         <div id="coupleBanner" class="couple-banner">
             <div class="couple-avatars">
-                <div class="couple-avatar">🧑🏻</div>
+                <div class="couple-avatar clickable" id="avatar1" onclick="mobile.pickAvatar(1)" title="点击上传头像">
+                    <img id="avatarImg1" src="" style="display:none;" onerror="this.style.display='none';this.parentElement.querySelector('.avatar-placeholder').style.display='';">
+                    <span class="avatar-placeholder">🧑🏻</span>
+                </div>
                 <div class="couple-heart">💕</div>
-                <div class="couple-avatar">👩🏻</div>
+                <div class="couple-avatar clickable" id="avatar2" onclick="mobile.pickAvatar(2)" title="点击上传头像">
+                    <img id="avatarImg2" src="" style="display:none;" onerror="this.style.display='none';this.parentElement.querySelector('.avatar-placeholder').style.display='';">
+                    <span class="avatar-placeholder">👩🏻</span>
+                </div>
             </div>
             <div class="couple-names">
                 <span id="coupleName1">老大</span>
@@ -51,6 +57,8 @@
             </div>
             <div id="coupleDays" class="couple-days">在一起的每一天</div>
         </div>
+        <input type="file" id="avatarInput1" accept="image/*" style="display:none;" onchange="mobile.uploadAvatar(1, event)">
+        <input type="file" id="avatarInput2" accept="image/*" style="display:none;" onchange="mobile.uploadAvatar(2, event)">
 
         <!-- 功能入口卡片 2x3 -->
         <div class="feature-cards">
@@ -646,7 +654,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=41"></script>
+    <script type="module" src="mobile-app.js?v=42"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;

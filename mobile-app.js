@@ -512,6 +512,78 @@ const mobile = {
         }
     },
 
+    // 头像上传
+    pickAvatar(n) {
+        document.getElementById('avatarInput' + n).click();
+    },
+
+    async uploadAvatar(n, event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const supabase = this.initSupabase();
+        if (!supabase) { this.showToast('数据库未连接'); return; }
+
+        try {
+            // 先压缩图片（最大 300x300）
+            const blob = await this._resizeAvatar(file, 300);
+            const path = 'avatars/' + (this.currentUser?.isLaoda ? 'laoda' : 'xiaodi') + '-' + n + '-' + Date.now() + '.jpg';
+            const { error } = await supabase.storage.from('photo').upload(path, blob, {
+                contentType: 'image/jpeg',
+                upsert: true
+            });
+            if (error) throw error;
+
+            // 生成公开URL
+            const { data: urlData } = supabase.storage.from('photo').getPublicUrl(path);
+            const url = urlData?.publicUrl;
+            if (url) {
+                localStorage.setItem('avatar_url_' + n, url);
+                this._showAvatar(n, url);
+            }
+        } catch (e) {
+            // 兜底：存 base64 到 localStorage
+            const reader = new FileReader();
+            reader.onload = function() {
+                localStorage.setItem('avatar_url_' + n, reader.result);
+                mobile._showAvatar(n, reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    },
+
+    _resizeAvatar(file, maxSize) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                let w = img.width, h = img.height;
+                if (w > h && w > maxSize) { h = h * maxSize / w; w = maxSize; }
+                else if (h > maxSize) { w = w * maxSize / h; h = maxSize; }
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                canvas.toBlob(function(b) { resolve(b); }, 'image/jpeg', 0.85);
+            };
+            img.onerror = reject;
+            img.src = URL.createObjectURL(file);
+        });
+    },
+
+    _showAvatar(n, url) {
+        const img = document.getElementById('avatarImg' + n);
+        const placeholder = document.querySelector('#avatar' + n + ' .avatar-placeholder');
+        if (img) { img.src = url; img.style.display = ''; }
+        if (placeholder) placeholder.style.display = 'none';
+    },
+
+    _loadAvatars() {
+        [1, 2].forEach(function(n) {
+            const url = localStorage.getItem('avatar_url_' + n);
+            if (url) mobile._showAvatar(n, url);
+        });
+    },
+
     // 渲染 Suki 风格情侣横幅
     async renderCoupleBanner() {
         if (!this._startDateLoaded) {
@@ -535,6 +607,7 @@ const mobile = {
         if (name2El && this.currentUser) {
             name2El.textContent = this.currentUser.isLaoda ? '小弟' : '老大';
         }
+        this._loadAvatars();
     },
 
     switchTab(tab) {
