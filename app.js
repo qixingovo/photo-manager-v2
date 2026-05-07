@@ -2908,7 +2908,41 @@ window.generateCollage = async function() {
             }
         });
         if (matchingPhotoIds.size === 0) {
-            alert('所选分类下没有照片\n\n调试：选中分类ID=' + catId + '，含子类=' + categoryIds.length + '个，内存photoCategories有' + pcEntries.length + '条记录');
+            // 详细诊断
+            const catIdType = typeof catId;
+            const sampleCatIds = categoryIds.slice(0, 3);
+            const samplePcKeys = Object.keys(photoCategories).slice(0, 3);
+            // 取一条 pc 值看 category_id 格式
+            let sampleCatIdInPc = '';
+            for (const [pid, cids] of Object.entries(photoCategories)) {
+                if (cids.length > 0) { sampleCatIdInPc = cids[0]; break; }
+            }
+            // 找到选中分类的名字
+            const selCat = categories.find(c => String(c.id) === String(catId));
+            const selCatName = selCat ? selCat.name : '未找到';
+            // 找到 photo_categories 中有哪些 category_id
+            const allCatIdsInPc = new Set();
+            Object.values(photoCategories).forEach(cids => cids.forEach(c => allCatIdsInPc.add(c)));
+            const allCatIdsSorted = [...allCatIdsInPc].sort().slice(0, 10);
+
+            const msg = [
+                '=== 拼贴墙诊断 ===',
+                '',
+                '选中分类ID: ' + catId,
+                '选中分类名: ' + selCatName,
+                'catId类型: ' + catIdType + ', 长度: ' + catId.length,
+                '含子类: ' + categoryIds.length + '个 => [' + sampleCatIds.join(', ') + '...]',
+                '',
+                'photoCategories条目: ' + pcEntries.length,
+                'photoCategories中category_id数量: ' + allCatIdsInPc.size,
+                'pc中category_id样例(前10): [' + allCatIdsSorted.join(', ') + ']',
+                '',
+                'photo_id样例: [' + samplePcKeys.join(', ') + '...]',
+                'pc中category_id样例: ' + sampleCatIdInPc,
+                '',
+                '选中分类ID是否在pc的category_id集合中? ' + (allCatIdsInPc.has(catId) ? '是' : '否'),
+            ].join('\n');
+            alert(msg);
             return;
         }
         collagePhotos = photos.filter(p => matchingPhotoIds.has(p.id)).slice(0, 200);
