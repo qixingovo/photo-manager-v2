@@ -523,6 +523,8 @@ const mobile = {
         if (tab === 'home') {
             this.showPage('home');
             this.renderCoupleBanner();
+        } else if (tab === 'photos') {
+            this.showPage('photos');
             this.renderPhotos();
         } else if (tab === 'upload') {
             this.showPage('upload');
@@ -1580,8 +1582,8 @@ const mobile = {
     },
 
     switchToHomeAndFilter(categoryId) {
-        // 切换到首页
-        this.switchTab('home');
+        // 切换到照片页
+        this.switchTab('photos');
 
         // 设置筛选器并筛选
         const filterSelect = document.getElementById('mobileFilterCategory');
@@ -2528,8 +2530,8 @@ const mobile = {
     },
 
     selectCategory(id) {
-        // 切换到首页并按分类过滤
-        this.switchTab('home');
+        // 切换到照片页并按分类过滤
+        this.switchTab('photos');
         document.getElementById('mobileFilterCategory').value = id;
         this.filterByCategory();
     },

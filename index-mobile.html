@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=30">
+    <link rel="stylesheet" href="mobile.css?v=31">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -75,9 +75,19 @@
                 <span class="feature-sub">一起完成100件事</span>
             </div>
         </div>
+    </div>
 
-        <!-- 照片区域标题 -->
-        <div class="photo-section-title">📸 最新回忆</div>
+    <!-- ========== 照片流页面 ========== -->
+    <div id="photosPage" class="page">
+        <header class="top-bar">
+            <div class="logo">
+                <span>📸</span>
+                <span>回忆相册</span>
+            </div>
+            <div class="top-actions">
+                <button class="icon-btn" onclick="mobile.toggleSearch()">🔍</button>
+            </div>
+        </header>
 
         <!-- 分类路径显示 -->
         <div id="categoryPathDisplay" class="category-path-display" style="display:none;"></div>
@@ -106,7 +116,7 @@
         <main class="photo-feed" id="photoFeed">
             <!-- 照片卡片会动态插入 -->
         </main>
-        
+
         <!-- 加载更多按钮 -->
         <div id="loadMoreContainer" class="load-more-container"></div>
 
@@ -635,6 +645,10 @@
             <span class="nav-icon">🏠</span>
             <span class="nav-label">首页</span>
         </div>
+        <div class="nav-item" data-page="photos" onclick="mobile.switchTab('photos')">
+            <span class="nav-icon">📸</span>
+            <span class="nav-label">照片</span>
+        </div>
         <div class="nav-item" data-page="upload" onclick="mobile.switchTab('upload')">
             <span class="nav-icon">📤</span>
             <span class="nav-label">上传</span>
@@ -653,7 +667,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=30"></script>
+    <script type="module" src="mobile-app.js?v=31"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;
