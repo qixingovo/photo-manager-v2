@@ -4211,27 +4211,48 @@ const mobile = {
                 }).join('') + '</div>';
         }
 
-        // 里程碑成就（保留旧版）
+        // 里程碑成就（成就路线）
         const grid = document.getElementById('mobileAchievementsGrid');
         if (grid) {
-            const achievements = [
-                { id: 'first_photo', icon: '🐣', name: '初出茅庐', desc: '上传第 1 张照片', check: function(s) { return s.photoCount >= 1; } },
-                { id: 'collector', icon: '📸', name: '记忆收集者', desc: '累计 100 张照片', check: function(s) { return s.photoCount >= 100; } },
-                { id: 'master', icon: '🏆', name: '回忆大师', desc: '累计 500 张照片', check: function(s) { return s.photoCount >= 500; } },
-                { id: 'organizer', icon: '📁', name: '整理达人', desc: '创建 5 个分类', check: function(s) { return s.categoryCount >= 5; } },
-                { id: 'collector_20', icon: '⭐', name: '收藏家', desc: '收藏 20 张照片', check: function(s) { return s.favoriteCount >= 20; } },
-                { id: 'collector_50', icon: '❤️', name: '真爱印记', desc: '收藏 50 张照片', check: function(s) { return s.favoriteCount >= 50; } },
-                { id: 'explorer', icon: '🗺️', name: '足迹遍布', desc: '标记 10 个地点', check: function(s) { return s.locationCount >= 10; } },
-                { id: 'explorer_30', icon: '🌍', name: '环球旅行', desc: '标记 30 个地点', check: function(s) { return s.locationCount >= 30; } },
+            const s = stats;
+            const tracks = [
+                { id: 'photo', icon: '📸', name: '照片之路', milestones: [
+                    { icon: '🐣', name: '初出茅庐', desc: '上传第1张', check: function() { return s.photoCount >= 1; } },
+                    { icon: '📸', name: '记忆收集者', desc: '累计100张', check: function() { return s.photoCount >= 100; } },
+                    { icon: '🏆', name: '回忆大师', desc: '累计500张', check: function() { return s.photoCount >= 500; } },
+                ]},
+                { id: 'fav', icon: '⭐', name: '收藏之路', milestones: [
+                    { icon: '⭐', name: '收藏家', desc: '收藏20张', check: function() { return s.favoriteCount >= 20; } },
+                    { icon: '❤️', name: '真爱印记', desc: '收藏50张', check: function() { return s.favoriteCount >= 50; } },
+                ]},
+                { id: 'explore', icon: '🗺️', name: '探索之路', milestones: [
+                    { icon: '🗺️', name: '足迹遍布', desc: '标记10个地点', check: function() { return s.locationCount >= 10; } },
+                    { icon: '🌍', name: '环球旅行', desc: '标记30个地点', check: function() { return s.locationCount >= 30; } },
+                ]},
+                { id: 'org', icon: '📁', name: '整理达人', milestones: [
+                    { icon: '📁', name: '整理达人', desc: '创建5个分类', check: function() { return s.categoryCount >= 5; } },
+                ]},
             ];
-            grid.innerHTML = '<h3>🏆 里程碑成就</h3><div class="achievement-grid">' + achievements.map(function(a) {
-                const unlocked = a.check(stats);
-                return '<div class="achievement-badge' + (unlocked ? ' unlocked' : ' locked') + '">' +
-                    '<span class="achievement-icon">' + a.icon + '</span>' +
-                    '<span class="achievement-name">' + a.name + '</span>' +
-                    '<span class="achievement-desc">' + (unlocked ? a.desc : '???') + '</span>' +
+            grid.innerHTML = '<h3>🏆 里程碑成就</h3>' + tracks.map(function(track) {
+                const done = track.milestones.filter(function(m) { return m.check(); }).length;
+                const total = track.milestones.length;
+                const pct = Math.round(done / total * 100);
+                return '<div class="rpg-track">' +
+                    '<div class="rpg-track-header">' +
+                        '<span class="rpg-track-icon">' + track.icon + '</span>' +
+                        '<span class="rpg-track-name">' + track.name + '</span>' +
+                        '<span class="rpg-track-count">' + done + '/' + total + '</span>' +
+                    '</div>' +
+                    '<div class="rpg-track-bar"><div class="rpg-track-fill" style="width:' + pct + '%"></div></div>' +
+                    '<div class="rpg-track-badges">' + track.milestones.map(function(m) {
+                        const ok = m.check();
+                        return '<div class="rpg-track-badge' + (ok ? '' : ' locked') + '">' +
+                            '<span class="rpg-track-badge-icon">' + (ok ? m.icon : '🔒') + '</span>' +
+                            '<span class="rpg-track-badge-name">' + (ok ? m.name : '???') + '</span>' +
+                            '</div>';
+                    }).join('') + '</div>' +
                     '</div>';
-            }).join('') + '</div>';
+            }).join('');
         }
 
         // 自定义奖励
