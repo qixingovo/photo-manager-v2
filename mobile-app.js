@@ -65,6 +65,15 @@ const mobile = {
     passportData: [],
     passportAllPhotos: [],
 
+    // 情侣功能状态
+    moodDiaryEntries: [],
+    dailyChatterEntries: [],
+    intimateRecords: [],
+    intimateUnlocked: false,
+    coupleTasks: [],
+    coupleCheckins: [],
+    currentTaskTab: 'tasks',
+
     // Supabase 配置（从外部配置文件读取）
     SUPABASE_URL: APP_CONFIG.SUPABASE_URL || '',
     SUPABASE_KEY: APP_CONFIG.SUPABASE_ANON_KEY || '',
@@ -517,6 +526,18 @@ const mobile = {
         } else if (tab === 'passport') {
             this.showPage('passport');
             this.loadPassport();
+        } else if (tab === 'moodDiary') {
+            this.showPage('moodDiary');
+            this.loadMoodDiary();
+        } else if (tab === 'dailyChatter') {
+            this.showPage('dailyChatter');
+            this.loadDailyChatter();
+        } else if (tab === 'intimateRecords') {
+            this.showPage('intimateRecords');
+            this.checkIntimateLock();
+        } else if (tab === 'coupleTasks') {
+            this.showPage('coupleTasks');
+            this.loadCoupleTasks();
         } else if (tab === 'profile') {
             this.showPage('profile');
             this.updateProfile();
@@ -2996,7 +3017,9 @@ const mobile = {
                     photoPath: m.photo_path || null,
                     photoName: m.photo_name || null,
                     categoryId: m.category_id || null,
-                    categoryName: m.category_name || null
+                    categoryName: m.category_name || null,
+                    milestone_type: m.milestone_type || 'anniversary',
+                    repeat_yearly: m.repeat_yearly || false
                 }));
                 selectOk = true;
                 // 如果 localStorage 有数据（可能是之前 Supabase 保存失败留下的），合并后回写
@@ -3071,7 +3094,9 @@ const mobile = {
                 photo_path: m.photoPath || null,
                 photo_name: m.photoName || null,
                 category_id: m.categoryId || null,
-                category_name: m.categoryName || null
+                category_name: m.categoryName || null,
+                milestone_type: m.milestone_type || 'anniversary',
+                repeat_yearly: m.repeat_yearly || false
             }));
             const { error } = await supabase.from('milestones').upsert(rows);
             if (error) { this._milestonesSupabaseFailed = true; return; }
@@ -3102,7 +3127,9 @@ const mobile = {
                 photo_path: m.photoPath || null,
                 photo_name: m.photoName || null,
                 category_id: m.categoryId || null,
-                category_name: m.categoryName || null
+                category_name: m.categoryName || null,
+                milestone_type: m.milestone_type || 'anniversary',
+                repeat_yearly: m.repeat_yearly || false
             }));
             const { error } = await supabase.from('milestones').upsert(rows);
             if (error) {
@@ -3142,6 +3169,7 @@ const mobile = {
         const startInput = document.getElementById('mobileStartDateInput');
         if (startInput) startInput.value = this.anniversaryStartDate;
         this.updateDaysCounter();
+        this.updateCountdownDisplay();
         this.renderTimeline();
     },
 
@@ -4292,6 +4320,749 @@ const mobile = {
         }
         const locationPhotos = document.getElementById('mobilePassportLocationPhotos');
         if (locationPhotos) locationPhotos.style.display = 'none';
+    },
+
+    // ========================================
+    // 心情日记
+    // ========================================
+
+    _moodEmojis: ['😊', '😢', '😡', '😴', '🥰', '😰', '🤩', '😤'],
+
+    async loadMoodDiary() {
+        try {
+            const supabase = this.initSupabase();
+            if (!supabase) return;
+            const { data } = await supabase.from('mood_diary').select('*, photos(id,storage_path,name)').order('created_at', { ascending: false });
+            this.moodDiaryEntries = (data || []).map(e => ({
+                ...e,
+                photo_storage_path: e.photos?.storage_path || '',
+                photo_name: e.photos?.name || ''
+            }));
+        } catch (e) { this.moodDiaryEntries = []; }
+        this.renderMoodDiary();
+    },
+
+    renderMoodDiary() {
+        const container = document.getElementById('mobileMoodDiaryList');
+        if (!container) return;
+        if (!this.moodDiaryEntries || this.moodDiaryEntries.length === 0) {
+            container.innerHTML = '<div class="empty-state"><span class="empty-icon">📝</span><p>还没有心情记录</p><small>点击上方按钮记录第一条心情</small></div>';
+            return;
+        }
+        container.innerHTML = this.moodDiaryEntries.map(e => {
+            const photoHtml = e.photo_id ? `<div class="timeline-photo" onclick="mobile.openDetail('${e.photo_id}')"><img src="${this.getPhotoUrl(e.photo_storage_path || '')}" onerror="this.style.display='none'"></div>` : '';
+            const dateStr = e.created_at ? new Date(e.created_at).toLocaleDateString('zh-CN') : '';
+            return `<div class="timeline-item mobile-timeline-item">
+                <div class="timeline-avatar">${e.mood}</div>
+                <div class="timeline-body">
+                    <div class="timeline-header">
+                        <span class="timeline-user">${this.escapeHtml(e.user_name)}</span>
+                        <span class="timeline-time">${dateStr}</span>
+                    </div>
+                    ${e.content ? `<div class="timeline-content">${this.escapeHtml(e.content)}</div>` : ''}
+                    ${photoHtml}
+                </div>
+            </div>`;
+        }).join('');
+    },
+
+    openMoodDiaryModal(editEntry) {
+        this._moodPhotoData = editEntry && editEntry.photo_id ? { id: editEntry.photo_id, storage_path: editEntry.photo_storage_path || '', name: editEntry.photo_name || '' } : null;
+        this._editingMoodEntry = editEntry || null;
+        const previewHtml = this._moodPhotoData ? `
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;">
+                <img src="${this.getPhotoUrl(this._moodPhotoData.storage_path)}" style="width:60px;height:45px;object-fit:cover;border-radius:4px;">
+                <div style="flex:1;">
+                    <div style="font-size:13px;">${this.escapeHtml(this._moodPhotoData.name || '')}</div>
+                    <button type="button" onclick="mobile.clearMoodPhoto()" style="background:none;border:none;color:#dc3545;cursor:pointer;font-size:12px;padding:0;">✕ 移除</button>
+                </div>
+            </div>` : '';
+
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'moodDiaryModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '1000';
+        modal.innerHTML = `
+            <div class="modal-card" style="max-width:90vw;max-height:85vh;overflow-y:auto;padding:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="margin:0;">${editEntry ? '编辑心情' : '记录心情'}</h3>
+                    <button class="icon-btn" onclick="document.getElementById('moodDiaryModal').remove()">×</button>
+                </div>
+                <div style="margin-bottom:16px;">
+                    <label style="display:block;font-size:14px;margin-bottom:8px;">选择心情</label>
+                    <div class="mood-picker">
+                        ${this._moodEmojis.map(m => `<button type="button" class="mood-btn${(editEntry && editEntry.mood === m) ? ' selected' : ''}" onclick="mobile.selectMood('${m}')">${m}</button>`).join('')}
+                    </div>
+                </div>
+                <div class="form-item">
+                    <label>内容</label>
+                    <textarea id="mobileMoodDiaryContent" rows="3" placeholder="今天发生了什么...">${editEntry ? this.escapeHtml(editEntry.content || '') : ''}</textarea>
+                </div>
+                <div class="form-item">
+                    <label>关联照片（可选）</label>
+                    ${previewHtml}
+                    <button type="button" class="btn-secondary" onclick="mobile.openPhotoPicker(mobile.onMoodPhotoPicked)">📷 选择照片</button>
+                </div>
+                <input type="hidden" id="mobileMoodDiaryPhotoId" value="${editEntry ? (editEntry.photo_id || '') : ''}">
+                <input type="hidden" id="mobileMoodDiaryMood" value="${editEntry ? (editEntry.mood || '') : ''}">
+                <button class="btn-primary" onclick="mobile.saveMoodDiary()" style="width:100%;border-radius:8px;margin-top:12px;">保存</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    selectMood(mood) {
+        document.getElementById('mobileMoodDiaryMood').value = mood;
+        document.querySelectorAll('#moodDiaryModal .mood-btn').forEach(b => b.classList.toggle('selected', b.textContent === mood));
+    },
+
+    clearMoodPhoto() {
+        this._moodPhotoData = null;
+        document.getElementById('mobileMoodDiaryPhotoId').value = '';
+        const previewDiv = document.querySelector('#moodDiaryModal .form-item:nth-of-type(2) div[style]');
+        if (previewDiv) previewDiv.remove();
+    },
+
+    onMoodPhotoPicked(photo) {
+        this._moodPhotoData = photo;
+        document.getElementById('mobileMoodDiaryPhotoId').value = photo.id;
+        const content = document.getElementById('mobileMoodDiaryContent').value;
+        const mood = document.getElementById('mobileMoodDiaryMood').value;
+        document.getElementById('moodDiaryModal').remove();
+        this.openMoodDiaryModal(mood ? { mood, content, photo_id: photo.id, photo_storage_path: photo.storage_path, photo_name: photo.name } : { mood, content, photo_id: photo.id, photo_storage_path: photo.storage_path, photo_name: photo.name });
+    },
+
+    async saveMoodDiary() {
+        const mood = document.getElementById('mobileMoodDiaryMood').value;
+        const content = document.getElementById('mobileMoodDiaryContent').value.trim();
+        const photoId = document.getElementById('mobileMoodDiaryPhotoId').value.trim() || null;
+        if (!mood) { this.showToast('请选择一个心情'); return; }
+
+        const supabase = this.initSupabase();
+        if (!supabase) { this.showToast('数据库未连接'); return; }
+
+        const row = { user_name: this.currentUser?.username || '用户', mood, content, photo_id: photoId || null };
+
+        try {
+            if (this._editingMoodEntry) {
+                await supabase.from('mood_diary').update(row).eq('id', this._editingMoodEntry.id);
+            } else {
+                await supabase.from('mood_diary').insert(row);
+            }
+            document.getElementById('moodDiaryModal').remove();
+            this.loadMoodDiary();
+            this.showToast('已保存');
+        } catch (e) {
+            this.showToast('保存失败: ' + e.message);
+        }
+    },
+
+    // ========================================
+    // 情侣打卡
+    // ========================================
+
+    async loadCoupleTasks() {
+        try {
+            const supabase = this.initSupabase();
+            if (!supabase) return;
+            const { data: tasks } = await supabase.from('couple_tasks').select('*').order('sort_order', { ascending: true });
+            this.coupleTasks = tasks || [];
+            const { data: checkins } = await supabase.from('couple_checkins').select('*, photos(id,storage_path,name)').order('checked_at', { ascending: false });
+            this.coupleCheckins = (checkins || []).map(c => ({
+                ...c,
+                photo_storage_path: c.photos?.storage_path || '',
+                photo_name: c.photos?.name || ''
+            }));
+        } catch (e) { this.coupleTasks = []; this.coupleCheckins = []; }
+        this.renderCoupleTasks();
+    },
+
+    renderCoupleTasks() {
+        const container = document.getElementById('mobileCoupleTasksList');
+        if (!container) return;
+
+        const filtered = this.currentTaskTab === 'wishes'
+            ? this.coupleTasks.filter(t => t.category === 'wish')
+            : this.coupleTasks.filter(t => t.category !== 'wish');
+
+        const label = this.currentTaskTab === 'wishes' ? '愿望' : '任务';
+        if (filtered.length === 0) {
+            container.innerHTML = '<div class="empty-state"><span class="empty-icon">✅</span><p>还没有' + label + '</p><small>点击上方按钮添加</small></div>';
+            return;
+        }
+
+        container.innerHTML = filtered.map(task => {
+            const taskCheckins = this.coupleCheckins.filter(c => c.task_id == task.id);
+            const lastCheckin = taskCheckins[0];
+            const checkinCount = taskCheckins.length;
+            const isWish = task.category === 'wish';
+            const completed = isWish && checkinCount > 0;
+
+            return '<div class="task-card mobile-task-card' + (completed ? ' completed' : '') + '">' +
+                '<div class="task-card-header">' +
+                    '<h3 class="task-title">' + this.escapeHtml(task.title) + '</h3>' +
+                    '<span class="task-checkin-badge">' + checkinCount + '次打卡</span>' +
+                '</div>' +
+                (task.description ? '<p class="task-desc">' + this.escapeHtml(task.description) + '</p>' : '') +
+                '<div class="task-card-footer">' +
+                    (lastCheckin ? '<span class="task-last-checkin">最近: ' + this.escapeHtml(lastCheckin.user_name) + ' ' + new Date(lastCheckin.checked_at).toLocaleDateString('zh-CN') + '</span>' : '<span class="task-last-checkin">还没有打卡记录</span>') +
+                    (completed
+                        ? '<span class="task-done-badge">已完成 ✅</span>'
+                        : '<button class="btn-primary btn-sm" onclick="mobile.openCheckinModal(' + task.id + ')">打卡</button>'
+                    ) +
+                '</div>' +
+            '</div>';
+        }).join('');
+    },
+
+    switchTaskTab(tab) {
+        this.currentTaskTab = tab;
+        const btns = document.querySelectorAll('#coupleTasksPage .feature-tab');
+        btns.forEach(b => b.classList.toggle('active', false));
+        document.getElementById('mobileTaskTabBtn_' + tab).classList.add('active');
+        this.renderCoupleTasks();
+    },
+
+    openAddTaskModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'addTaskModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '1000';
+        const isWish = this.currentTaskTab === 'wishes';
+        modal.innerHTML = `
+            <div class="modal-card" style="max-width:90vw;padding:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="margin:0;">添加${isWish ? '愿望' : '任务'}</h3>
+                    <button class="icon-btn" onclick="document.getElementById('addTaskModal').remove()">×</button>
+                </div>
+                <div class="form-item">
+                    <label>标题</label>
+                    <input type="text" id="mobileNewTaskTitle" placeholder="输入标题...">
+                </div>
+                <div class="form-item">
+                    <label>描述</label>
+                    <textarea id="mobileNewTaskDesc" rows="2" placeholder="可选描述..."></textarea>
+                </div>
+                <div class="form-item">
+                    <label>类型</label>
+                    <select id="mobileNewTaskCategory" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;">
+                        <option value="general" ${!isWish ? 'selected' : ''}>日常</option>
+                        <option value="date">约会</option>
+                        <option value="travel">旅行</option>
+                        <option value="wish" ${isWish ? 'selected' : ''}>愿望</option>
+                    </select>
+                </div>
+                <button class="btn-primary" onclick="mobile.saveNewTask()" style="width:100%;border-radius:8px;margin-top:12px;">保存</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    async saveNewTask() {
+        const title = document.getElementById('mobileNewTaskTitle').value.trim();
+        const description = document.getElementById('mobileNewTaskDesc').value.trim();
+        const category = document.getElementById('mobileNewTaskCategory').value;
+        if (!title) { this.showToast('请输入标题'); return; }
+        const supabase = this.initSupabase();
+        if (!supabase) { this.showToast('数据库未连接'); return; }
+        const maxOrder = this.coupleTasks.reduce((max, t) => Math.max(max, t.sort_order || 0), 0);
+        try {
+            await supabase.from('couple_tasks').insert({ title, description, category, sort_order: maxOrder + 1 });
+            document.getElementById('addTaskModal').remove();
+            this.loadCoupleTasks();
+            this.showToast('已添加');
+        } catch (e) { this.showToast('添加失败: ' + e.message); }
+    },
+
+    openCheckinModal(taskId) {
+        const task = this.coupleTasks.find(t => t.id == taskId);
+        if (!task) return;
+        this._checkinPhotoData = null;
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'checkinModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '1000';
+        modal.innerHTML = `
+            <div class="modal-card" style="max-width:90vw;padding:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="margin:0;">打卡: ${this.escapeHtml(task.title)}</h3>
+                    <button class="icon-btn" onclick="document.getElementById('checkinModal').remove()">×</button>
+                </div>
+                <div class="form-item">
+                    <label>备注（可选）</label>
+                    <textarea id="mobileCheckinNote" rows="2" placeholder="写下今天的感受..."></textarea>
+                </div>
+                <div class="form-item">
+                    <label>关联照片（可选）</label>
+                    <div id="mobileCheckinPhotoPreview"></div>
+                    <button type="button" class="btn-secondary" onclick="mobile.openPhotoPicker(mobile.onCheckinPhotoPicked)" style="border-radius:8px;">📷 选择照片</button>
+                </div>
+                <input type="hidden" id="mobileCheckinPhotoId" value="">
+                <button class="btn-primary" onclick="mobile.saveCheckin(${taskId})" style="width:100%;border-radius:8px;margin-top:12px;">确认打卡</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    onCheckinPhotoPicked(photo) {
+        this._checkinPhotoData = photo;
+        document.getElementById('mobileCheckinPhotoId').value = photo.id;
+        document.getElementById('mobileCheckinPhotoPreview').innerHTML = `
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;">
+                <img src="${this.getPhotoUrl(photo.storage_path)}" style="width:60px;height:45px;object-fit:cover;border-radius:4px;">
+                <div style="flex:1;">
+                    <div style="font-size:13px;">${this.escapeHtml(photo.name || '')}</div>
+                    <button type="button" onclick="mobile.clearCheckinPhoto()" style="background:none;border:none;color:#dc3545;cursor:pointer;font-size:12px;padding:0;">✕ 移除</button>
+                </div>
+            </div>`;
+    },
+
+    clearCheckinPhoto() {
+        this._checkinPhotoData = null;
+        document.getElementById('mobileCheckinPhotoId').value = '';
+        document.getElementById('mobileCheckinPhotoPreview').innerHTML = '';
+    },
+
+    async saveCheckin(taskId) {
+        const note = document.getElementById('mobileCheckinNote').value.trim();
+        const photoId = document.getElementById('mobileCheckinPhotoId').value.trim() || null;
+        const supabase = this.initSupabase();
+        if (!supabase) { this.showToast('数据库未连接'); return; }
+        try {
+            await supabase.from('couple_checkins').insert({
+                task_id: parseInt(taskId),
+                user_name: this.currentUser?.username || '用户',
+                note,
+                photo_id: photoId || null
+            });
+            document.getElementById('checkinModal').remove();
+            this.loadCoupleTasks();
+            this.showToast('打卡成功');
+        } catch (e) { this.showToast('打卡失败: ' + e.message); }
+    },
+
+    // ========================================
+    // 亲密记录
+    // ========================================
+
+    async getIntimatePassword() {
+        try {
+            const supabase = this.initSupabase();
+            if (!supabase) return null;
+            const { data } = await supabase.from('app_settings').select('value').eq('key', 'intimate_password').single();
+            return data?.value || null;
+        } catch (e) { return null; }
+    },
+
+    async setIntimatePassword(password) {
+        try {
+            const supabase = this.initSupabase();
+            if (!supabase) return false;
+            await supabase.from('app_settings').upsert({ key: 'intimate_password', value: password });
+            return true;
+        } catch (e) { return false; }
+    },
+
+    checkIntimateLock() {
+        const lockScreen = document.getElementById('mobileIntimateLockScreen');
+        const content = document.getElementById('mobileIntimateContent');
+        if (!lockScreen || !content) return;
+
+        const unlockData = localStorage.getItem('intimate_unlocked');
+        if (unlockData) {
+            try {
+                const parsed = JSON.parse(unlockData);
+                if (parsed.expiresAt && Date.now() < parsed.expiresAt) {
+                    lockScreen.style.display = 'none';
+                    content.style.display = 'flex';
+                    this.intimateUnlocked = true;
+                    this.loadIntimateRecords();
+                    return;
+                }
+            } catch (e) {}
+        }
+
+        this.getIntimatePassword().then(pwd => {
+            lockScreen.style.display = 'flex';
+            content.style.display = 'none';
+            if (pwd) {
+                document.getElementById('mobileIntimateLockTitle').textContent = '输入密码';
+                document.getElementById('mobileIntimateLockHint').textContent = '请输入密码解锁';
+            } else {
+                document.getElementById('mobileIntimateLockTitle').textContent = '设置密码';
+                document.getElementById('mobileIntimateLockHint').textContent = '首次使用，请设置一个密码';
+            }
+            document.getElementById('mobileIntimatePasswordInput').value = '';
+            document.getElementById('mobileIntimateLockError').textContent = '';
+        });
+    },
+
+    async handleIntimatePassword() {
+        const input = document.getElementById('mobileIntimatePasswordInput').value.trim();
+        if (!input) { document.getElementById('mobileIntimateLockError').textContent = '请输入密码'; return; }
+        const existingPwd = await this.getIntimatePassword();
+        if (!existingPwd) {
+            const ok = await this.setIntimatePassword(input);
+            if (!ok) { document.getElementById('mobileIntimateLockError').textContent = '设置失败'; return; }
+            this.unlockIntimateContent();
+        } else if (input === existingPwd) {
+            this.unlockIntimateContent();
+        } else {
+            document.getElementById('mobileIntimateLockError').textContent = '密码错误';
+        }
+    },
+
+    unlockIntimateContent() {
+        this.intimateUnlocked = true;
+        document.getElementById('mobileIntimateLockScreen').style.display = 'none';
+        document.getElementById('mobileIntimateContent').style.display = 'flex';
+        const expiresAt = Date.now() + 30 * 60 * 1000;
+        localStorage.setItem('intimate_unlocked', JSON.stringify({ expiresAt }));
+        this.loadIntimateRecords();
+    },
+
+    lockIntimate() {
+        this.intimateUnlocked = false;
+        localStorage.removeItem('intimate_unlocked');
+        document.getElementById('mobileIntimateLockScreen').style.display = 'flex';
+        document.getElementById('mobileIntimateContent').style.display = 'none';
+        document.getElementById('mobileIntimatePasswordInput').value = '';
+        document.getElementById('mobileIntimateLockError').textContent = '';
+    },
+
+    async loadIntimateRecords() {
+        if (!this.intimateUnlocked) return;
+        try {
+            const supabase = this.initSupabase();
+            if (!supabase) return;
+            const { data } = await supabase.from('intimate_records').select('*, photos(id,storage_path,name)').order('record_date', { ascending: false });
+            this.intimateRecords = (data || []).map(e => ({
+                ...e,
+                photo_storage_path: e.photos?.storage_path || '',
+                photo_name: e.photos?.name || ''
+            }));
+        } catch (e) { this.intimateRecords = []; }
+        this.renderIntimateRecords();
+    },
+
+    renderIntimateRecords() {
+        const container = document.getElementById('mobileIntimateRecordsList');
+        if (!container) return;
+        if (!this.intimateRecords || this.intimateRecords.length === 0) {
+            container.innerHTML = '<div class="empty-state"><span class="empty-icon">🔒</span><p>还没有记录</p><small>点击上方按钮添加第一条记录</small></div>';
+            return;
+        }
+        container.innerHTML = this.intimateRecords.map(e => {
+            const photoHtml = e.photo_id ? '<div class="timeline-photo" onclick="mobile.openDetail(\'' + e.photo_id + '\')"><img src="' + this.getPhotoUrl(e.photo_storage_path || '') + '" onerror="this.style.display=\'none\'"></div>' : '';
+            const dateStr = e.record_date ? new Date(e.record_date).toLocaleDateString('zh-CN') : '';
+            return '<div class="timeline-item mobile-timeline-item">' +
+                '<div class="timeline-avatar">' + (e.mood || '💕') + '</div>' +
+                '<div class="timeline-body">' +
+                    '<div class="timeline-header">' +
+                        '<span class="timeline-user">' + this.escapeHtml(e.user_name) + '</span>' +
+                        '<span class="timeline-time">' + dateStr + '</span>' +
+                    '</div>' +
+                    (e.notes ? '<div class="timeline-content">' + this.escapeHtml(e.notes) + '</div>' : '') +
+                    photoHtml +
+                '</div>' +
+            '</div>';
+        }).join('');
+    },
+
+    openIntimateRecordModal() {
+        this._intimatePhotoData = null;
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'intimateRecordModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '1000';
+        modal.innerHTML = `
+            <div class="modal-card" style="max-width:90vw;padding:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="margin:0;">添加亲密记录</h3>
+                    <button class="icon-btn" onclick="document.getElementById('intimateRecordModal').remove()">×</button>
+                </div>
+                <div class="form-item">
+                    <label>日期</label>
+                    <input type="date" id="mobileIntimateRecordDate" value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <div class="form-item">
+                    <label>心情</label>
+                    <div class="mood-picker">
+                        ${this._moodEmojis.map(m => '<button type="button" class="mood-btn" onclick="mobile.selectIntimateMood(\'' + m + '\')">' + m + '</button>').join('')}
+                    </div>
+                </div>
+                <input type="hidden" id="mobileIntimateRecordMood" value="">
+                <div class="form-item">
+                    <label>备注</label>
+                    <textarea id="mobileIntimateRecordNotes" rows="3" placeholder="记录今天的特别时刻..."></textarea>
+                </div>
+                <div class="form-item">
+                    <label>关联照片（可选）</label>
+                    <div id="mobileIntimatePhotoPreview"></div>
+                    <button type="button" class="btn-secondary" onclick="mobile.openPhotoPicker(mobile.onIntimatePhotoPicked)" style="border-radius:8px;">📷 选择照片</button>
+                </div>
+                <input type="hidden" id="mobileIntimateRecordPhotoId" value="">
+                <button class="btn-primary" onclick="mobile.saveIntimateRecord()" style="width:100%;border-radius:8px;margin-top:12px;">保存</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    selectIntimateMood(mood) {
+        document.getElementById('mobileIntimateRecordMood').value = mood;
+        document.querySelectorAll('#intimateRecordModal .mood-btn').forEach(b => b.classList.toggle('selected', b.textContent === mood));
+    },
+
+    onIntimatePhotoPicked(photo) {
+        this._intimatePhotoData = photo;
+        document.getElementById('mobileIntimateRecordPhotoId').value = photo.id;
+        document.getElementById('mobileIntimatePhotoPreview').innerHTML = `
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;">
+                <img src="${this.getPhotoUrl(photo.storage_path)}" style="width:60px;height:45px;object-fit:cover;border-radius:4px;">
+                <div style="flex:1;">
+                    <div style="font-size:13px;">${this.escapeHtml(photo.name || '')}</div>
+                    <button type="button" onclick="mobile.clearIntimatePhoto()" style="background:none;border:none;color:#dc3545;cursor:pointer;font-size:12px;padding:0;">✕ 移除</button>
+                </div>
+            </div>`;
+    },
+
+    clearIntimatePhoto() {
+        this._intimatePhotoData = null;
+        document.getElementById('mobileIntimateRecordPhotoId').value = '';
+        document.getElementById('mobileIntimatePhotoPreview').innerHTML = '';
+    },
+
+    async saveIntimateRecord() {
+        const recordDate = document.getElementById('mobileIntimateRecordDate').value;
+        const mood = document.getElementById('mobileIntimateRecordMood').value;
+        const notes = document.getElementById('mobileIntimateRecordNotes').value.trim();
+        const photoId = document.getElementById('mobileIntimateRecordPhotoId').value.trim() || null;
+        if (!recordDate) { this.showToast('请选择日期'); return; }
+        const supabase = this.initSupabase();
+        if (!supabase) { this.showToast('数据库未连接'); return; }
+        try {
+            await supabase.from('intimate_records').insert({
+                user_name: this.currentUser?.username || '用户',
+                record_date: recordDate, mood, notes,
+                photo_id: photoId || null
+            });
+            document.getElementById('intimateRecordModal').remove();
+            this.loadIntimateRecords();
+            this.showToast('已保存');
+        } catch (e) { this.showToast('保存失败: ' + e.message); }
+    },
+
+    showIntimateStats() {
+        if (!this.intimateRecords || this.intimateRecords.length === 0) {
+            this.showToast('还没有记录');
+            return;
+        }
+        const total = this.intimateRecords.length;
+        const dates = this.intimateRecords.map(r => new Date(r.record_date));
+        const minDate = new Date(Math.min(...dates));
+        const maxDate = new Date(Math.max(...dates));
+        const monthsDiff = (maxDate.getFullYear() - minDate.getFullYear()) * 12 + (maxDate.getMonth() - minDate.getMonth()) + 1;
+        const monthlyAvg = monthsDiff > 0 ? (total / monthsDiff).toFixed(1) : total;
+
+        const monthCounts = {};
+        this.intimateRecords.forEach(r => {
+            const d = new Date(r.record_date);
+            const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+            monthCounts[key] = (monthCounts[key] || 0) + 1;
+        });
+        const sortedMonths = Object.keys(monthCounts).sort().slice(-12);
+        const maxCount = Math.max(...Object.values(monthCounts), 1);
+
+        const barsHtml = sortedMonths.map(m => {
+            const count = monthCounts[m] || 0;
+            const height = (count / maxCount * 100).toFixed(0);
+            return '<div class="stat-bar-col"><div class="stat-bar" style="height:' + height + '%"></div><div class="stat-bar-value">' + count + '</div><div class="stat-bar-label">' + m + '</div></div>';
+        }).join('');
+
+        document.getElementById('mobileIntimateRecordsList').innerHTML = `
+            <div class="intimate-stats">
+                <div class="stat-cards">
+                    <div class="stat-card"><div class="stat-card-value">${total}</div><div class="stat-card-label">总次数</div></div>
+                    <div class="stat-card"><div class="stat-card-value">${monthlyAvg}</div><div class="stat-card-label">月均</div></div>
+                    <div class="stat-card"><div class="stat-card-value">${monthsDiff}</div><div class="stat-card-label">跨度(月)</div></div>
+                </div>
+                <h4 style="margin:16px 0 8px 0;">月度趋势</h4>
+                <div class="stat-bar-chart">${barsHtml}</div>
+                <button class="btn-secondary" onclick="mobile.renderIntimateRecords()" style="margin-top:16px;width:100%;border-radius:8px;">← 返回记录列表</button>
+            </div>`;
+    },
+
+    // ========================================
+    // 纪念日升级
+    // ========================================
+
+    updateCountdownDisplay() {
+        const container = document.getElementById('mobileCountdownContainer');
+        if (!container) return;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let nextMilestone = null;
+        let minDiff = Infinity;
+        this.anniversaryMilestones.forEach(m => {
+            let targetDate;
+            if (m.repeat_yearly || m.milestone_type === 'birthday') {
+                const parts = m.date.split('-');
+                targetDate = new Date(today.getFullYear(), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                if (targetDate <= today) {
+                    targetDate = new Date(today.getFullYear() + 1, parseInt(parts[1]) - 1, parseInt(parts[2]));
+                }
+            } else {
+                targetDate = new Date(m.date);
+            }
+            const diff = targetDate - today;
+            if (diff > 0 && diff < minDiff) {
+                minDiff = diff;
+                nextMilestone = { ...m, targetDate };
+            }
+        });
+
+        if (nextMilestone) {
+            const diffDays = Math.ceil(minDiff / (1000 * 60 * 60 * 24));
+            container.innerHTML = '<div style="text-align:center;padding:12px;background:linear-gradient(135deg,#a8edea 0%,#fed6e3 100%);border-radius:12px;margin-bottom:12px;">' +
+                '<div style="font-size:0.9rem;color:#666;">下一个纪念日</div>' +
+                '<div style="font-size:1.3rem;font-weight:bold;color:#e74c3c;">' + this.escapeHtml(nextMilestone.title) + '</div>' +
+                '<div style="font-size:1.8rem;font-weight:bold;color:#e74c3c;">还有 ' + diffDays + ' 天</div>' +
+                '<div style="font-size:0.8rem;color:#999;">' + nextMilestone.targetDate.toLocaleDateString('zh-CN') + '</div>' +
+            '</div>';
+        }
+    },
+
+    // ========================================
+    // 每日叨叨
+    // ========================================
+
+    getRelativeTime(dateStr) {
+        const now = new Date();
+        const date = new Date(dateStr);
+        const diff = now - date;
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return '刚刚';
+        if (mins < 60) return mins + '分钟前';
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return hours + '小时前';
+        const days = Math.floor(hours / 24);
+        if (days < 7) return days + '天前';
+        const weeks = Math.floor(days / 7);
+        if (weeks < 4) return weeks + '周前';
+        const months = Math.floor(days / 30);
+        if (months < 12) return months + '个月前';
+        const y = Math.floor(days / 365);
+        return y + '年前';
+    },
+
+    async loadDailyChatter() {
+        try {
+            const supabase = this.initSupabase();
+            if (!supabase) return;
+            const { data } = await supabase.from('daily_chatter').select('*, photos(id,storage_path,name)').order('created_at', { ascending: false });
+            this.dailyChatterEntries = (data || []).map(e => ({
+                ...e,
+                photo_storage_path: e.photos?.storage_path || '',
+                photo_name: e.photos?.name || ''
+            }));
+        } catch (e) { this.dailyChatterEntries = []; }
+        this.renderDailyChatter();
+    },
+
+    renderDailyChatter() {
+        const container = document.getElementById('mobileDailyChatterList');
+        if (!container) return;
+        if (!this.dailyChatterEntries || this.dailyChatterEntries.length === 0) {
+            container.innerHTML = '<div class="empty-state"><span class="empty-icon">💬</span><p>还没有动态</p><small>点击上方按钮发布第一条动态</small></div>';
+            return;
+        }
+        container.innerHTML = this.dailyChatterEntries.map(e => {
+            const avatar = e.user_name ? e.user_name.charAt(0).toUpperCase() : '?';
+            const photoHtml = e.photo_id ? '<div class="timeline-photo" onclick="mobile.openDetail(\'' + e.photo_id + '\')"><img src="' + this.getPhotoUrl(e.photo_storage_path || '') + '" onerror="this.style.display=\'none\'"></div>' : '';
+            const relTime = this.getRelativeTime(e.created_at);
+            return '<div class="timeline-item mobile-timeline-item">' +
+                '<div class="timeline-avatar chatter-avatar">' + avatar + '</div>' +
+                '<div class="timeline-body">' +
+                    '<div class="timeline-header">' +
+                        '<span class="timeline-user">' + this.escapeHtml(e.user_name) + '</span>' +
+                        '<span class="timeline-time">' + relTime + '</span>' +
+                    '</div>' +
+                    '<div class="timeline-content">' + this.escapeHtml(e.content) + '</div>' +
+                    photoHtml +
+                '</div>' +
+            '</div>';
+        }).join('');
+    },
+
+    openDailyChatterModal() {
+        this._chatterPhotoData = null;
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'dailyChatterModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '1000';
+        modal.innerHTML = `
+            <div class="modal-card" style="max-width:90vw;padding:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="margin:0;">发布动态</h3>
+                    <button class="icon-btn" onclick="document.getElementById('dailyChatterModal').remove()">×</button>
+                </div>
+                <textarea id="mobileDailyChatterContent" rows="4" placeholder="今天想说什么..." style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:12px;"></textarea>
+                <div id="mobileDailyChatterPhotoPreview"></div>
+                <div style="display:flex;gap:8px;">
+                    <button type="button" class="btn-secondary" onclick="mobile.openPhotoPicker(mobile.onChatterPhotoPicked)" style="flex:1;border-radius:8px;">📷 选择照片</button>
+                </div>
+                <input type="hidden" id="mobileDailyChatterPhotoId" value="">
+                <button class="btn-primary" onclick="mobile.saveDailyChatter()" style="width:100%;border-radius:8px;margin-top:12px;">发布</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    onChatterPhotoPicked(photo) {
+        this._chatterPhotoData = photo;
+        document.getElementById('mobileDailyChatterPhotoId').value = photo.id;
+        document.getElementById('mobileDailyChatterPhotoPreview').innerHTML = `
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;">
+                <img src="${this.getPhotoUrl(photo.storage_path)}" style="width:60px;height:45px;object-fit:cover;border-radius:4px;">
+                <div style="flex:1;">
+                    <div style="font-size:13px;">${this.escapeHtml(photo.name || '')}</div>
+                    <button type="button" onclick="mobile.clearChatterPhoto()" style="background:none;border:none;color:#dc3545;cursor:pointer;font-size:12px;padding:0;">✕ 移除</button>
+                </div>
+            </div>`;
+    },
+
+    clearChatterPhoto() {
+        this._chatterPhotoData = null;
+        document.getElementById('mobileDailyChatterPhotoId').value = '';
+        document.getElementById('mobileDailyChatterPhotoPreview').innerHTML = '';
+    },
+
+    async saveDailyChatter() {
+        const content = document.getElementById('mobileDailyChatterContent').value.trim();
+        const photoId = document.getElementById('mobileDailyChatterPhotoId').value.trim() || null;
+        if (!content) { this.showToast('请输入内容'); return; }
+
+        const supabase = this.initSupabase();
+        if (!supabase) { this.showToast('数据库未连接'); return; }
+
+        try {
+            await supabase.from('daily_chatter').insert({
+                user_name: this.currentUser?.username || '用户',
+                content,
+                photo_id: photoId || null
+            });
+            document.getElementById('dailyChatterModal').remove();
+            this.loadDailyChatter();
+            this.showToast('已发布');
+        } catch (e) {
+            this.showToast('发布失败: ' + e.message);
+        }
     },
 
     // ========================================

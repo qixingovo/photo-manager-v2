@@ -1468,3 +1468,360 @@ mark {
     margin-bottom: 16px;
     font-size: 14px;
 }
+
+/* ========================================
+   情侣功能通用样式
+   ======================================== */
+
+.feature-section {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.feature-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.feature-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.feature-tab {
+    padding: 8px 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #f8f9fa;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.feature-tab.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+/* 时间线列表 */
+
+.timeline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.timeline-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: #fafbfc;
+    border-radius: 10px;
+    border: 1px solid #f0f0f0;
+    transition: box-shadow 0.2s;
+}
+
+.timeline-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.timeline-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+    background: #f0f0f0;
+}
+
+.timeline-avatar.chatter-avatar {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.timeline-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.timeline-user {
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+}
+
+.timeline-time {
+    font-size: 12px;
+    color: #999;
+}
+
+.timeline-content {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.timeline-photo {
+    margin-top: 8px;
+    cursor: pointer;
+    border-radius: 8px;
+    overflow: hidden;
+    max-width: 200px;
+}
+
+.timeline-photo img {
+    width: 100%;
+    height: auto;
+    max-height: 150px;
+    object-fit: cover;
+}
+
+/* 心情选择器 */
+
+.mood-picker {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.mood-btn {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #eee;
+    border-radius: 10px;
+    background: white;
+    font-size: 28px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mood-btn:hover {
+    border-color: #667eea;
+    transform: scale(1.05);
+}
+
+.mood-btn.selected {
+    border-color: #667eea;
+    background: #f0f0ff;
+    transform: scale(1.1);
+}
+
+/* 密码锁屏 */
+
+.lock-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    padding: 40px;
+}
+
+.lock-screen-box {
+    text-align: center;
+    max-width: 320px;
+    width: 100%;
+}
+
+.lock-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.lock-hint {
+    color: #999;
+    font-size: 13px;
+    margin-bottom: 16px;
+}
+
+.lock-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.lock-btn {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.lock-error {
+    color: #dc3545;
+    font-size: 13px;
+    margin-top: 8px;
+}
+
+/* 任务卡片 */
+
+.task-card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+}
+
+.task-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.task-card.completed {
+    opacity: 0.7;
+    border-color: #c8e6c9;
+    background: #f1f8e9;
+}
+
+.task-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.task-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+}
+
+.task-checkin-badge {
+    font-size: 12px;
+    padding: 2px 10px;
+    background: #667eea;
+    color: white;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+
+.task-desc {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+.task-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.task-last-checkin {
+    font-size: 12px;
+    color: #999;
+}
+
+.task-done-badge {
+    font-size: 14px;
+    font-weight: 600;
+    color: #2e7d32;
+}
+
+.btn-sm {
+    padding: 6px 16px;
+    font-size: 13px;
+}
+
+/* 亲密记录统计 */
+
+.intimate-stats {
+    padding: 0;
+}
+
+.stat-cards {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.stat-card {
+    flex: 1;
+    text-align: center;
+    padding: 16px 12px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 10px;
+}
+
+.stat-card-value {
+    font-size: 28px;
+    font-weight: bold;
+    color: #667eea;
+}
+
+.stat-card-label {
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+}
+
+.stat-bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 120px;
+    padding: 8px;
+    background: #fafbfc;
+    border-radius: 8px;
+}
+
+.stat-bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+}
+
+.stat-bar {
+    width: 100%;
+    max-width: 30px;
+    background: linear-gradient(to top, #667eea, #a8b8ff);
+    border-radius: 4px 4px 0 0;
+    min-height: 2px;
+    transition: height 0.3s;
+}
+
+.stat-bar-value {
+    font-size: 10px;
+    color: #666;
+    margin-top: 2px;
+}
+
+.stat-bar-label {
+    font-size: 9px;
+    color: #999;
+    margin-top: 2px;
+    transform: rotate(-45deg);
+    transform-origin: left;
+    white-space: nowrap;
+}

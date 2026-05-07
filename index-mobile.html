@@ -225,6 +225,7 @@
                        style="padding:6px 12px;border:none;border-radius:8px;font-size:13px;">
             </div>
         </div>
+        <div id="mobileCountdownContainer" style="padding:0 16px;"></div>
         <div id="mobileTimelineContainer" style="flex:1;overflow-y:auto;padding:16px;"></div>
         <button class="btn-primary" style="margin:12px;border-radius:25px;" onclick="mobile.openAddMilestoneModal()">
             + 添加纪念日
@@ -339,6 +340,74 @@
         </div>
     </div>
 
+    <!-- ========== 心情日记页面 ========== -->
+    <div id="moodDiaryPage" class="page">
+        <header class="top-bar">
+            <div class="logo">
+                <span>📝</span>
+                <span>心情日记</span>
+            </div>
+        </header>
+        <button class="btn-primary" style="margin:12px;border-radius:25px;" onclick="mobile.openMoodDiaryModal()">+ 记录心情</button>
+        <div id="mobileMoodDiaryList" style="flex:1;overflow-y:auto;padding:12px;"></div>
+    </div>
+
+    <!-- ========== 每日叨叨页面 ========== -->
+    <div id="dailyChatterPage" class="page">
+        <header class="top-bar">
+            <div class="logo">
+                <span>💬</span>
+                <span>每日叨叨</span>
+            </div>
+        </header>
+        <button class="btn-primary" style="margin:12px;border-radius:25px;" onclick="mobile.openDailyChatterModal()">+ 发布动态</button>
+        <div id="mobileDailyChatterList" style="flex:1;overflow-y:auto;padding:12px;"></div>
+    </div>
+
+    <!-- ========== 亲密记录页面 ========== -->
+    <div id="intimateRecordsPage" class="page">
+        <header class="top-bar">
+            <div class="logo">
+                <span>🔒</span>
+                <span>亲密记录</span>
+            </div>
+        </header>
+        <div id="mobileIntimateLockScreen" class="lock-screen">
+            <div class="lock-screen-box">
+                <div class="lock-icon">🔐</div>
+                <h3 id="mobileIntimateLockTitle">设置密码</h3>
+                <p class="lock-hint" id="mobileIntimateLockHint">首次使用，请设置一个密码</p>
+                <input type="password" id="mobileIntimatePasswordInput" class="lock-input" placeholder="输入密码">
+                <button class="btn-primary lock-btn" onclick="mobile.handleIntimatePassword()">确认</button>
+                <p id="mobileIntimateLockError" class="lock-error"></p>
+            </div>
+        </div>
+        <div id="mobileIntimateContent" style="display:none;flex:1;flex-direction:column;">
+            <div style="display:flex;gap:8px;padding:12px;">
+                <button class="btn-primary" style="flex:1;border-radius:8px;" onclick="mobile.openIntimateRecordModal()">+ 添加记录</button>
+                <button class="btn-secondary" style="border-radius:8px;" onclick="mobile.showIntimateStats()">📊 统计</button>
+                <button class="btn-secondary" style="border-radius:8px;" onclick="mobile.lockIntimate()">🔒</button>
+            </div>
+            <div id="mobileIntimateRecordsList" style="flex:1;overflow-y:auto;padding:12px;"></div>
+        </div>
+    </div>
+
+    <!-- ========== 情侣打卡页面 ========== -->
+    <div id="coupleTasksPage" class="page">
+        <header class="top-bar">
+            <div class="logo">
+                <span>✅</span>
+                <span>情侣打卡</span>
+            </div>
+        </header>
+        <div style="display:flex;padding:8px 12px;gap:8px;">
+            <button class="feature-tab active" id="mobileTaskTabBtn_tasks" onclick="mobile.switchTaskTab('tasks')" style="flex:1;border-radius:8px;padding:8px;">任务列表</button>
+            <button class="feature-tab" id="mobileTaskTabBtn_wishes" onclick="mobile.switchTaskTab('wishes')" style="flex:1;border-radius:8px;padding:8px;">愿望清单</button>
+        </div>
+        <button class="btn-primary" style="margin:8px 12px;border-radius:25px;" onclick="mobile.openAddTaskModal()">+ 添加任务/愿望</button>
+        <div id="mobileCoupleTasksList" style="flex:1;overflow-y:auto;padding:12px;"></div>
+    </div>
+
     <!-- ========== 我的页面 ========== -->
     <div id="profilePage" class="page">
         <header class="top-bar">
@@ -395,6 +464,26 @@
             <div class="menu-item" onclick="mobile.switchTab('passport')">
                 <span class="menu-icon">🛂</span>
                 <span class="menu-text">足迹护照</span>
+                <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item" onclick="mobile.switchTab('moodDiary')">
+                <span class="menu-icon">📝</span>
+                <span class="menu-text">心情日记</span>
+                <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item" onclick="mobile.switchTab('dailyChatter')">
+                <span class="menu-icon">💬</span>
+                <span class="menu-text">每日叨叨</span>
+                <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item" onclick="mobile.switchTab('intimateRecords')">
+                <span class="menu-icon">🔒</span>
+                <span class="menu-text">亲密记录</span>
+                <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item" onclick="mobile.switchTab('coupleTasks')">
+                <span class="menu-icon">✅</span>
+                <span class="menu-text">情侣打卡</span>
                 <span class="menu-arrow">›</span>
             </div>
             <div class="menu-item" onclick="mobile.showSettings()">
@@ -534,7 +623,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=25"></script>
+    <script type="module" src="mobile-app.js?v=27"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;

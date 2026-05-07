@@ -41,6 +41,16 @@ let passportSortByPhotoCount = true
 let passportData = []
 let passportAllPhotos = []
 
+// 情侣功能状态
+let moodDiaryEntries = []
+let dailyChatterEntries = []
+let intimateRecords = []
+let intimateUnlocked = false
+let coupleTasks = []
+let coupleCheckins = []
+let currentTaskTab = 'tasks'
+const INTIMATE_STORAGE_KEY = 'intimate_unlocked'
+
 // Supabase 配置（从外部配置文件读取）
 const APP_CONFIG = window.__APP_CONFIG__ || {}
 const SUPABASE_URL = APP_CONFIG.SUPABASE_URL || ''
@@ -416,6 +426,10 @@ window.toggleSection = function(section) {
         if (albumsSection) albumsSection.style.display = 'none'
         if (albumDetailSection) albumDetailSection.style.display = 'none'
         if (passportSection) passportSection.style.display = 'none'
+        if (document.getElementById('moodDiarySection')) document.getElementById('moodDiarySection').style.display = 'none'
+        if (document.getElementById('dailyChatterSection')) document.getElementById('dailyChatterSection').style.display = 'none'
+        if (document.getElementById('intimateRecordsSection')) document.getElementById('intimateRecordsSection').style.display = 'none'
+        if (document.getElementById('coupleTasksSection')) document.getElementById('coupleTasksSection').style.display = 'none'
     }
 
     if (section === 'upload') {
@@ -486,6 +500,46 @@ window.toggleSection = function(section) {
             loadPassport()
         } else {
             passportSection.style.display = 'none'
+        }
+    } else if (section === 'moodDiary') {
+        const sec = document.getElementById('moodDiarySection')
+        if (!sec) return
+        if (sec.style.display === 'none' || !sec.style.display) {
+            hideAll()
+            sec.style.display = 'block'
+            loadMoodDiary()
+        } else {
+            sec.style.display = 'none'
+        }
+    } else if (section === 'dailyChatter') {
+        const sec = document.getElementById('dailyChatterSection')
+        if (!sec) return
+        if (sec.style.display === 'none' || !sec.style.display) {
+            hideAll()
+            sec.style.display = 'block'
+            loadDailyChatter()
+        } else {
+            sec.style.display = 'none'
+        }
+    } else if (section === 'intimateRecords') {
+        const sec = document.getElementById('intimateRecordsSection')
+        if (!sec) return
+        if (sec.style.display === 'none' || !sec.style.display) {
+            hideAll()
+            sec.style.display = 'block'
+            checkIntimateLock()
+        } else {
+            sec.style.display = 'none'
+        }
+    } else if (section === 'coupleTasks') {
+        const sec = document.getElementById('coupleTasksSection')
+        if (!sec) return
+        if (sec.style.display === 'none' || !sec.style.display) {
+            hideAll()
+            sec.style.display = 'block'
+            loadCoupleTasks()
+        } else {
+            sec.style.display = 'none'
         }
     }
 }
@@ -2078,7 +2132,9 @@ async function loadMilestones() {
                 photoPath: m.photo_path || null,
                 photoName: m.photo_name || null,
                 categoryId: m.category_id || null,
-                categoryName: m.category_name || null
+                categoryName: m.category_name || null,
+                milestone_type: m.milestone_type || 'anniversary',
+                repeat_yearly: m.repeat_yearly || false
             }));
             selectOk = true
             // 如果 localStorage 有数据（可能是之前 Supabase 保存失败留下的），合并后回写
@@ -2157,7 +2213,9 @@ async function migrateMilestonesToSupabase() {
             photo_path: m.photoPath || null,
             photo_name: m.photoName || null,
             category_id: m.categoryId || null,
-            category_name: m.categoryName || null
+            category_name: m.categoryName || null,
+            milestone_type: m.milestone_type || 'anniversary',
+            repeat_yearly: m.repeat_yearly || false
         }));
         const { error } = await supabase.from('milestones').upsert(rows);
         if (error) { _milestonesSupabaseFailed = true; return; }
@@ -2183,7 +2241,9 @@ async function saveMilestonesToSupabase() {
             photo_path: m.photoPath || null,
             photo_name: m.photoName || null,
             category_id: m.categoryId || null,
-            category_name: m.categoryName || null
+            category_name: m.categoryName || null,
+            milestone_type: m.milestone_type || 'anniversary',
+            repeat_yearly: m.repeat_yearly || false
         }));
         const { error } = await supabase.from('milestones').upsert(rows);
         if (error) {
@@ -2226,10 +2286,137 @@ function updateDaysCounter() {
 
 async function initTimeline() {
     await loadMilestones();
+    await loadPeriodRecords();
     const startInput = document.getElementById('startDateInput');
     if (startInput) startInput.value = anniversaryStartDate;
     updateDaysCounter();
+    updateCountdownDisplay();
     renderTimeline();
+    renderPeriodSection();
+}
+
+function updateCountdownDisplay() {
+    const container = document.getElementById('countdownContainer')
+    if (!container) return
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // Find next anniversary
+    let nextMilestone = null
+    let minDiff = Infinity
+    anniversaryMilestones.forEach(m => {
+        // For repeat_yearly, use this year's date
+        let targetDate
+        if (m.repeat_yearly || m.milestone_type === 'birthday') {
+            const parts = m.date.split('-')
+            targetDate = new Date(today.getFullYear(), parseInt(parts[1]) - 1, parseInt(parts[2]))
+            if (targetDate <= today) {
+                targetDate = new Date(today.getFullYear() + 1, parseInt(parts[1]) - 1, parseInt(parts[2]))
+            }
+        } else {
+            targetDate = new Date(m.date)
+        }
+        const diff = targetDate - today
+        if (diff > 0 && diff < minDiff) {
+            minDiff = diff
+            nextMilestone = { ...m, targetDate }
+        }
+    })
+
+    if (nextMilestone) {
+        const diffDays = Math.ceil(minDiff / (1000 * 60 * 60 * 24))
+        container.innerHTML = `<div style="text-align:center;padding:12px;background:linear-gradient(135deg,#a8edea 0%,#fed6e3 100%);border-radius:12px;margin-bottom:12px;">
+            <div style="font-size:0.9rem;color:#666;">下一个纪念日</div>
+            <div style="font-size:1.5rem;font-weight:bold;color:#e74c3c;">${escapeHtml(nextMilestone.title)}</div>
+            <div style="font-size:2rem;font-weight:bold;color:#e74c3c;">还有 ${diffDays} 天</div>
+            <div style="font-size:0.8rem;color:#999;">${nextMilestone.targetDate.toLocaleDateString('zh-CN')}</div>
+        </div>`
+    } else {
+        container.innerHTML = '<p style="text-align:center;color:#999;padding:12px;">还没有纪念日</p>'
+    }
+}
+
+function renderPeriodSection() {
+    const container = document.getElementById('periodSection')
+    if (!container) return
+
+    const prediction = predictNextPeriod()
+    const sorted = [...periodRecords].sort((a, b) => new Date(b.start_date) - new Date(a.start_date))
+
+    container.innerHTML = `
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid #eee;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h3 style="margin:0;font-size:1rem;">📅 经期记录</h3>
+                <button class="btn btn-primary btn-sm" onclick="window.openPeriodRecordModal()">+ 记录</button>
+            </div>
+            ${prediction ? `<div style="text-align:center;padding:10px;background:#fff3e0;border-radius:8px;margin-bottom:12px;font-size:13px;">
+                预计下次: <strong>${prediction.date}</strong> (周期约${prediction.avgCycle}天)
+            </div>` : (periodRecords.length > 0 ? '<p style="text-align:center;color:#999;font-size:13px;">需要至少2次记录才能预测</p>' : '')}
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                ${sorted.slice(0, 10).map(r => `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f8f9fa;border-radius:8px;font-size:13px;">
+                        <span>${r.start_date}${r.end_date ? ' ~ ' + r.end_date : ''} (${r.end_date ? Math.ceil((new Date(r.end_date) - new Date(r.start_date)) / (1000*60*60*24)) + 1 : '?'}天)</span>
+                        <button class="btn-danger" style="padding:2px 8px;font-size:11px;" onclick="window.deletePeriodRecord(${r.id})">×</button>
+                    </div>`).join('')}
+            </div>
+            ${periodRecords.length === 0 ? '<p style="text-align:center;color:#999;font-size:13px;">还没有记录</p>' : ''}
+        </div>`
+}
+
+window.openPeriodRecordModal = function() {
+    const modal = document.createElement('div')
+    modal.className = 'modal active'
+    modal.id = 'periodRecordModal'
+    modal.innerHTML = `
+        <div class="modal-content modal-small" style="padding:24px;">
+            <span class="modal-close" onclick="document.getElementById('periodRecordModal').remove()">&times;</span>
+            <h3>记录经期</h3>
+            <div class="form-group">
+                <label>开始日期</label>
+                <input type="date" id="periodStartDate" value="${new Date().toISOString().split('T')[0]}">
+            </div>
+            <div class="form-group">
+                <label>结束日期（可选）</label>
+                <input type="date" id="periodEndDate">
+            </div>
+            <div class="form-group">
+                <label>备注（可选）</label>
+                <textarea id="periodNotes" rows="2" placeholder="症状、心情等..."></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="window.savePeriodRecord()" style="width:100%;">保存</button>
+        </div>
+    `
+    document.body.appendChild(modal)
+}
+
+window.savePeriodRecord = async function() {
+    const startDate = document.getElementById('periodStartDate').value
+    const endDate = document.getElementById('periodEndDate').value || null
+    const notes = document.getElementById('periodNotes').value.trim()
+    if (!startDate) { alert('请选择开始日期'); return }
+
+    try {
+        await supabase.from('period_records').insert({
+            user_name: getStoredSession()?.username || '用户',
+            start_date: startDate,
+            end_date: endDate,
+            notes
+        })
+        document.getElementById('periodRecordModal').remove()
+        loadPeriodRecords().then(() => renderPeriodSection())
+    } catch (e) {
+        alert('保存失败: ' + e.message)
+    }
+}
+
+window.deletePeriodRecord = async function(id) {
+    if (!confirm('确定删除这条记录？')) return
+    try {
+        await supabase.from('period_records').delete().eq('id', id)
+        loadPeriodRecords().then(() => renderPeriodSection())
+    } catch (e) {
+        alert('删除失败: ' + e.message)
+    }
 }
 
 window.updateStartDate = async function() {
@@ -2388,6 +2575,21 @@ window.openAddMilestoneModal = function() {
                 <textarea id="milestoneDesc" rows="2"></textarea>
             </div>
             <div class="form-group">
+                <label>类型</label>
+                <select id="milestoneType" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;">
+                    <option value="anniversary">纪念日</option>
+                    <option value="birthday">生日</option>
+                    <option value="festival">节日</option>
+                    <option value="period">经期</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="milestoneRepeatYearly">
+                    <span>每年重复</span>
+                </label>
+            </div>
+            <div class="form-group">
                 <label>关联类别（可选）</label>
                 <select id="milestoneCategoryId" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;">
                     <option value="">不关联类别</option>
@@ -2511,6 +2713,21 @@ window.openEditMilestoneModal = function(id) {
                 <textarea id="milestoneDesc" rows="2">${escapeHtml(m.description || '')}</textarea>
             </div>
             <div class="form-group">
+                <label>类型</label>
+                <select id="milestoneType" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;">
+                    <option value="anniversary" ${(m.milestone_type || 'anniversary') === 'anniversary' ? 'selected' : ''}>纪念日</option>
+                    <option value="birthday" ${m.milestone_type === 'birthday' ? 'selected' : ''}>生日</option>
+                    <option value="festival" ${m.milestone_type === 'festival' ? 'selected' : ''}>节日</option>
+                    <option value="period" ${m.milestone_type === 'period' ? 'selected' : ''}>经期</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="milestoneRepeatYearly" ${m.repeat_yearly ? 'checked' : ''}>
+                    <span>每年重复</span>
+                </label>
+            </div>
+            <div class="form-group">
                 <label>关联类别（可选）</label>
                 <select id="milestoneCategoryId" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;">
                     <option value="">不关联类别</option>
@@ -2538,6 +2755,8 @@ window.saveMilestone = function() {
     const photoId = document.getElementById('milestonePhotoId').value.trim() || null;
     const catId = document.getElementById('milestoneCategoryId').value || null;
     const catName = catId ? (categories.find(c => String(c.id) === String(catId)) || {}).name || '' : '';
+    const type = document.getElementById('milestoneType').value || 'anniversary';
+    const repeatYearly = document.getElementById('milestoneRepeatYearly').checked;
 
     if (!date || !title) {
         alert('请填写日期和标题');
@@ -2553,13 +2772,16 @@ window.saveMilestone = function() {
         photoPath: pd ? pd.storage_path : null,
         photoName: pd ? pd.name : null,
         categoryId: catId || null,
-        categoryName: catName || null
+        categoryName: catName || null,
+        milestone_type: type,
+        repeat_yearly: repeatYearly
     };
 
     anniversaryMilestones.push(newMilestone);
     window._milestonePhotoData = null;
     saveMilestonesToSupabase();
     renderTimeline();
+    updateCountdownDisplay();
     document.getElementById('milestoneModal').remove();
 };
 
@@ -2577,10 +2799,15 @@ window.updateMilestone = function(id) {
     const catId = document.getElementById('milestoneCategoryId').value || null;
     m.categoryId = catId || null;
     m.categoryName = catId ? (categories.find(c => String(c.id) === String(catId)) || {}).name || '' : null;
+    const typeEl = document.getElementById('milestoneType');
+    if (typeEl) m.milestone_type = typeEl.value || 'anniversary';
+    const repeatEl = document.getElementById('milestoneRepeatYearly');
+    if (repeatEl) m.repeat_yearly = repeatEl.checked;
 
     window._milestonePhotoData = null;
     saveMilestonesToSupabase();
     renderTimeline();
+    updateCountdownDisplay();
     document.getElementById('milestoneModal').remove();
 };
 
@@ -3905,6 +4132,267 @@ window.closePassportLocation = function() {
 }
 
 // ========================================
+// 心情日记
+// ========================================
+
+const MOOD_EMOJIS = ['😊', '😢', '😡', '😴', '🥰', '😰', '🤩', '😤']
+
+async function loadMoodDiary() {
+    try {
+        const { data } = await supabase.from('mood_diary').select('*, photos(id,storage_path,name)').order('created_at', { ascending: false })
+        moodDiaryEntries = (data || []).map(e => ({
+            ...e,
+            photo_storage_path: e.photos?.storage_path || '',
+            photo_name: e.photos?.name || ''
+        }))
+    } catch (e) { moodDiaryEntries = [] }
+    renderMoodDiary()
+}
+
+function renderMoodDiary() {
+    const container = document.getElementById('moodDiaryList')
+    if (!container) return
+    if (moodDiaryEntries.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>📝 还没有心情记录</p><small>点击"记录心情"写第一条吧</small></div>'
+        return
+    }
+    container.innerHTML = moodDiaryEntries.map(e => {
+        const photoHtml = e.photo_id ? `<div class="timeline-photo" onclick="window.openPhotoModal('${e.photo_id}')"><img src="${getPhotoUrl(e.photo_storage_path || '')}" onerror="this.style.display='none'"></div>` : ''
+        const dateStr = e.created_at ? new Date(e.created_at).toLocaleDateString('zh-CN') : ''
+        return `<div class="timeline-item">
+            <div class="timeline-avatar">${e.mood}</div>
+            <div class="timeline-body">
+                <div class="timeline-header">
+                    <span class="timeline-user">${escapeHtml(e.user_name)}</span>
+                    <span class="timeline-time">${dateStr}</span>
+                </div>
+                ${e.content ? `<div class="timeline-content">${escapeHtml(e.content)}</div>` : ''}
+                ${photoHtml}
+            </div>
+        </div>`
+    }).join('')
+}
+
+window.openMoodDiaryModal = function(editEntry) {
+    window._moodPhotoData = editEntry && editEntry.photo_id ? { id: editEntry.photo_id, storage_path: editEntry.photo_storage_path || '', name: editEntry.photo_name || '' } : null
+    const previewHtml = window._moodPhotoData ? `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;">
+            <img src="${getPhotoUrl(window._moodPhotoData.storage_path)}" style="width:60px;height:45px;object-fit:cover;border-radius:4px;">
+            <div>
+                <div style="font-size:13px;">${escapeHtml(window._moodPhotoData.name || '')}</div>
+                <button type="button" onclick="window.clearMoodPhoto()" style="background:none;border:none;color:#dc3545;cursor:pointer;font-size:12px;padding:0;">✕ 移除</button>
+            </div>
+        </div>` : ''
+
+    const modal = document.createElement('div')
+    modal.className = 'modal active'
+    modal.id = 'moodDiaryModal'
+    modal.innerHTML = `
+        <div class="modal-content modal-small" style="padding:24px;">
+            <span class="modal-close" onclick="document.getElementById('moodDiaryModal').remove()">&times;</span>
+            <h3>${editEntry ? '编辑心情' : '记录心情'}</h3>
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-size:14px;margin-bottom:8px;">选择心情</label>
+                <div class="mood-picker">
+                    ${MOOD_EMOJIS.map(m => `<button type="button" class="mood-btn${(editEntry && editEntry.mood === m) ? ' selected' : ''}" onclick="window.selectMood('${m}')">${m}</button>`).join('')}
+                </div>
+            </div>
+            <div class="form-group">
+                <label>内容</label>
+                <textarea id="moodDiaryContent" rows="3" placeholder="今天发生了什么...">${editEntry ? escapeHtml(editEntry.content || '') : ''}</textarea>
+            </div>
+            <div class="form-group">
+                <label>关联照片（可选）</label>
+                ${previewHtml}
+                <button type="button" class="btn btn-secondary" onclick="window.openPhotoPicker(window.onMoodPhotoPicked)">📷 选择照片</button>
+            </div>
+            <input type="hidden" id="moodDiaryPhotoId" value="${editEntry ? (editEntry.photo_id || '') : ''}">
+            <input type="hidden" id="moodDiaryMood" value="${editEntry ? (editEntry.mood || '') : ''}">
+            <button class="btn btn-primary" onclick="${editEntry ? "window.saveMoodDiary('" + editEntry.id + "')" : "window.saveMoodDiary()"}" style="width:100%;">保存</button>
+        </div>
+    `
+    document.body.appendChild(modal)
+}
+
+window.selectMood = function(mood) {
+    document.getElementById('moodDiaryMood').value = mood
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.toggle('selected', b.textContent === mood))
+}
+
+window.clearMoodPhoto = function() {
+    window._moodPhotoData = null
+    document.getElementById('moodDiaryPhotoId').value = ''
+    const preview = document.querySelector('#moodDiaryModal .form-group:nth-of-type(2)')
+    if (preview) {
+        const existing = preview.querySelector('div[style]')
+        if (existing) existing.remove()
+    }
+}
+
+window.onMoodPhotoPicked = function(photo) {
+    window._moodPhotoData = photo
+    document.getElementById('moodDiaryPhotoId').value = photo.id
+    // Refresh the modal to show the picked photo
+    const mood = document.getElementById('moodDiaryMood').value
+    const content = document.getElementById('moodDiaryContent').value
+    const editId = window._editingMoodId
+    document.getElementById('moodDiaryModal').remove()
+    if (editId) {
+        window.openMoodDiaryModal({ id: editId, mood, content, photo_id: photo.id, photo_storage_path: photo.storage_path, photo_name: photo.name })
+        window._editingMoodId = editId
+    } else {
+        window.openMoodDiaryModal({ mood, content, photo_id: photo.id, photo_storage_path: photo.storage_path, photo_name: photo.name })
+    }
+}
+
+window.saveMoodDiary = async function(editId) {
+    const mood = document.getElementById('moodDiaryMood').value
+    const content = document.getElementById('moodDiaryContent').value.trim()
+    const photoId = document.getElementById('moodDiaryPhotoId').value.trim() || null
+    if (!mood) { alert('请选择一个心情'); return }
+
+    const row = {
+        user_name: getStoredSession()?.username || '用户',
+        mood,
+        content,
+        photo_id: photoId || null
+    }
+
+    try {
+        if (editId) {
+            await supabase.from('mood_diary').update(row).eq('id', editId)
+        } else {
+            await supabase.from('mood_diary').insert(row)
+        }
+        document.getElementById('moodDiaryModal').remove()
+        loadMoodDiary()
+    } catch (e) {
+        alert('保存失败: ' + e.message)
+    }
+}
+
+// ========================================
+// 每日叨叨
+// ========================================
+
+function getRelativeTime(dateStr) {
+    const now = new Date()
+    const date = new Date(dateStr)
+    const diff = now - date
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return '刚刚'
+    if (mins < 60) return `${mins}分钟前`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours}小时前`
+    const days = Math.floor(hours / 24)
+    if (days < 7) return `${days}天前`
+    const weeks = Math.floor(days / 7)
+    if (weeks < 4) return `${weeks}周前`
+    const months = Math.floor(days / 30)
+    if (months < 12) return `${months}个月前`
+    const years = Math.floor(days / 365)
+    return `${years}年前`
+}
+
+async function loadDailyChatter() {
+    try {
+        const { data } = await supabase.from('daily_chatter').select('*, photos(id,storage_path,name)').order('created_at', { ascending: false })
+        dailyChatterEntries = (data || []).map(e => ({
+            ...e,
+            photo_storage_path: e.photos?.storage_path || '',
+            photo_name: e.photos?.name || ''
+        }))
+    } catch (e) { dailyChatterEntries = [] }
+    renderDailyChatter()
+}
+
+function renderDailyChatter() {
+    const container = document.getElementById('dailyChatterList')
+    if (!container) return
+    if (dailyChatterEntries.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>💬 还没有动态</p><small>点击"发布动态"说说心里话吧</small></div>'
+        return
+    }
+    container.innerHTML = dailyChatterEntries.map(e => {
+        const avatar = e.user_name ? e.user_name.charAt(0).toUpperCase() : '?'
+        const photoHtml = e.photo_id ? `<div class="timeline-photo" onclick="window.openPhotoModal('${e.photo_id}')"><img src="${getPhotoUrl(e.photo_storage_path || '')}" onerror="this.style.display='none'"></div>` : ''
+        const relTime = getRelativeTime(e.created_at)
+        return `<div class="timeline-item">
+            <div class="timeline-avatar chatter-avatar">${avatar}</div>
+            <div class="timeline-body">
+                <div class="timeline-header">
+                    <span class="timeline-user">${escapeHtml(e.user_name)}</span>
+                    <span class="timeline-time">${relTime}</span>
+                </div>
+                <div class="timeline-content">${escapeHtml(e.content)}</div>
+                ${photoHtml}
+            </div>
+        </div>`
+    }).join('')
+}
+
+window.openDailyChatterModal = function() {
+    window._chatterPhotoData = null
+    const modal = document.createElement('div')
+    modal.className = 'modal active'
+    modal.id = 'dailyChatterModal'
+    modal.innerHTML = `
+        <div class="modal-content modal-small" style="padding:24px;">
+            <span class="modal-close" onclick="document.getElementById('dailyChatterModal').remove()">&times;</span>
+            <h3>发布动态</h3>
+            <div class="form-group">
+                <textarea id="dailyChatterContent" rows="4" placeholder="今天想说什么..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>关联照片（可选）</label>
+                <div id="dailyChatterPhotoPreview"></div>
+                <button type="button" class="btn btn-secondary" onclick="window.openPhotoPicker(window.onChatterPhotoPicked)">📷 选择照片</button>
+            </div>
+            <input type="hidden" id="dailyChatterPhotoId" value="">
+            <button class="btn btn-primary" onclick="window.saveDailyChatter()" style="width:100%;">发布</button>
+        </div>
+    `
+    document.body.appendChild(modal)
+}
+
+window.onChatterPhotoPicked = function(photo) {
+    window._chatterPhotoData = photo
+    document.getElementById('dailyChatterPhotoId').value = photo.id
+    document.getElementById('dailyChatterPhotoPreview').innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;">
+            <img src="${getPhotoUrl(photo.storage_path)}" style="width:60px;height:45px;object-fit:cover;border-radius:4px;">
+            <div style="flex:1;">
+                <div style="font-size:13px;">${escapeHtml(photo.name || '')}</div>
+                <button type="button" onclick="window.clearChatterPhoto()" style="background:none;border:none;color:#dc3545;cursor:pointer;font-size:12px;padding:0;">✕ 移除</button>
+            </div>
+        </div>`
+}
+
+window.clearChatterPhoto = function() {
+    window._chatterPhotoData = null
+    document.getElementById('dailyChatterPhotoId').value = ''
+    document.getElementById('dailyChatterPhotoPreview').innerHTML = ''
+}
+
+window.saveDailyChatter = async function() {
+    const content = document.getElementById('dailyChatterContent').value.trim()
+    const photoId = document.getElementById('dailyChatterPhotoId').value.trim() || null
+    if (!content) { alert('请输入内容'); return }
+
+    try {
+        await supabase.from('daily_chatter').insert({
+            user_name: getStoredSession()?.username || '用户',
+            content,
+            photo_id: photoId || null
+        })
+        document.getElementById('dailyChatterModal').remove()
+        loadDailyChatter()
+    } catch (e) {
+        alert('发布失败: ' + e.message)
+    }
+}
+
+// ========================================
 // 通用照片选择器
 // ========================================
 
@@ -3958,6 +4446,484 @@ window.pickGenericPhoto = function(id, storagePath, name) {
     }
     document.getElementById('genericPhotoPicker').remove();
 };
+
+// ========================================
+// 情侣打卡
+// ========================================
+
+async function loadCoupleTasks() {
+    try {
+        const { data: tasks } = await supabase.from('couple_tasks').select('*').order('sort_order', { ascending: true })
+        coupleTasks = tasks || []
+        const { data: checkins } = await supabase.from('couple_checkins').select('*, photos(id,storage_path,name)').order('checked_at', { ascending: false })
+        coupleCheckins = (checkins || []).map(c => ({
+            ...c,
+            photo_storage_path: c.photos?.storage_path || '',
+            photo_name: c.photos?.name || ''
+        }))
+    } catch (e) {
+        coupleTasks = []
+        coupleCheckins = []
+    }
+    renderCoupleTasks()
+}
+
+function renderCoupleTasks() {
+    const container = document.getElementById('coupleTasksList')
+    if (!container) return
+
+    const filtered = currentTaskTab === 'wishes' ? coupleTasks.filter(t => t.category === 'wish') : coupleTasks.filter(t => t.category !== 'wish')
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>✅ 还没有' + (currentTaskTab === 'wishes' ? '愿望' : '任务') + '</p><small>点击上方按钮添加</small></div>'
+        return
+    }
+
+    container.innerHTML = filtered.map(task => {
+        const taskCheckins = coupleCheckins.filter(c => c.task_id == task.id)
+        const lastCheckin = taskCheckins[0]
+        const checkinCount = taskCheckins.length
+        const isWish = task.category === 'wish'
+        const completed = isWish && checkinCount > 0
+
+        return `<div class="task-card${completed ? ' completed' : ''}">
+            <div class="task-card-header">
+                <h3 class="task-title">${escapeHtml(task.title)}</h3>
+                <span class="task-checkin-badge">${checkinCount}次打卡</span>
+            </div>
+            ${task.description ? `<p class="task-desc">${escapeHtml(task.description)}</p>` : ''}
+            <div class="task-card-footer">
+                ${lastCheckin ? `<span class="task-last-checkin">最近: ${escapeHtml(lastCheckin.user_name)} ${new Date(lastCheckin.checked_at).toLocaleDateString('zh-CN')}</span>` : '<span class="task-last-checkin">还没有打卡记录</span>'}
+                ${completed
+                    ? '<span class="task-done-badge">已完成 ✅</span>'
+                    : `<button class="btn btn-primary btn-sm" onclick="window.openCheckinModal(${task.id})">打卡</button>`
+                }
+            </div>
+        </div>`
+    }).join('')
+}
+
+window.switchTaskTab = function(tab) {
+    currentTaskTab = tab
+    document.getElementById('taskTabBtn_tasks').classList.toggle('active', tab === 'tasks')
+    document.getElementById('taskTabBtn_wishes').classList.toggle('active', tab === 'wishes')
+    renderCoupleTasks()
+}
+
+window.openAddTaskModal = function() {
+    const modal = document.createElement('div')
+    modal.className = 'modal active'
+    modal.id = 'addTaskModal'
+    modal.innerHTML = `
+        <div class="modal-content modal-small" style="padding:24px;">
+            <span class="modal-close" onclick="document.getElementById('addTaskModal').remove()">&times;</span>
+            <h3>添加${currentTaskTab === 'wishes' ? '愿望' : '任务'}</h3>
+            <div class="form-group">
+                <label>标题</label>
+                <input type="text" id="newTaskTitle" placeholder="输入标题...">
+            </div>
+            <div class="form-group">
+                <label>描述</label>
+                <textarea id="newTaskDesc" rows="2" placeholder="可选描述..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>类型</label>
+                <select id="newTaskCategory" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;">
+                    <option value="general" ${currentTaskTab !== 'wishes' ? 'selected' : ''}>日常</option>
+                    <option value="date">约会</option>
+                    <option value="travel">旅行</option>
+                    <option value="wish" ${currentTaskTab === 'wishes' ? 'selected' : ''}>愿望</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="window.saveNewTask()" style="width:100%;">保存</button>
+        </div>
+    `
+    document.body.appendChild(modal)
+}
+
+window.saveNewTask = async function() {
+    const title = document.getElementById('newTaskTitle').value.trim()
+    const description = document.getElementById('newTaskDesc').value.trim()
+    const category = document.getElementById('newTaskCategory').value
+    if (!title) { alert('请输入标题'); return }
+
+    try {
+        const maxOrder = coupleTasks.reduce((max, t) => Math.max(max, t.sort_order || 0), 0)
+        await supabase.from('couple_tasks').insert({
+            title, description, category, sort_order: maxOrder + 1
+        })
+        document.getElementById('addTaskModal').remove()
+        loadCoupleTasks()
+    } catch (e) {
+        alert('添加失败: ' + e.message)
+    }
+}
+
+window.openCheckinModal = function(taskId) {
+    const task = coupleTasks.find(t => t.id == taskId)
+    if (!task) return
+
+    window._checkinPhotoData = null
+
+    const modal = document.createElement('div')
+    modal.className = 'modal active'
+    modal.id = 'checkinModal'
+    modal.innerHTML = `
+        <div class="modal-content modal-small" style="padding:24px;">
+            <span class="modal-close" onclick="document.getElementById('checkinModal').remove()">&times;</span>
+            <h3>打卡: ${escapeHtml(task.title)}</h3>
+            <div class="form-group">
+                <label>备注（可选）</label>
+                <textarea id="checkinNote" rows="2" placeholder="写下今天的感受..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>关联照片（可选）</label>
+                <div id="checkinPhotoPreview"></div>
+                <button type="button" class="btn btn-secondary" onclick="window.openPhotoPicker(window.onCheckinPhotoPicked)">📷 选择照片</button>
+            </div>
+            <input type="hidden" id="checkinPhotoId" value="">
+            <button class="btn btn-primary" onclick="window.saveCheckin(${taskId})" style="width:100%;">确认打卡</button>
+        </div>
+    `
+    document.body.appendChild(modal)
+}
+
+window.onCheckinPhotoPicked = function(photo) {
+    window._checkinPhotoData = photo
+    document.getElementById('checkinPhotoId').value = photo.id
+    document.getElementById('checkinPhotoPreview').innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;">
+            <img src="${getPhotoUrl(photo.storage_path)}" style="width:60px;height:45px;object-fit:cover;border-radius:4px;">
+            <div style="flex:1;">
+                <div style="font-size:13px;">${escapeHtml(photo.name || '')}</div>
+                <button type="button" onclick="window.clearCheckinPhoto()" style="background:none;border:none;color:#dc3545;cursor:pointer;font-size:12px;padding:0;">✕ 移除</button>
+            </div>
+        </div>`
+}
+
+window.clearCheckinPhoto = function() {
+    window._checkinPhotoData = null
+    document.getElementById('checkinPhotoId').value = ''
+    document.getElementById('checkinPhotoPreview').innerHTML = ''
+}
+
+window.saveCheckin = async function(taskId) {
+    const note = document.getElementById('checkinNote').value.trim()
+    const photoId = document.getElementById('checkinPhotoId').value.trim() || null
+
+    try {
+        await supabase.from('couple_checkins').insert({
+            task_id: parseInt(taskId),
+            user_name: getStoredSession()?.username || '用户',
+            note,
+            photo_id: photoId || null
+        })
+        document.getElementById('checkinModal').remove()
+        loadCoupleTasks()
+    } catch (e) {
+        alert('打卡失败: ' + e.message)
+    }
+}
+
+// ========================================
+// 亲密记录
+// ========================================
+
+async function getIntimatePassword() {
+    try {
+        const { data } = await supabase.from('app_settings').select('value').eq('key', 'intimate_password').single()
+        return data?.value || null
+    } catch (e) { return null }
+}
+
+async function setIntimatePassword(password) {
+    try {
+        await supabase.from('app_settings').upsert({ key: 'intimate_password', value: password })
+        return true
+    } catch (e) { return false }
+}
+
+function checkIntimateLock() {
+    const lockScreen = document.getElementById('intimateLockScreen')
+    const content = document.getElementById('intimateContent')
+    if (!lockScreen || !content) return
+
+    // Check localStorage unlock state
+    const unlockData = localStorage.getItem(INTIMATE_STORAGE_KEY)
+    if (unlockData) {
+        try {
+            const parsed = JSON.parse(unlockData)
+            if (parsed.expiresAt && Date.now() < parsed.expiresAt) {
+                lockScreen.style.display = 'none'
+                content.style.display = 'block'
+                intimateUnlocked = true
+                loadIntimateRecords()
+                return
+            }
+        } catch (e) { /* invalid, continue to lock */ }
+    }
+
+    // Check if password is set
+    getIntimatePassword().then(pwd => {
+        if (pwd) {
+            lockScreen.style.display = 'flex'
+            content.style.display = 'none'
+            document.getElementById('intimateLockTitle').textContent = '输入密码'
+            document.getElementById('intimateLockHint').textContent = '请输入密码解锁'
+            document.getElementById('intimatePasswordInput').value = ''
+            document.getElementById('intimateLockError').textContent = ''
+        } else {
+            lockScreen.style.display = 'flex'
+            content.style.display = 'none'
+            document.getElementById('intimateLockTitle').textContent = '设置密码'
+            document.getElementById('intimateLockHint').textContent = '首次使用，请设置一个密码'
+            document.getElementById('intimatePasswordInput').value = ''
+            document.getElementById('intimateLockError').textContent = ''
+        }
+    })
+}
+
+window.handleIntimatePassword = async function() {
+    const input = document.getElementById('intimatePasswordInput').value.trim()
+    if (!input) { document.getElementById('intimateLockError').textContent = '请输入密码'; return }
+
+    const existingPwd = await getIntimatePassword()
+
+    if (!existingPwd) {
+        // First time - set password
+        const ok = await setIntimatePassword(input)
+        if (!ok) { document.getElementById('intimateLockError').textContent = '设置失败'; return }
+        unlockIntimateContent()
+    } else if (input === existingPwd) {
+        unlockIntimateContent()
+    } else {
+        document.getElementById('intimateLockError').textContent = '密码错误'
+    }
+}
+
+function unlockIntimateContent() {
+    intimateUnlocked = true
+    document.getElementById('intimateLockScreen').style.display = 'none'
+    document.getElementById('intimateContent').style.display = 'block'
+    const expiresAt = Date.now() + 30 * 60 * 1000 // 30 minutes
+    localStorage.setItem(INTIMATE_STORAGE_KEY, JSON.stringify({ expiresAt }))
+    loadIntimateRecords()
+}
+
+window.lockIntimate = function() {
+    intimateUnlocked = false
+    localStorage.removeItem(INTIMATE_STORAGE_KEY)
+    document.getElementById('intimateLockScreen').style.display = 'flex'
+    document.getElementById('intimateContent').style.display = 'none'
+    document.getElementById('intimatePasswordInput').value = ''
+    document.getElementById('intimateLockError').textContent = ''
+}
+
+async function loadIntimateRecords() {
+    if (!intimateUnlocked) return
+    try {
+        const { data } = await supabase.from('intimate_records').select('*, photos(id,storage_path,name)').order('record_date', { ascending: false })
+        intimateRecords = (data || []).map(e => ({
+            ...e,
+            photo_storage_path: e.photos?.storage_path || '',
+            photo_name: e.photos?.name || ''
+        }))
+    } catch (e) { intimateRecords = [] }
+    renderIntimateRecords()
+}
+
+function renderIntimateRecords() {
+    const container = document.getElementById('intimateRecordsList')
+    if (!container) return
+    if (intimateRecords.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>🔒 还没有记录</p><small>点击"添加记录"开始记录私密时刻</small></div>'
+        return
+    }
+    container.innerHTML = intimateRecords.map(e => {
+        const photoHtml = e.photo_id ? `<div class="timeline-photo" onclick="window.openPhotoModal('${e.photo_id}')"><img src="${getPhotoUrl(e.photo_storage_path || '')}" onerror="this.style.display='none'"></div>` : ''
+        const dateStr = e.record_date ? new Date(e.record_date).toLocaleDateString('zh-CN') : ''
+        return `<div class="timeline-item">
+            <div class="timeline-avatar">${e.mood || '💕'}</div>
+            <div class="timeline-body">
+                <div class="timeline-header">
+                    <span class="timeline-user">${escapeHtml(e.user_name)}</span>
+                    <span class="timeline-time">${dateStr}</span>
+                </div>
+                ${e.notes ? `<div class="timeline-content">${escapeHtml(e.notes)}</div>` : ''}
+                ${photoHtml}
+            </div>
+        </div>`
+    }).join('')
+}
+
+window.openIntimateRecordModal = function() {
+    window._intimatePhotoData = null
+
+    const modal = document.createElement('div')
+    modal.className = 'modal active'
+    modal.id = 'intimateRecordModal'
+    modal.innerHTML = `
+        <div class="modal-content modal-small" style="padding:24px;">
+            <span class="modal-close" onclick="document.getElementById('intimateRecordModal').remove()">&times;</span>
+            <h3>添加亲密记录</h3>
+            <div class="form-group">
+                <label>日期</label>
+                <input type="date" id="intimateRecordDate" value="${new Date().toISOString().split('T')[0]}">
+            </div>
+            <div class="form-group">
+                <label>心情</label>
+                <div class="mood-picker">
+                    ${MOOD_EMOJIS.map(m => `<button type="button" class="mood-btn" onclick="window.selectIntimateMood('${m}')">${m}</button>`).join('')}
+                </div>
+            </div>
+            <input type="hidden" id="intimateRecordMood" value="">
+            <div class="form-group">
+                <label>备注</label>
+                <textarea id="intimateRecordNotes" rows="3" placeholder="记录今天的特别时刻..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>关联照片（可选）</label>
+                <div id="intimatePhotoPreview"></div>
+                <button type="button" class="btn btn-secondary" onclick="window.openPhotoPicker(window.onIntimatePhotoPicked)">📷 选择照片</button>
+            </div>
+            <input type="hidden" id="intimateRecordPhotoId" value="">
+            <button class="btn btn-primary" onclick="window.saveIntimateRecord()" style="width:100%;">保存</button>
+        </div>
+    `
+    document.body.appendChild(modal)
+}
+
+window.selectIntimateMood = function(mood) {
+    document.getElementById('intimateRecordMood').value = mood
+    document.querySelectorAll('#intimateRecordModal .mood-btn').forEach(b => b.classList.toggle('selected', b.textContent === mood))
+}
+
+window.onIntimatePhotoPicked = function(photo) {
+    window._intimatePhotoData = photo
+    document.getElementById('intimateRecordPhotoId').value = photo.id
+    document.getElementById('intimatePhotoPreview').innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;margin-bottom:8px;">
+            <img src="${getPhotoUrl(photo.storage_path)}" style="width:60px;height:45px;object-fit:cover;border-radius:4px;">
+            <div style="flex:1;">
+                <div style="font-size:13px;">${escapeHtml(photo.name || '')}</div>
+                <button type="button" onclick="window.clearIntimatePhoto()" style="background:none;border:none;color:#dc3545;cursor:pointer;font-size:12px;padding:0;">✕ 移除</button>
+            </div>
+        </div>`
+}
+
+window.clearIntimatePhoto = function() {
+    window._intimatePhotoData = null
+    document.getElementById('intimateRecordPhotoId').value = ''
+    document.getElementById('intimatePhotoPreview').innerHTML = ''
+}
+
+window.saveIntimateRecord = async function() {
+    const recordDate = document.getElementById('intimateRecordDate').value
+    const mood = document.getElementById('intimateRecordMood').value
+    const notes = document.getElementById('intimateRecordNotes').value.trim()
+    const photoId = document.getElementById('intimateRecordPhotoId').value.trim() || null
+    if (!recordDate) { alert('请选择日期'); return }
+
+    try {
+        await supabase.from('intimate_records').insert({
+            user_name: getStoredSession()?.username || '用户',
+            record_date: recordDate,
+            mood,
+            notes,
+            photo_id: photoId || null
+        })
+        document.getElementById('intimateRecordModal').remove()
+        loadIntimateRecords()
+    } catch (e) {
+        alert('保存失败: ' + e.message)
+    }
+}
+
+window.showIntimateStats = function() {
+    if (intimateRecords.length === 0) {
+        alert('还没有记录')
+        return
+    }
+
+    // Build stats
+    const total = intimateRecords.length
+    const dates = intimateRecords.map(r => new Date(r.record_date))
+    const minDate = new Date(Math.min(...dates))
+    const maxDate = new Date(Math.max(...dates))
+    const monthsDiff = (maxDate.getFullYear() - minDate.getFullYear()) * 12 + (maxDate.getMonth() - minDate.getMonth()) + 1
+    const monthlyAvg = monthsDiff > 0 ? (total / monthsDiff).toFixed(1) : total
+
+    // Monthly counts for bar chart
+    const monthCounts = {}
+    intimateRecords.forEach(r => {
+        const d = new Date(r.record_date)
+        const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+        monthCounts[key] = (monthCounts[key] || 0) + 1
+    })
+    const sortedMonths = Object.keys(monthCounts).sort().slice(-12)
+    const maxCount = Math.max(...Object.values(monthCounts), 1)
+
+    const barsHtml = sortedMonths.map(m => {
+        const count = monthCounts[m] || 0
+        const height = (count / maxCount * 100).toFixed(0)
+        return `<div class="stat-bar-col">
+            <div class="stat-bar" style="height:${height}%"></div>
+            <div class="stat-bar-value">${count}</div>
+            <div class="stat-bar-label">${m}</div>
+        </div>`
+    }).join('')
+
+    document.getElementById('intimateRecordsList').innerHTML = `
+        <div class="intimate-stats">
+            <div class="stat-cards">
+                <div class="stat-card">
+                    <div class="stat-card-value">${total}</div>
+                    <div class="stat-card-label">总次数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-value">${monthlyAvg}</div>
+                    <div class="stat-card-label">月均</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-value">${monthsDiff}</div>
+                    <div class="stat-card-label">跨度(月)</div>
+                </div>
+            </div>
+            <h4 style="margin:16px 0 8px 0;">月度趋势</h4>
+            <div class="stat-bar-chart">${barsHtml}</div>
+            <button class="btn btn-secondary" onclick="renderIntimateRecords()" style="margin-top:16px;width:100%;">← 返回记录列表</button>
+        </div>`
+}
+
+// ========================================
+// 纪念日升级: 经期记录
+// ========================================
+
+let periodRecords = []
+
+async function loadPeriodRecords() {
+    try {
+        const { data } = await supabase.from('period_records').select('*').order('start_date', { ascending: false })
+        periodRecords = data || []
+    } catch (e) { periodRecords = [] }
+}
+
+function predictNextPeriod() {
+    if (periodRecords.length < 2) return null
+    const sorted = [...periodRecords].sort((a, b) => new Date(b.start_date) - new Date(a.start_date))
+    const cycles = []
+    for (let i = 0; i < sorted.length - 1 && i < 3; i++) {
+        const curr = new Date(sorted[i].start_date)
+        const prev = new Date(sorted[i + 1].start_date)
+        const diffDays = Math.round((curr - prev) / (1000 * 60 * 60 * 24))
+        if (diffDays > 0 && diffDays < 60) cycles.push(diffDays)
+    }
+    if (cycles.length === 0) return null
+    const avgCycle = Math.round(cycles.reduce((a, b) => a + b, 0) / cycles.length)
+    const lastStart = new Date(sorted[0].start_date)
+    const predicted = new Date(lastStart.getTime() + avgCycle * 24 * 60 * 60 * 1000)
+    return { date: predicted.toISOString().split('T')[0], avgCycle }
+}
 
 // Helper: get photo category names
 function getPhotoCategoryNames(photoId) {

@@ -86,6 +86,26 @@
                 <span class="nav-text">足迹护照</span>
             </div>
             <div class="nav-divider"></div>
+            <div class="nav-section" onclick="window.toggleSection('moodDiary')">
+                <span class="nav-icon">📝</span>
+                <span class="nav-text">心情日记</span>
+            </div>
+            <div class="nav-divider"></div>
+            <div class="nav-section" onclick="window.toggleSection('dailyChatter')">
+                <span class="nav-icon">💬</span>
+                <span class="nav-text">每日叨叨</span>
+            </div>
+            <div class="nav-divider"></div>
+            <div class="nav-section" onclick="window.toggleSection('intimateRecords')">
+                <span class="nav-icon">🔒</span>
+                <span class="nav-text">亲密记录</span>
+            </div>
+            <div class="nav-divider"></div>
+            <div class="nav-section" onclick="window.toggleSection('coupleTasks')">
+                <span class="nav-icon">✅</span>
+                <span class="nav-text">情侣打卡</span>
+            </div>
+            <div class="nav-divider"></div>
             <div class="nav-section" onclick="window.refreshData()">
                 <span class="nav-icon">🔄</span>
                 <span class="nav-text">刷新</span>
@@ -168,10 +188,12 @@
                            style="padding:6px 12px;border:none;border-radius:8px;font-size:14px;">
                 </div>
             </div>
+            <div id="countdownContainer"></div>
             <div id="timelineContainer" class="timeline-container"></div>
             <div style="text-align:center;margin-top:16px;">
                 <button class="btn btn-primary" onclick="window.openAddMilestoneModal()">+ 添加纪念日</button>
             </div>
+            <div id="periodSection"></div>
         </section>
 
         <!-- 照片拼贴墙 -->
@@ -253,6 +275,60 @@
                 <p>🗺️ 还没有足迹记录</p>
                 <small>上传照片时添加地点信息，就会在这里生成你的足迹护照</small>
             </div>
+        </section>
+
+        <!-- 心情日记 -->
+        <section class="feature-section" id="moodDiarySection" style="display:none;">
+            <h2>📝 心情日记</h2>
+            <div class="feature-toolbar">
+                <button class="btn btn-primary" onclick="window.openMoodDiaryModal()">+ 记录心情</button>
+            </div>
+            <div id="moodDiaryList" class="timeline-list"></div>
+        </section>
+
+        <!-- 每日叨叨 -->
+        <section class="feature-section" id="dailyChatterSection" style="display:none;">
+            <h2>💬 每日叨叨</h2>
+            <div class="feature-toolbar">
+                <button class="btn btn-primary" onclick="window.openDailyChatterModal()">+ 发布动态</button>
+            </div>
+            <div id="dailyChatterList" class="timeline-list"></div>
+        </section>
+
+        <!-- 亲密记录 -->
+        <section class="feature-section" id="intimateRecordsSection" style="display:none;">
+            <h2>🔒 亲密记录</h2>
+            <div id="intimateLockScreen" class="lock-screen">
+                <div class="lock-screen-box">
+                    <div class="lock-icon">🔐</div>
+                    <h3 id="intimateLockTitle">设置密码</h3>
+                    <p class="lock-hint" id="intimateLockHint">首次使用，请设置一个密码</p>
+                    <input type="password" id="intimatePasswordInput" class="lock-input" placeholder="输入密码">
+                    <button class="btn btn-primary lock-btn" onclick="window.handleIntimatePassword()">确认</button>
+                    <p id="intimateLockError" class="lock-error"></p>
+                </div>
+            </div>
+            <div id="intimateContent" style="display:none;">
+                <div class="feature-toolbar">
+                    <button class="btn btn-primary" onclick="window.openIntimateRecordModal()">+ 添加记录</button>
+                    <button class="btn btn-secondary" onclick="window.showIntimateStats()">📊 统计</button>
+                    <button class="btn btn-secondary" onclick="window.lockIntimate()">🔒 锁定</button>
+                </div>
+                <div id="intimateRecordsList" class="timeline-list"></div>
+            </div>
+        </section>
+
+        <!-- 情侣打卡 -->
+        <section class="feature-section" id="coupleTasksSection" style="display:none;">
+            <h2>✅ 情侣打卡</h2>
+            <div class="feature-tabs">
+                <button class="feature-tab active" id="taskTabBtn_tasks" onclick="window.switchTaskTab('tasks')">任务列表</button>
+                <button class="feature-tab" id="taskTabBtn_wishes" onclick="window.switchTaskTab('wishes')">愿望清单</button>
+            </div>
+            <div class="feature-toolbar">
+                <button class="btn btn-primary" onclick="window.openAddTaskModal()">+ 添加任务/愿望</button>
+            </div>
+            <div id="coupleTasksList"></div>
         </section>
 
         <button onclick="window.handleLogout()" class="btn btn-secondary" style="position:fixed;top:20px;right:20px;z-index:100;">退出登录</button>
@@ -401,6 +477,6 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="app.js?v=25"></script>
+    <script type="module" src="app.js?v=27"></script>
 </body>
 </html>
