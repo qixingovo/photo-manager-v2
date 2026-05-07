@@ -2704,7 +2704,6 @@ window.generateCollage = async function() {
         const url = getPhotoUrl(photo.storage_path);
         try {
             const img = new Image();
-            img.crossOrigin = 'anonymous';
             await new Promise((resolve, reject) => {
                 img.onload = resolve;
                 img.onerror = reject;
