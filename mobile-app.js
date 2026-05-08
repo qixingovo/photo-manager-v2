@@ -20,6 +20,7 @@ const mobile = {
     selectedPhotos: new Set(),
     currentPhotoId: null,
     _detailTouchX: 0,
+    _timelinePage: 1,
     previewFiles: [],
     pendingDeleteId: null,
     pendingDeleteType: null,
@@ -3512,6 +3513,7 @@ const mobile = {
     },
 
     async initTimeline() {
+        this._timelinePage = 1;
         await this.loadMilestones();
         const startInput = document.getElementById('mobileStartDateInput');
         if (startInput) startInput.value = this.anniversaryStartDate;
@@ -3544,8 +3546,10 @@ const mobile = {
         if (!container) return;
 
         const sorted = [...this.anniversaryMilestones].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const visible = sorted.slice(0, this._timelinePage * 10);
+        const hasMore = sorted.length > visible.length;
 
-        container.innerHTML = sorted.map(m => {
+        container.innerHTML = visible.map(m => {
             const milestoneDate = new Date(m.date);
             const today = new Date();
             const diffDays = Math.floor((today - milestoneDate) / (1000 * 60 * 60 * 24));
@@ -3593,6 +3597,20 @@ const mobile = {
                 </div>
             `;
         }).join('');
+
+        if (hasMore) {
+            container.innerHTML += `
+                <div style="text-align:center;padding:16px 0;">
+                    <button class="btn-secondary" onclick="mobile.loadMoreTimeline()" style="font-size:13px;padding:8px 28px;border-radius:20px;">
+                        加载更多 (${visible.length}/${sorted.length})
+                    </button>
+                </div>`;
+        }
+    },
+
+    loadMoreTimeline() {
+        this._timelinePage++;
+        this.renderTimeline();
     },
 
     buildMobileCategoryOptions(selectedId) {

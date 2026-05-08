@@ -41,6 +41,10 @@ let passportSortByPhotoCount = true
 let passportData = []
 let passportAllPhotos = []
 
+// 时间线分页
+const TIMELINE_PAGE_SIZE = 10
+let _timelinePage = 1
+
 // 情侣功能状态
 let moodDiaryEntries = []
 let dailyChatterEntries = []
@@ -2409,6 +2413,7 @@ function updateDaysCounter() {
 }
 
 async function initTimeline() {
+    _timelinePage = 1;
     await loadMilestones();
     await loadPeriodRecords();
     const startInput = document.getElementById('startDateInput');
@@ -2551,66 +2556,84 @@ window.updateStartDate = async function() {
     updateDaysCounter();
 };
 
+function renderSingleMilestone(m, i) {
+    const milestoneDate = new Date(m.date);
+    const today = new Date();
+    const diffDays = Math.floor((today - milestoneDate) / (1000 * 60 * 60 * 24));
+    const years = Math.floor(diffDays / 365);
+    const remainDays = diffDays % 365;
+
+    const side = i % 2 === 0 ? 'left' : 'right';
+
+    let catHtml = '';
+    if (m.categoryId) {
+        catHtml = `<div style="margin-top:8px;">
+            <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px;"
+                onclick="window.goToCategory('${m.categoryId}')">📁 ${escapeHtml(m.categoryName || '查看分类')}</button>
+        </div>`;
+    }
+
+    let photoHtml = '';
+    if (m.photoId) {
+        const photoUrl = m.photoPath ? getPhotoUrl(m.photoPath) : '';
+        if (photoUrl) {
+            photoHtml = `<img src="${photoUrl}"
+                style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:8px;cursor:pointer;"
+                onclick="window.openPhotoModal('${m.photoId}')"
+                onerror="this.style.display='none'">`;
+        }
+    }
+
+    let timeAgo = '';
+    if (years > 0) timeAgo += years + '年';
+    if (remainDays > 0 || years === 0) timeAgo += remainDays + '天';
+    timeAgo += '前';
+
+    return `
+        <div class="timeline-item timeline-${side}">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+                <div class="timeline-date">${m.date}</div>
+                <h3>${escapeHtml(m.title)}</h3>
+                ${m.description ? '<p>' + escapeHtml(m.description) + '</p>' : ''}
+                <small style="color:#999;">${timeAgo}</small>
+                ${catHtml}
+                ${photoHtml}
+                <div class="milestone-actions" style="margin-top:8px;display:flex;gap:8px;">
+                    <button class="btn btn-secondary" style="font-size:11px;padding:4px 8px;"
+                        onclick="window.openEditMilestoneModal('${m.id}')">✏️</button>
+                    <button class="btn-danger" style="font-size:11px;padding:4px 8px;"
+                        onclick="window.deleteMilestone('${m.id}')">🗑️</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
 function renderTimeline() {
     const container = document.getElementById('timelineContainer');
     if (!container) return;
 
     const sorted = [...anniversaryMilestones].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const visible = sorted.slice(0, _timelinePage * TIMELINE_PAGE_SIZE);
+    const hasMore = sorted.length > visible.length;
 
-    container.innerHTML = sorted.map((m, i) => {
-        const milestoneDate = new Date(m.date);
-        const today = new Date();
-        const diffDays = Math.floor((today - milestoneDate) / (1000 * 60 * 60 * 24));
-        const years = Math.floor(diffDays / 365);
-        const remainDays = diffDays % 365;
+    container.innerHTML = visible.map((m, i) => renderSingleMilestone(m, i)).join('');
 
-        const side = i % 2 === 0 ? 'left' : 'right';
-
-        let catHtml = '';
-        if (m.categoryId) {
-            catHtml = `<div style="margin-top:8px;">
-                <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px;"
-                    onclick="window.goToCategory('${m.categoryId}')">📁 ${escapeHtml(m.categoryName || '查看分类')}</button>
+    if (hasMore) {
+        container.innerHTML += `
+            <div style="text-align:center;padding:20px 0;">
+                <button class="btn btn-secondary" onclick="window.loadMoreTimeline()" style="font-size:14px;padding:8px 32px;">
+                    加载更多 (${visible.length}/${sorted.length})
+                </button>
             </div>`;
-        }
+    }
+}
 
-        let photoHtml = '';
-        if (m.photoId) {
-            const photoUrl = m.photoPath ? getPhotoUrl(m.photoPath) : '';
-            const displayUrl = photoUrl;
-            if (displayUrl) {
-                photoHtml = `<img src="${displayUrl}"
-                    style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:8px;cursor:pointer;"
-                    onclick="window.openPhotoModal('${m.photoId}')"
-                    onerror="this.style.display='none'">`;
-            }
-        }
-
-        let timeAgo = '';
-        if (years > 0) timeAgo += years + '年';
-        if (remainDays > 0 || years === 0) timeAgo += remainDays + '天';
-        timeAgo += '前';
-
-        return `
-            <div class="timeline-item timeline-${side}">
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <div class="timeline-date">${m.date}</div>
-                    <h3>${escapeHtml(m.title)}</h3>
-                    ${m.description ? '<p>' + escapeHtml(m.description) + '</p>' : ''}
-                    <small style="color:#999;">${timeAgo}</small>
-                    ${catHtml}
-                    ${photoHtml}
-                    <div class="milestone-actions" style="margin-top:8px;display:flex;gap:8px;">
-                        <button class="btn btn-secondary" style="font-size:11px;padding:4px 8px;"
-                            onclick="window.openEditMilestoneModal('${m.id}')">✏️</button>
-                        <button class="btn-danger" style="font-size:11px;padding:4px 8px;"
-                            onclick="window.deleteMilestone('${m.id}')">🗑️</button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
+window.loadMoreTimeline = function() {
+    _timelinePage++;
+    renderTimeline();
+}
 }
 
 function renderFilterCategoryCascadePath(catId) {
