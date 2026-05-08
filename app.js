@@ -138,6 +138,7 @@ async function checkLogin() {
         await Promise.all([loadCategories(), loadPhotos()])
         window.checkIncomingBottles();
         window.checkIncomingNotes();
+        window.checkIncomingNudges();
     } else {
         showLoginPage()
     }
@@ -196,6 +197,7 @@ window.handleLogin = async function(e) {
         await Promise.all([loadCategories(), loadPhotos()])
         window.checkIncomingBottles();
         window.checkIncomingNotes();
+        window.checkIncomingNudges();
     }
 }
 
@@ -567,6 +569,16 @@ window.toggleSection = function(section) {
             hideAll()
             sec.style.display = 'block'
             loadSecretNoteInbox()
+        } else {
+            sec.style.display = 'none'
+        }
+    } else if (section === 'nudge') {
+        const sec = document.getElementById('nudgeSection')
+        if (!sec) return
+        if (sec.style.display === 'none' || !sec.style.display) {
+            hideAll()
+            sec.style.display = 'block'
+            window.checkIncomingNudges()
         } else {
             sec.style.display = 'none'
         }
@@ -5737,6 +5749,79 @@ window.closeReceivedNote = async function() {
     await supabase.from('secret_notes').update({ status: 'revealed', revealed_at: new Date().toISOString() }).eq('id', note.id);
     window._incomingNote = null;
     loadSecretNoteInbox();
+};
+
+// ========================================
+// 戳一戳
+// ========================================
+window._nudgeCooldownUntil = 0;
+window._nudgeLastCheck = localStorage.getItem('nudge_lastCheck') || '1970-01-01T00:00:00Z';
+
+window.sendNudge = async function() {
+    if (Date.now() < window._nudgeCooldownUntil) {
+        var secs = Math.ceil((window._nudgeCooldownUntil - Date.now()) / 1000);
+        alert('请等 ' + secs + ' 秒再戳 ~');
+        return;
+    }
+    var toUser = currentUser.username === 'laoda' ? 'xiaodi' : 'laoda';
+    try {
+        await supabase.from('nudges').insert({ from_user: currentUser.username, to_user: toUser });
+        window._nudgeCooldownUntil = Date.now() + 30000;
+        var cdEl = document.getElementById('nudgeCooldown');
+        if (cdEl) {
+            cdEl.style.display = 'block';
+            cdEl.textContent = '30秒后可再戳';
+            var interval = setInterval(function() {
+                var remain = Math.ceil((window._nudgeCooldownUntil - Date.now()) / 1000);
+                if (remain <= 0) { cdEl.style.display = 'none'; clearInterval(interval); }
+                else { cdEl.textContent = remain + '秒后可再戳'; }
+            }, 1000);
+        }
+        // Button animation
+        var btn = document.getElementById('nudgeBtn');
+        if (btn) { btn.classList.add('nudged'); setTimeout(function() { btn.classList.remove('nudged'); }, 300); }
+        showToast('戳了一下对方 💗');
+    } catch (e) { alert('戳一戳失败: ' + e.message); }
+};
+
+window.checkIncomingNudges = async function() {
+    if (!currentUser) return;
+    try {
+        var { data } = await supabase
+            .from('nudges')
+            .select('*')
+            .eq('to_user', currentUser.username)
+            .gt('created_at', window._nudgeLastCheck)
+            .order('created_at', { ascending: false });
+        if (data && data.length > 0) {
+            var fromName = data[0].from_user === 'laoda' ? '老大' : '小弟';
+            var time = new Date(data[data.length - 1].created_at);
+            var timeStr = time.getHours().toString().padStart(2,'0') + ':' + time.getMinutes().toString().padStart(2,'0');
+            var suffix = data.length > 1 ? '（共' + data.length + '次）' : '';
+            window.showNudgePopup(fromName, timeStr, suffix);
+        }
+        window._nudgeLastCheck = new Date().toISOString();
+        localStorage.setItem('nudge_lastCheck', window._nudgeLastCheck);
+        // Update inbox
+        var inbox = document.getElementById('nudgeInbox');
+        if (inbox && (data && data.length > 0)) {
+            inbox.innerHTML = '<span style="color:#e88;">💗 最近被 ' + (data[0].from_user === 'laoda' ? '老大' : '小弟') + ' 戳过</span>';
+        }
+    } catch (e) { /* silent */ }
+};
+
+window.showNudgePopup = function(fromName, timeStr, suffix) {
+    var existing = document.getElementById('nudgePopup');
+    if (existing) existing.remove();
+    var popup = document.createElement('div');
+    popup.id = 'nudgePopup';
+    popup.className = 'nudge-popup';
+    popup.innerHTML = '<span class="nudge-popup-heart">💗</span>' +
+        '<span class="nudge-popup-text">' + escapeHtml(fromName) + ' 戳了戳你 ' + escapeHtml(suffix) + '</span>' +
+        '<span class="nudge-popup-time">' + timeStr + '</span>';
+    popup.onclick = function() { popup.remove(); };
+    document.body.appendChild(popup);
+    setTimeout(function() { if (popup.parentNode) { popup.classList.add('nudge-popup-out'); setTimeout(function() { if (popup.parentNode) popup.remove(); }, 400); } }, 3000);
 };
 
 // 点击外部收起已标记浮窗

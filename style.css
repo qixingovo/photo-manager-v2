@@ -2114,3 +2114,91 @@ mark {
     0% { transform: translateX(100px); opacity: 0; }
     100% { transform: translateX(0); opacity: 1; }
 }
+
+/* ========================================
+   戳一戳
+   ======================================== */
+
+/* 桌面端戳一戳大按钮 */
+.btn-nudge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 40px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #e88;
+    background: linear-gradient(135deg, #FFF5F7, #FFE0E6);
+    border: 2px solid #ffcdd2;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 4px 16px rgba(255, 100, 100, 0.15);
+}
+
+.btn-nudge:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 24px rgba(255, 100, 100, 0.25);
+}
+
+.btn-nudge:active { transform: scale(0.95); }
+
+.btn-nudge.nudged {
+    animation: nudge-bounce 0.3s ease;
+}
+
+.nudge-heart { font-size: 24px; }
+
+@keyframes nudge-bounce {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.15); }
+    60% { transform: scale(0.9); }
+    100% { transform: scale(1); }
+}
+
+/* 戳一戳弹出动画 */
+.nudge-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border-radius: 20px;
+    padding: 24px 32px;
+    text-align: center;
+    z-index: 3000;
+    box-shadow: 0 8px 40px rgba(255, 100, 100, 0.25);
+    animation: nudge-pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.nudge-popup.nudge-popup-out {
+    animation: nudge-pop-out 0.4s ease forwards;
+}
+
+.nudge-popup-heart { font-size: 40px; }
+
+.nudge-popup-text {
+    font-size: 18px;
+    color: #d44;
+    font-weight: 500;
+}
+
+.nudge-popup-time {
+    font-size: 13px;
+    color: #bbb;
+}
+
+@keyframes nudge-pop-in {
+    0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+@keyframes nudge-pop-out {
+    0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+}

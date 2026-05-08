@@ -670,6 +670,7 @@ const mobile = {
             this.renderCoupleBanner();
             this.checkIncomingBottles();
             this.checkIncomingNotes();
+            this.checkIncomingNudges();
         } else if (tab === 'photos') {
             this.showPage('photos');
             this.renderPhotos();
@@ -6596,6 +6597,82 @@ const mobile = {
         await supabase.from('secret_notes').update({ status: 'revealed', revealed_at: new Date().toISOString() }).eq('id', note.id);
         this._incomingNote = null;
         this.loadSecretNoteInbox();
+    },
+
+    // ========================================
+    // 戳一戳
+    // ========================================
+
+    async sendNudge() {
+        if (Date.now() < (this._nudgeCooldownUntil || 0)) {
+            var secs = Math.ceil(((this._nudgeCooldownUntil || 0) - Date.now()) / 1000);
+            this.showToast('请等 ' + secs + ' 秒再戳 ~');
+            return;
+        }
+        var toUser = this.currentUser.username === 'laoda' ? 'xiaodi' : 'laoda';
+        var supabase = this.initSupabase();
+        try {
+            await supabase.from('nudges').insert({ from_user: this.currentUser.username, to_user: toUser });
+            this._nudgeCooldownUntil = Date.now() + 30000;
+            // Vibrate
+            if (navigator.vibrate) { navigator.vibrate([30, 50, 30]); }
+            // Button animation
+            var btn = document.getElementById('mobileNudgeBtn');
+            if (btn) { btn.classList.add('nudged'); setTimeout(function() { btn.classList.remove('nudged'); }, 300); }
+            // Cooldown display
+            var cdEl = document.getElementById('mobileNudgeCooldown');
+            if (cdEl) {
+                cdEl.style.display = 'block';
+                cdEl.textContent = '30秒后可再戳';
+                var self = this;
+                var interval = setInterval(function() {
+                    var remain = Math.ceil(((self._nudgeCooldownUntil || 0) - Date.now()) / 1000);
+                    if (remain <= 0) { cdEl.style.display = 'none'; clearInterval(interval); }
+                    else { cdEl.textContent = remain + '秒后可再戳'; }
+                }, 1000);
+            }
+            this.showToast('戳了一下对方 💗');
+        } catch (e) { this.showToast('戳一戳失败: ' + e.message); }
+    },
+
+    async checkIncomingNudges() {
+        if (!this.currentUser) return;
+        try {
+            var supabase = this.initSupabase();
+            if (!supabase) return;
+            var lastCheck = localStorage.getItem('nudge_lastCheck') || '1970-01-01T00:00:00Z';
+            var { data } = await supabase
+                .from('nudges')
+                .select('*')
+                .eq('to_user', this.currentUser.username)
+                .gt('created_at', lastCheck)
+                .order('created_at', { ascending: false });
+            if (data && data.length > 0) {
+                var fromName = data[0].from_user === 'laoda' ? '老大' : '小弟';
+                var time = new Date(data[data.length - 1].created_at);
+                var timeStr = time.getHours().toString().padStart(2,'0') + ':' + time.getMinutes().toString().padStart(2,'0');
+                var suffix = data.length > 1 ? '（共' + data.length + '次）' : '';
+                this.showNudgePopup(fromName, timeStr, suffix);
+                // Vibrate on receive too
+                if (navigator.vibrate) { navigator.vibrate([20, 40, 20]); }
+            }
+            localStorage.setItem('nudge_lastCheck', new Date().toISOString());
+        } catch (e) { /* silent */ }
+    },
+
+    showNudgePopup(fromName, timeStr, suffix) {
+        var existing = document.getElementById('mobileNudgePopup');
+        if (existing) existing.remove();
+        var self = this;
+        var popup = document.createElement('div');
+        popup.id = 'mobileNudgePopup';
+        popup.className = 'nudge-popup';
+        popup.innerHTML = '<span class="nudge-popup-heart">💗</span>' +
+            '<span class="nudge-popup-text">' + self.escapeHtml(fromName) + ' 戳了戳你 ' + self.escapeHtml(suffix) + '</span>' +
+            '<span class="nudge-popup-time">' + timeStr + '</span>';
+        popup.onclick = function() { popup.remove(); };
+        document.body.appendChild(popup);
+        setTimeout(function() { if (popup.parentNode) { popup.classList.add('nudge-popup-out'); setTimeout(function() { if (popup.parentNode) popup.remove(); }, 400); } }, 3000);
     },
 
 };

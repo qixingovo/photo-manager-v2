@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=51">
+    <link rel="stylesheet" href="mobile.css?v=52">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -64,6 +64,15 @@
         <div id="mobileDriftBottleAlert" class="drift-bottle-alert" style="display:none;" onclick="mobile.openReceivedBottle()">
             <span class="bottle-icon">🍾</span>
             <span class="bottle-text">一个漂流瓶漂到了...</span>
+        </div>
+
+        <!-- 戳一戳按钮 -->
+        <div class="nudge-section" style="padding:0 12px;margin-bottom:8px;">
+            <button id="mobileNudgeBtn" class="btn-nudge-mobile" onclick="mobile.sendNudge()">
+                <span class="nudge-heart-mobile">💗</span>
+                <span>戳一戳 Ta</span>
+            </button>
+            <p id="mobileNudgeCooldown" style="font-size:11px;color:#999;text-align:center;margin-top:4px;display:none;"></p>
         </div>
 
         <!-- 功能入口卡片 3x3 -->
@@ -718,7 +727,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=51"></script>
+    <script type="module" src="mobile-app.js?v=52"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;
