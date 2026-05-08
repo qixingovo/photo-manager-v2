@@ -602,6 +602,7 @@ const mobile = {
             const url = urlData?.publicUrl;
             if (url) {
                 localStorage.setItem('avatar_url_' + n, url);
+                await supabase.from('app_settings').upsert({ key: 'avatar_' + n, value: url });
                 this._showAvatar(n, url);
             }
         } catch (e) {
@@ -640,11 +641,25 @@ const mobile = {
         if (placeholder) placeholder.style.display = 'none';
     },
 
-    _loadAvatars() {
-        [1, 2].forEach(function(n) {
-            const url = localStorage.getItem('avatar_url_' + n);
-            if (url) mobile._showAvatar(n, url);
-        });
+    async _loadAvatars() {
+        var supabase = this.initSupabase();
+        var self = this;
+        for (var n = 1; n <= 2; n++) {
+            var url = null;
+            // 优先从数据库加载
+            if (supabase) {
+                try {
+                    var { data } = await supabase.from('app_settings').select('value').eq('key', 'avatar_' + n).maybeSingle();
+                    if (data && data.value) {
+                        url = data.value;
+                        localStorage.setItem('avatar_url_' + n, url);
+                    }
+                } catch (e) { /* fallback to localStorage */ }
+            }
+            // 兜底 localStorage
+            if (!url) url = localStorage.getItem('avatar_url_' + n);
+            if (url) self._showAvatar(n, url);
+        }
     },
 
     // 渲染 Suki 风格情侣横幅
@@ -670,7 +685,7 @@ const mobile = {
         if (name2El && this.currentUser) {
             name2El.textContent = this.currentUser.isLaoda ? '小弟' : '老大';
         }
-        this._loadAvatars();
+        await this._loadAvatars();
     },
 
     switchTab(tab) {
