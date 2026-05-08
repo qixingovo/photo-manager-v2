@@ -6827,11 +6827,14 @@ const mobile = {
             inner = '<div class="emotion-bottle-msg">🍾 ' + this.escapeHtml(data.message || '一张照片') + '</div>';
         }
 
+        var deleteBtn = item.type === 'photo' ? '<span class="emotion-item-delete" onclick="event.stopPropagation();mobile.deleteTimelinePhoto(\'' + data.id + '\')" title="删除">×</span>' : '';
+
         return '<div class="emotion-item emotion-item-' + item.type + '">' +
             '<div class="emotion-item-header">' +
             '<span class="emotion-item-icon">' + icon + '</span>' +
             (userLabel ? '<span class="emotion-item-user">' + userLabel + '</span>' : '') +
             '<span class="emotion-item-time">' + timeStr + '</span>' +
+            deleteBtn +
             '</div>' +
             '<div class="emotion-item-body">' + inner + '</div>' +
             '</div>';
@@ -6840,6 +6843,29 @@ const mobile = {
     loadMoreEmotionTimeline() {
         this._emotionTimelinePage++;
         this.renderEmotionTimeline();
+    },
+
+    async deleteTimelinePhoto(photoId) {
+        if (!confirm('确定要删除这张照片吗？')) return;
+        try {
+            var supabase = this.initSupabase();
+            if (!supabase) return;
+            var photoItem = this._emotionTimelineData.find(function(item) {
+                return item.type === 'photo' && item.data && item.data.id === photoId;
+            });
+            if (photoItem && photoItem.data && photoItem.data.storage_path) {
+                await supabase.storage.from('photo').remove([photoItem.data.storage_path]);
+            }
+            await supabase.from('photo_categories').delete().eq('photo_id', photoId);
+            await supabase.from('comments').delete().eq('photo_id', photoId);
+            await supabase.from('photos').delete().eq('id', photoId);
+            this._emotionTimelineData = this._emotionTimelineData.filter(function(item) {
+                return !(item.type === 'photo' && item.data && item.data.id === photoId);
+            });
+            this.photos = this.photos.filter(function(p) { return p.id !== photoId; });
+            this.renderEmotionTimeline();
+            this.showToast('照片已删除');
+        } catch (e) { this.showToast('删除失败: ' + e.message); }
     },
 
     renderEmotionTimelineFilters() {

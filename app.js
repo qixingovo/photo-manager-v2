@@ -6022,11 +6022,14 @@ window.renderEmotionItem = function(item) {
         inner = '<div class="emotion-bottle-msg">🍾 ' + escapeHtml(data.message || '一张照片') + '</div>';
     }
 
+    var deleteBtn = item.type === 'photo' ? '<span class="emotion-item-delete" onclick="event.stopPropagation();window.deleteTimelinePhoto(\'' + data.id + '\')" title="删除">×</span>' : '';
+
     return '<div class="emotion-item emotion-item-' + item.type + '">' +
         '<div class="emotion-item-header">' +
         '<span class="emotion-item-icon">' + icon + '</span>' +
         (userLabel ? '<span class="emotion-item-user">' + userLabel + '</span>' : '') +
         '<span class="emotion-item-time">' + timeStr + '</span>' +
+        deleteBtn +
         '</div>' +
         '<div class="emotion-item-body">' + inner + '</div>' +
         '</div>';
@@ -6035,6 +6038,25 @@ window.renderEmotionItem = function(item) {
 window.loadMoreEmotionTimeline = function() {
     window._emotionTimelinePage++;
     window.renderEmotionTimeline();
+};
+
+window.deleteTimelinePhoto = async function(photoId) {
+    if (!confirm('确定要删除这张照片吗？')) return;
+    try {
+        var photo = window._emotionTimelineData.find(function(item) {
+            return item.type === 'photo' && item.data && item.data.id === photoId;
+        });
+        if (photo && photo.data && photo.data.storage_path) {
+            await supabase.storage.from('photo').remove([photo.data.storage_path]);
+        }
+        await supabase.from('photo_categories').delete().eq('photo_id', photoId);
+        await supabase.from('comments').delete().eq('photo_id', photoId);
+        await supabase.from('photos').delete().eq('id', photoId);
+        window._emotionTimelineData = window._emotionTimelineData.filter(function(item) {
+            return !(item.type === 'photo' && item.data && item.data.id === photoId);
+        });
+        window.renderEmotionTimeline();
+    } catch (e) { alert('删除失败: ' + e.message); }
 };
 
 window.renderEmotionTimelineFilters = function() {

@@ -3055,6 +3055,16 @@ mark {
     margin-left: auto;
 }
 
+.emotion-item-delete {
+    font-size: 20px;
+    color: #ccc;
+    cursor: pointer;
+    padding: 0 6px;
+    margin-left: 4px;
+    line-height: 1;
+}
+.emotion-item-delete:active { color: #e55; }
+
 .emotion-item-body {
     padding-left: 18px;
 }
