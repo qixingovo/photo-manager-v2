@@ -3481,23 +3481,23 @@ window.openPhotoModal = async function(photoId) {
     // 键盘导航
     document.addEventListener('keydown', _modalKeyHandler)
 
-    // 触屏滑动
-    const container = document.getElementById('modalImageContainer')
-    if (container) {
-        container.addEventListener('touchstart', _modalTouchStart, { passive: true })
-        container.addEventListener('touchend', _modalTouchEnd, { passive: true })
+    // 触屏滑动（绑定到整个弹窗）
+    const modal = document.getElementById('photoModal')
+    if (modal) {
+        modal.addEventListener('touchstart', _modalTouchStart, { passive: true })
+        modal.addEventListener('touchend', _modalTouchEnd, { passive: true })
     }
 
-    document.getElementById('photoModal').classList.add('active')
+    modal.classList.add('active')
 }
 
 window.closeModal = function() {
-    document.getElementById('photoModal').classList.remove('active')
+    const modal = document.getElementById('photoModal')
+    modal.classList.remove('active')
     document.removeEventListener('keydown', _modalKeyHandler)
-    const container = document.getElementById('modalImageContainer')
-    if (container) {
-        container.removeEventListener('touchstart', _modalTouchStart)
-        container.removeEventListener('touchend', _modalTouchEnd)
+    if (modal) {
+        modal.removeEventListener('touchstart', _modalTouchStart)
+        modal.removeEventListener('touchend', _modalTouchEnd)
     }
     currentPhoto = null
     currentComments = []
@@ -3579,11 +3579,17 @@ function _modalKeyHandler(e) {
 }
 
 let _modalTouchStartX = 0
-function _modalTouchStart(e) { _modalTouchStartX = e.touches[0].clientX }
+function _modalTouchStart(e) {
+    // 按钮和输入框上不触发滑动
+    if (e.target.closest('button, input, textarea, a, .modal-actions, .comments-section')) return;
+    _modalTouchStartX = e.touches[0].clientX;
+}
 function _modalTouchEnd(e) {
-    const dx = e.changedTouches[0].clientX - _modalTouchStartX
+    if (!_modalTouchStartX) return;
+    const dx = e.changedTouches[0].clientX - _modalTouchStartX;
+    _modalTouchStartX = 0;
     if (Math.abs(dx) > 50) {
-        window.navigatePhoto(dx > 0 ? -1 : 1)
+        window.navigatePhoto(dx > 0 ? -1 : 1);
     }
 }
 

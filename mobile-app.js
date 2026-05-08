@@ -1083,30 +1083,35 @@ const mobile = {
         // 页面指示器
         this._updateDetailIndicator();
 
-        // 触屏滑动
-        const container = document.getElementById('detailImageContainer');
-        if (container) {
+        // 触屏滑动（绑定到整个详情页）
+        const page = document.getElementById('detailPage');
+        if (page) {
             this._boundDetailTouchEnd = this._detailTouchEnd.bind(this);
-            container.addEventListener('touchstart', this._detailTouchStart, { passive: true });
-            container.addEventListener('touchend', this._boundDetailTouchEnd, { passive: true });
+            page.addEventListener('touchstart', this._detailTouchStart, { passive: true });
+            page.addEventListener('touchend', this._boundDetailTouchEnd, { passive: true });
         }
 
         this.showPage('detail');
     },
 
     closeDetail() {
-        const container = document.getElementById('detailImageContainer');
-        if (container) {
-            container.removeEventListener('touchstart', this._detailTouchStart);
-            if (this._boundDetailTouchEnd) container.removeEventListener('touchend', this._boundDetailTouchEnd);
+        const page = document.getElementById('detailPage');
+        if (page) {
+            page.removeEventListener('touchstart', this._detailTouchStart);
+            if (this._boundDetailTouchEnd) page.removeEventListener('touchend', this._boundDetailTouchEnd);
         }
         this.showPage('home');
     },
 
-    _detailTouchStart(e) { mobile._detailTouchX = e.touches[0].clientX; },
+    _detailTouchStart(e) {
+        if (e.target.closest('button, input, textarea, a, .detail-actions, .comments-section')) return;
+        mobile._detailTouchX = e.touches[0].clientX;
+    },
 
     _detailTouchEnd(e) {
-        const dx = e.changedTouches[0].clientX - (mobile._detailTouchX || 0);
+        if (!mobile._detailTouchX) return;
+        const dx = e.changedTouches[0].clientX - mobile._detailTouchX;
+        mobile._detailTouchX = 0;
         if (Math.abs(dx) > 50) {
             mobile._navigateDetail(dx > 0 ? -1 : 1);
         }
