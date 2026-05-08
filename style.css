@@ -491,18 +491,22 @@ input[type="file"] {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    background: rgba(255,255,255,0.15);
-    color: white;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.6);
     border: none;
-    font-size: 32px;
-    padding: 12px 16px;
+    font-size: 24px;
+    width: 36px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    border-radius: 6px;
+    border-radius: 4px;
     z-index: 5;
-    transition: background 0.2s;
+    transition: background 0.2s, color 0.2s, opacity 0.2s;
     user-select: none;
 }
-.nav-arrow:hover { background: rgba(255,255,255,0.35); }
+.nav-arrow:hover { background: rgba(255,255,255,0.25); color: rgba(255,255,255,0.9); }
 .nav-prev { left: 12px; }
 .nav-next { right: 12px; }
 
