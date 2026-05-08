@@ -5311,7 +5311,7 @@ const DEFAULT_PROFILE = {
 async function loadPartnerProfile() {
     const profileKey = 'partner_profile_' + (currentUser?.username || 'default');
     try {
-        const { data } = await supabase.from('app_settings').select('value').eq('key', profileKey).single();
+        const { data } = await supabase.from('app_settings').select('value').eq('key', profileKey).maybeSingle();
         if (data && data.value) {
             window.partnerProfileData = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
         } else {

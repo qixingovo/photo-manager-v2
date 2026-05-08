@@ -6032,7 +6032,7 @@ const mobile = {
         const supabase = this.initSupabase();
         try {
             const profileKey = 'partner_profile_' + (this.currentUser?.username || 'default');
-            const { data } = await supabase.from('app_settings').select('value').eq('key', profileKey).single();
+            const { data } = await supabase.from('app_settings').select('value').eq('key', profileKey).maybeSingle();
             if (data && data.value) {
                 this.partnerProfileData = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
             } else {
