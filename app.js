@@ -3448,23 +3448,48 @@ async function loadAllPhotoCategories() {
 window.openPhotoModal = async function(photoId) {
     currentPhoto = photos.find(p => p.id === photoId)
     if (!currentPhoto) return
-    
-    // 加载该照片的分类
+
     await loadPhotoCategories(photoId)
-    
-    // 加载留言
     await loadComments(photoId)
-    
+
+    _refreshModalContent()
+    _updateNavArrows()
+
+    // 键盘导航
+    document.addEventListener('keydown', _modalKeyHandler)
+
+    // 触屏滑动
+    const container = document.getElementById('modalImageContainer')
+    if (container) {
+        container.addEventListener('touchstart', _modalTouchStart, { passive: true })
+        container.addEventListener('touchend', _modalTouchEnd, { passive: true })
+    }
+
+    document.getElementById('photoModal').classList.add('active')
+}
+
+window.closeModal = function() {
+    document.getElementById('photoModal').classList.remove('active')
+    document.removeEventListener('keydown', _modalKeyHandler)
+    const container = document.getElementById('modalImageContainer')
+    if (container) {
+        container.removeEventListener('touchstart', _modalTouchStart)
+        container.removeEventListener('touchend', _modalTouchEnd)
+    }
+    currentPhoto = null
+    currentComments = []
+}
+
+function _refreshModalContent() {
     const photoUrl = getPhotoUrl(currentPhoto.storage_path)
-    
+    document.getElementById('modalImage').style.opacity = '0.3'
     document.getElementById('modalImage').src = photoUrl
     document.getElementById('modalPhotoName').textContent = currentPhoto.name
     document.getElementById('modalPhotoDesc').textContent = currentPhoto.description || '暂无描述'
     document.getElementById('modalPhotoSize').textContent = formatFileSize(currentPhoto.size)
-    
-    // 显示分类
+
     const categoryEl = document.getElementById('modalPhotoCategory')
-    const photoCats = photoCategories[String(photoId)] || []
+    const photoCats = photoCategories[String(currentPhoto.id)] || []
     if (photoCats.length > 0) {
         const catNames = photoCats.map(cid => {
             const cat = categories.find(c => String(c.id) === cid)
@@ -3478,20 +3503,51 @@ window.openPhotoModal = async function(photoId) {
         categoryEl.style.background = '#e9ecef'
         categoryEl.style.color = '#333'
     }
-    
+
     const downloadBtn = document.getElementById('modalDownloadBtn')
     downloadBtn.href = photoUrl
     downloadBtn.download = currentPhoto.original_name || currentPhoto.name
-    
+
     updateFavoriteButton()
-    
-    document.getElementById('photoModal').classList.add('active')
+
+    // 图片加载完成后淡入
+    document.getElementById('modalImage').onload = function() {
+        this.style.opacity = '1'
+    }
 }
 
-window.closeModal = function() {
-    document.getElementById('photoModal').classList.remove('active')
-    currentPhoto = null
-    currentComments = []
+function _updateNavArrows() {
+    const idx = photos.indexOf(currentPhoto)
+    document.getElementById('navPrevBtn').style.visibility = idx > 0 ? 'visible' : 'hidden'
+    document.getElementById('navNextBtn').style.visibility = idx < photos.length - 1 ? 'visible' : 'hidden'
+}
+
+function _modalKeyHandler(e) {
+    if (e.key === 'ArrowLeft') window.navigatePhoto(-1)
+    else if (e.key === 'ArrowRight') window.navigatePhoto(1)
+    else if (e.key === 'Escape') window.closeModal()
+}
+
+let _modalTouchStartX = 0
+function _modalTouchStart(e) { _modalTouchStartX = e.touches[0].clientX }
+function _modalTouchEnd(e) {
+    const dx = e.changedTouches[0].clientX - _modalTouchStartX
+    if (Math.abs(dx) > 50) {
+        window.navigatePhoto(dx > 0 ? -1 : 1)
+    }
+}
+
+window.navigatePhoto = async function(direction) {
+    const idx = photos.indexOf(currentPhoto)
+    const newIdx = idx + direction
+    if (newIdx < 0 || newIdx >= photos.length) return
+
+    const photoId = photos[newIdx].id
+    currentPhoto = photos[newIdx]
+    await loadPhotoCategories(photoId)
+    await loadComments(photoId)
+    _refreshModalContent()
+    _updateNavArrows()
 }
 
 window.openEditModal = function() {

@@ -19,6 +19,7 @@ const mobile = {
     markedCategories: [],
     selectedPhotos: new Set(),
     currentPhotoId: null,
+    _detailTouchX: 0,
     previewFiles: [],
     pendingDeleteId: null,
     pendingDeleteType: null,
@@ -1076,24 +1077,76 @@ const mobile = {
         const photo = this.photos.find(p => p.id === photoId);
         if (!photo) return;
 
-        document.getElementById('detailImage').src = this.getPhotoUrl(photo.storage_path) || 'https://picsum.photos/800/600';
-        document.getElementById('detailName').textContent = photo.name || '未命名';
-        document.getElementById('detailDesc').textContent = photo.description || '';
-        document.getElementById('detailCategory').textContent = photo.category_name || '未分类';
-        document.getElementById('detailSize').textContent = photo.formatted_size || '';
+        this._refreshDetailContent(photo);
 
-        // 更新收藏按钮
-        const favBtn = document.getElementById('detailFavoriteBtn');
-        favBtn.textContent = photo.is_favorite ? '❤️' : '🤍';
+        // 页面指示器
+        this._updateDetailIndicator();
 
-        // 加载留言
-        this.loadComments(photoId);
+        // 触屏滑动
+        const container = document.getElementById('detailImageContainer');
+        if (container) {
+            this._boundDetailTouchEnd = this._detailTouchEnd.bind(this);
+            container.addEventListener('touchstart', this._detailTouchStart, { passive: true });
+            container.addEventListener('touchend', this._boundDetailTouchEnd, { passive: true });
+        }
 
         this.showPage('detail');
     },
 
     closeDetail() {
+        const container = document.getElementById('detailImageContainer');
+        if (container) {
+            container.removeEventListener('touchstart', this._detailTouchStart);
+            if (this._boundDetailTouchEnd) container.removeEventListener('touchend', this._boundDetailTouchEnd);
+        }
         this.showPage('home');
+    },
+
+    _detailTouchStart(e) { mobile._detailTouchX = e.touches[0].clientX; },
+
+    _detailTouchEnd(e) {
+        const dx = e.changedTouches[0].clientX - (mobile._detailTouchX || 0);
+        if (Math.abs(dx) > 50) {
+            mobile._navigateDetail(dx > 0 ? -1 : 1);
+        }
+    },
+
+    _navigateDetail(direction) {
+        const idx = this.photos.findIndex(p => p.id === this.currentPhotoId);
+        const newIdx = idx + direction;
+        if (newIdx < 0 || newIdx >= this.photos.length) return;
+
+        const photo = this.photos[newIdx];
+        this.currentPhotoId = photo.id;
+        this._refreshDetailContent(photo);
+        this.loadComments(photo.id);
+        this._updateDetailIndicator();
+    },
+
+    _refreshDetailContent(photo) {
+        const img = document.getElementById('detailImage');
+        img.style.opacity = '0.3';
+        img.src = this.getPhotoUrl(photo.storage_path) || 'https://picsum.photos/800/600';
+        img.onload = function() { this.style.opacity = '1'; };
+
+        document.getElementById('detailName').textContent = photo.name || '未命名';
+        document.getElementById('detailDesc').textContent = photo.description || '';
+        document.getElementById('detailCategory').textContent = photo.category_name || '未分类';
+        document.getElementById('detailSize').textContent = photo.formatted_size || '';
+
+        const favBtn = document.getElementById('detailFavoriteBtn');
+        if (favBtn) favBtn.textContent = photo.is_favorite ? '❤️' : '🤍';
+    },
+
+    _updateDetailIndicator() {
+        const idx = this.photos.findIndex(p => p.id === this.currentPhotoId);
+        const el = document.getElementById('detailPosition');
+        if (el) el.textContent = (idx + 1) + ' / ' + this.photos.length;
+        // 箭头显示
+        const prevBtn = document.getElementById('detailPrevBtn');
+        const nextBtn = document.getElementById('detailNextBtn');
+        if (prevBtn) prevBtn.style.opacity = idx > 0 ? '1' : '0.3';
+        if (nextBtn) nextBtn.style.opacity = idx < this.photos.length - 1 ? '1' : '0.3';
     },
 
     async toggleFavorite() {

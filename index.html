@@ -382,8 +382,10 @@
         <div class="modal-content">
             <span class="modal-close" onclick="window.closeModal()">&times;</span>
             <div class="modal-body">
-                <div class="modal-image-container">
+                <div class="modal-image-container" id="modalImageContainer">
+                    <button class="nav-arrow nav-prev" id="navPrevBtn" onclick="window.navigatePhoto(-1)">&#10094;</button>
                     <img id="modalImage" src="" alt="">
+                    <button class="nav-arrow nav-next" id="navNextBtn" onclick="window.navigatePhoto(1)">&#10095;</button>
                 </div>
                 <div class="modal-info">
                     <h3 id="modalPhotoName"></h3>

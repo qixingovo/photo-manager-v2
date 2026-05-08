@@ -570,8 +570,11 @@
             <button class="icon-btn light" id="detailFavoriteBtn" onclick="mobile.toggleFavorite()">🤍</button>
         </header>
 
-        <div class="detail-image-container">
+        <div class="detail-image-container" id="detailImageContainer">
+            <button class="detail-nav-arrow detail-nav-prev" id="detailPrevBtn" onclick="mobile._navigateDetail(-1)">‹</button>
             <img id="detailImage" src="" alt="">
+            <button class="detail-nav-arrow detail-nav-next" id="detailNextBtn" onclick="mobile._navigateDetail(1)">›</button>
+            <div class="detail-position" id="detailPosition"></div>
         </div>
 
         <div class="detail-panel">

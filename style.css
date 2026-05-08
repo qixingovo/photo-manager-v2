@@ -480,19 +480,41 @@ input[type="file"] {
     }
 }
 
+.modal-image-container img {
+    max-width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+    transition: opacity 0.2s ease;
+}
+
+.nav-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: none;
+    font-size: 32px;
+    padding: 12px 16px;
+    cursor: pointer;
+    border-radius: 6px;
+    z-index: 5;
+    transition: background 0.2s;
+    user-select: none;
+}
+.nav-arrow:hover { background: rgba(255,255,255,0.35); }
+.nav-prev { left: 12px; }
+.nav-next { right: 12px; }
+
 .modal-image-container {
+    position: relative;
     flex: 1;
     background: #000;
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 300px;
-}
-
-.modal-image-container img {
-    max-width: 100%;
-    max-height: 70vh;
-    object-fit: contain;
+    touch-action: pan-y;
 }
 
 .modal-info {
