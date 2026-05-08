@@ -1119,16 +1119,14 @@ const mobile = {
 
         const photo = this.photos[newIdx];
         this.currentPhotoId = photo.id;
-        this._refreshDetailContent(photo);
+        this._refreshDetailContent(photo, direction);
         this.loadComments(photo.id);
         this._updateDetailIndicator();
     },
 
-    _refreshDetailContent(photo) {
+    _refreshDetailContent(photo, direction) {
         const img = document.getElementById('detailImage');
-        img.style.opacity = '0.3';
-        img.src = this.getPhotoUrl(photo.storage_path) || 'https://picsum.photos/800/600';
-        img.onload = function() { this.style.opacity = '1'; };
+        const src = this.getPhotoUrl(photo.storage_path) || 'https://picsum.photos/800/600';
 
         document.getElementById('detailName').textContent = photo.name || '未命名';
         document.getElementById('detailDesc').textContent = photo.description || '';
@@ -1137,6 +1135,34 @@ const mobile = {
 
         const favBtn = document.getElementById('detailFavoriteBtn');
         if (favBtn) favBtn.textContent = photo.is_favorite ? '❤️' : '🤍';
+
+        if (direction) {
+            const dir = direction > 0 ? 1 : -1;
+            img.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+            img.style.transform = 'translateX(' + (-dir * 30) + '%)';
+            img.style.opacity = '0';
+
+            const onEnd = function() {
+                img.removeEventListener('transitionend', onEnd);
+                img.style.transition = 'none';
+                img.style.transform = 'translateX(' + (dir * 30) + '%)';
+                img.src = src;
+                img.offsetHeight;
+                img.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+                img.style.transform = 'translateX(0)';
+                img.style.opacity = '1';
+            };
+            img.addEventListener('transitionend', onEnd, { once: true });
+        } else {
+            img.style.transition = 'none';
+            img.style.transform = 'none';
+            img.style.opacity = '0.3';
+            img.src = src;
+            img.onload = function() {
+                this.style.transition = 'opacity 0.25s ease';
+                this.style.opacity = '1';
+            };
+        }
     },
 
     _updateDetailIndicator() {

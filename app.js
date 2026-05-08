@@ -3503,39 +3503,66 @@ window.closeModal = function() {
     currentComments = []
 }
 
-function _refreshModalContent() {
-    const photoUrl = getPhotoUrl(currentPhoto.storage_path)
-    document.getElementById('modalImage').style.opacity = '0.3'
-    document.getElementById('modalImage').src = photoUrl
-    document.getElementById('modalPhotoName').textContent = currentPhoto.name
-    document.getElementById('modalPhotoDesc').textContent = currentPhoto.description || '暂无描述'
-    document.getElementById('modalPhotoSize').textContent = formatFileSize(currentPhoto.size)
+function _refreshModalContent(direction) {
+    const img = document.getElementById('modalImage');
+    const photoUrl = getPhotoUrl(currentPhoto.storage_path);
 
-    const categoryEl = document.getElementById('modalPhotoCategory')
-    const photoCats = photoCategories[String(currentPhoto.id)] || []
+    // 更新右侧信息面板
+    document.getElementById('modalPhotoName').textContent = currentPhoto.name;
+    document.getElementById('modalPhotoDesc').textContent = currentPhoto.description || '暂无描述';
+    document.getElementById('modalPhotoSize').textContent = formatFileSize(currentPhoto.size);
+
+    const categoryEl = document.getElementById('modalPhotoCategory');
+    const photoCats = photoCategories[String(currentPhoto.id)] || [];
     if (photoCats.length > 0) {
         const catNames = photoCats.map(cid => {
-            const cat = categories.find(c => String(c.id) === cid)
-            return cat ? cat.name : ''
-        }).filter(n => n).join(', ')
-        categoryEl.textContent = catNames || '未分类'
-        categoryEl.style.background = '#667eea'
-        categoryEl.style.color = 'white'
+            const cat = categories.find(c => String(c.id) === cid);
+            return cat ? cat.name : '';
+        }).filter(n => n).join(', ');
+        categoryEl.textContent = catNames || '未分类';
+        categoryEl.style.background = '#667eea';
+        categoryEl.style.color = 'white';
     } else {
-        categoryEl.textContent = '未分类'
-        categoryEl.style.background = '#e9ecef'
-        categoryEl.style.color = '#333'
+        categoryEl.textContent = '未分类';
+        categoryEl.style.background = '#e9ecef';
+        categoryEl.style.color = '#333';
     }
 
-    const downloadBtn = document.getElementById('modalDownloadBtn')
-    downloadBtn.href = photoUrl
-    downloadBtn.download = currentPhoto.original_name || currentPhoto.name
+    const downloadBtn = document.getElementById('modalDownloadBtn');
+    downloadBtn.href = photoUrl;
+    downloadBtn.download = currentPhoto.original_name || currentPhoto.name;
 
-    updateFavoriteButton()
+    updateFavoriteButton();
 
-    // 图片加载完成后淡入
-    document.getElementById('modalImage').onload = function() {
-        this.style.opacity = '1'
+    if (direction) {
+        // 滑动动画：先滑出旧图，再滑入新图
+        const dir = direction > 0 ? 1 : -1;
+        img.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+        img.style.transform = 'translateX(' + (-dir * 30) + '%)';
+        img.style.opacity = '0';
+
+        img.addEventListener('transitionend', function handler() {
+            img.removeEventListener('transitionend', handler);
+            img.style.transition = 'none';
+            img.style.transform = 'translateX(' + (dir * 30) + '%)';
+            img.src = photoUrl;
+            // 强制回流
+            img.offsetHeight;
+            img.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+            img.style.transform = 'translateX(0)';
+            img.style.opacity = '1';
+            img.onload = null;
+        }, { once: true });
+    } else {
+        // 首次打开：直接淡入
+        img.style.transition = 'none';
+        img.style.transform = 'none';
+        img.style.opacity = '0.3';
+        img.src = photoUrl;
+        img.onload = function() {
+            this.style.transition = 'opacity 0.25s ease';
+            this.style.opacity = '1';
+        };
     }
 }
 
@@ -3569,7 +3596,7 @@ window.navigatePhoto = async function(direction) {
     currentPhoto = photos[newIdx]
     await loadPhotoCategories(photoId)
     await loadComments(photoId)
-    _refreshModalContent()
+    _refreshModalContent(direction)
     _updateNavArrows()
 }
 
