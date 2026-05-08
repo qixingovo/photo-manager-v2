@@ -5,6 +5,12 @@
 
 const APP_CONFIG = window.__APP_CONFIG__ || {};
 
+function safeBigint(val, fallback) {
+    if (val === null || val === undefined) return fallback;
+    const n = parseInt(val, 10);
+    return Number.isFinite(n) ? n : fallback;
+}
+
 const mobile = {
     // 状态
     currentUser: null,
@@ -3386,14 +3392,14 @@ const mobile = {
         if (!supabase) return;
         try {
             const rows = this.anniversaryMilestones.map(m => ({
-                id: parseInt(m.id) || Date.now() + Math.floor(Math.random() * 1000),
+                id: safeBigint(m.id, Date.now() + Math.floor(Math.random() * 1000)),
                 date: m.date,
                 title: m.title,
                 description: m.description || '',
                 photo_id: m.photoId || null,
                 photo_path: m.photoPath || null,
                 photo_name: m.photoName || null,
-                category_id: m.categoryId || null,
+                category_id: safeBigint(m.categoryId, null),
                 category_name: m.categoryName || null,
                 milestone_type: m.milestone_type || 'anniversary',
                 repeat_yearly: m.repeat_yearly || false
@@ -3414,14 +3420,14 @@ const mobile = {
         }
         try {
             const rows = this.anniversaryMilestones.map(m => ({
-                id: parseInt(m.id) || Date.now(),
+                id: safeBigint(m.id, Date.now()),
                 date: m.date,
                 title: m.title,
                 description: m.description || '',
                 photo_id: m.photoId || null,
                 photo_path: m.photoPath || null,
                 photo_name: m.photoName || null,
-                category_id: m.categoryId || null,
+                category_id: safeBigint(m.categoryId, null),
                 category_name: m.categoryName || null,
                 milestone_type: m.milestone_type || 'anniversary',
                 repeat_yearly: m.repeat_yearly || false

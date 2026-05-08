@@ -2332,17 +2332,23 @@ async function loadStartDate() {
     } catch (e) { /* 静默 */ }
 }
 
+function safeBigint(val, fallback) {
+    if (val === null || val === undefined) return fallback;
+    const n = parseInt(val, 10);
+    return Number.isFinite(n) ? n : fallback;
+}
+
 async function migrateMilestonesToSupabase() {
     try {
         const rows = anniversaryMilestones.map(m => ({
-            id: parseInt(m.id) || Date.now() + Math.floor(Math.random() * 1000),
+            id: safeBigint(m.id, Date.now() + Math.floor(Math.random() * 1000)),
             date: m.date,
             title: m.title,
             description: m.description || '',
             photo_id: m.photoId || null,
             photo_path: m.photoPath || null,
             photo_name: m.photoName || null,
-            category_id: m.categoryId || null,
+            category_id: safeBigint(m.categoryId, null),
             category_name: m.categoryName || null,
             milestone_type: m.milestone_type || 'anniversary',
             repeat_yearly: m.repeat_yearly || false
@@ -2358,14 +2364,14 @@ async function migrateMilestonesToSupabase() {
 async function saveMilestonesToSupabase() {
     try {
         const rows = anniversaryMilestones.map(m => ({
-            id: parseInt(m.id) || Date.now(),
+            id: safeBigint(m.id, Date.now()),
             date: m.date,
             title: m.title,
             description: m.description || '',
             photo_id: m.photoId || null,
             photo_path: m.photoPath || null,
             photo_name: m.photoName || null,
-            category_id: m.categoryId || null,
+            category_id: safeBigint(m.categoryId, null),
             category_name: m.categoryName || null,
             milestone_type: m.milestone_type || 'anniversary',
             repeat_yearly: m.repeat_yearly || false
