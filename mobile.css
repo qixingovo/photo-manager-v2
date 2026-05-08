@@ -72,6 +72,8 @@ body {
     overflow-y: auto !important;
     height: 100%;
     flex: 1;
+    padding-bottom: 80px;
+    box-sizing: border-box;
 }
 
 /* ========================================
