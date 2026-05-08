@@ -137,6 +137,7 @@ async function checkLogin() {
         showMainApp()
         await Promise.all([loadCategories(), loadPhotos()])
         window.checkIncomingBottles();
+        window.checkIncomingNotes();
     } else {
         showLoginPage()
     }
@@ -194,6 +195,7 @@ window.handleLogin = async function(e) {
         showMainApp()
         await Promise.all([loadCategories(), loadPhotos()])
         window.checkIncomingBottles();
+        window.checkIncomingNotes();
     }
 }
 
@@ -557,6 +559,16 @@ window.toggleSection = function(section) {
             loadPartnerProfile()
         } else {
             partnerProfileSection.style.display = 'none'
+        }
+    } else if (section === 'secretNote') {
+        const sec = document.getElementById('secretNoteSection')
+        if (!sec) return
+        if (sec.style.display === 'none' || !sec.style.display) {
+            hideAll()
+            sec.style.display = 'block'
+            loadSecretNoteInbox()
+        } else {
+            sec.style.display = 'none'
         }
     }
 }
@@ -5531,6 +5543,200 @@ window.removeProfileCategory = function(key) {
     if (!confirm('删除分类 "' + (window.partnerProfileData.categories[key]?.label || key) + '" ？')) return;
     delete window.partnerProfileData.categories[key];
     renderPartnerProfile();
+};
+
+// ========================================
+// 悄悄话
+// ========================================
+window._incomingNote = null;
+
+function loadSecretNoteInbox() {
+    const inboxEl = document.getElementById('secretNoteInbox');
+    if (!inboxEl) return;
+    window.checkIncomingNotes().then(function() {
+        if (window._incomingNote) {
+            inboxEl.innerHTML = '<div class="secret-note-preview" onclick="window.openReceivedNote()">' +
+                '<div class="secret-note-icon">💌</div>' +
+                '<div class="secret-note-hint">你有一张新的小纸条</div>' +
+                '<div class="secret-note-action">点击打开</div>' +
+                '</div>';
+        } else {
+            inboxEl.innerHTML = '<p class="empty-hint">还没有收到悄悄话 💭</p><small>写一张小纸条给对方吧</small>';
+        }
+    });
+}
+
+window.openSecretNoteSendModal = function() {
+    var modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.id = 'secretNoteSendModal';
+    modal.innerHTML = '<div class="modal-content modal-small" style="max-width:460px;">' +
+        '<span class="modal-close" onclick="document.getElementById(\'secretNoteSendModal\').remove()">&times;</span>' +
+        '<h2 style="margin:0 0 16px;">💌 写张小纸条</h2>' +
+        '<div style="margin-bottom:12px;">' +
+        '<textarea id="secretNoteContent" placeholder="想说点什么...（200字）" maxlength="200" rows="4" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;resize:vertical;box-sizing:border-box;"></textarea>' +
+        '</div>' +
+        '<div style="margin-bottom:12px;">' +
+        '<div style="font-size:13px;color:#666;margin-bottom:8px;">发送方式：</div>' +
+        '<label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;cursor:pointer;">' +
+        '<input type="radio" name="secretNoteMode" value="instant" checked onchange="window.onSecretNoteModeChange()"> 📨 即时发送' +
+        '</label>' +
+        '<label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;cursor:pointer;">' +
+        '<input type="radio" name="secretNoteMode" value="scheduled" onchange="window.onSecretNoteModeChange()"> ⏰ 定时送达' +
+        '</label>' +
+        '<div id="secretNoteScheduledRow" style="display:none;margin-left:24px;margin-bottom:6px;">' +
+        '<input type="datetime-local" id="secretNoteRevealAt" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;">' +
+        '</div>' +
+        '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;">' +
+        '<input type="radio" name="secretNoteMode" value="proximity" onchange="window.onSecretNoteModeChange()"> 📍 见面解锁' +
+        '</label>' +
+        '<div id="secretNoteProximityRow" style="display:none;margin-left:24px;margin-top:6px;">' +
+        '<div style="display:flex;gap:6px;margin-bottom:6px;">' +
+        '<input type="number" id="secretNoteRevealLat" placeholder="纬度" step="any" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px;">' +
+        '<input type="number" id="secretNoteRevealLng" placeholder="经度" step="any" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px;">' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:6px;">' +
+        '<span style="font-size:12px;color:#666;">半径:</span>' +
+        '<input type="range" id="secretNoteRadius" min="50" max="1000" value="200" step="50" style="flex:1;">' +
+        '<span id="secretNoteRadiusLabel" style="font-size:12px;color:#666;min-width:40px;">200m</span>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;">' +
+        '<button onclick="document.getElementById(\'secretNoteSendModal\').remove()" class="btn btn-secondary" style="flex:1;">取消</button>' +
+        '<button onclick="window.sendSecretNote()" class="btn btn-primary" style="flex:1;">送出 💌</button>' +
+        '</div>' +
+        '</div>';
+    document.body.appendChild(modal);
+    setTimeout(function() {
+        var slider = document.getElementById('secretNoteRadius');
+        if (slider) {
+            slider.addEventListener('input', function() {
+                document.getElementById('secretNoteRadiusLabel').textContent = this.value + 'm';
+            });
+        }
+    }, 100);
+};
+
+window.onSecretNoteModeChange = function() {
+    var mode = document.querySelector('input[name="secretNoteMode"]:checked').value;
+    document.getElementById('secretNoteScheduledRow').style.display = mode === 'scheduled' ? 'block' : 'none';
+    document.getElementById('secretNoteProximityRow').style.display = mode === 'proximity' ? 'block' : 'none';
+};
+
+window.sendSecretNote = async function() {
+    var content = document.getElementById('secretNoteContent').value.trim();
+    if (!content) { alert('请写点什么吧 💌'); return; }
+    var mode = document.querySelector('input[name="secretNoteMode"]:checked').value;
+    var toUser = currentUser.username === 'laoda' ? 'xiaodi' : 'laoda';
+    var note = { from_user: currentUser.username, to_user: toUser, content: content, send_mode: mode };
+    if (mode === 'scheduled') {
+        var revealAt = document.getElementById('secretNoteRevealAt').value;
+        if (!revealAt) { alert('请选择送达时间'); return; }
+        note.reveal_at = new Date(revealAt).toISOString();
+    } else if (mode === 'proximity') {
+        var lat = parseFloat(document.getElementById('secretNoteRevealLat').value);
+        var lng = parseFloat(document.getElementById('secretNoteRevealLng').value);
+        if (isNaN(lat) || isNaN(lng)) { alert('请输入解锁坐标'); return; }
+        note.reveal_lat = lat;
+        note.reveal_lng = lng;
+        note.reveal_radius = parseInt(document.getElementById('secretNoteRadius').value) || 200;
+    }
+    try {
+        await supabase.from('secret_notes').insert(note);
+        document.getElementById('secretNoteSendModal').remove();
+        alert('小纸条已送出 💌');
+    } catch (e) { alert('送出失败: ' + e.message); }
+};
+
+window.checkIncomingNotes = async function() {
+    if (!currentUser) return;
+    try {
+        await supabase.from('secret_notes')
+            .update({ status: 'expired' })
+            .eq('status', 'hidden')
+            .eq('to_user', currentUser.username)
+            .lt('expires_at', new Date().toISOString());
+        var data = null;
+        var instantResult = await supabase
+            .from('secret_notes')
+            .select('*')
+            .eq('to_user', currentUser.username)
+            .eq('status', 'hidden')
+            .eq('send_mode', 'instant')
+            .order('created_at', { ascending: false })
+            .limit(1);
+        data = instantResult.data;
+        if (!data || data.length === 0) {
+            var schedResult = await supabase
+                .from('secret_notes')
+                .select('*')
+                .eq('to_user', currentUser.username)
+                .eq('status', 'hidden')
+                .eq('send_mode', 'scheduled')
+                .lte('reveal_at', new Date().toISOString())
+                .order('created_at', { ascending: false })
+                .limit(1);
+            data = schedResult.data;
+        }
+        if (data && data.length > 0) {
+            window._incomingNote = data[0];
+            var inboxEl = document.getElementById('secretNoteInbox');
+            if (inboxEl && inboxEl.offsetParent !== null) { loadSecretNoteInbox(); }
+            window.showPaperNotification();
+        }
+    } catch (e) { /* silent */ }
+};
+
+window.showPaperNotification = function() {
+    if (!window._incomingNote) return;
+    var existing = document.getElementById('secretNoteNotification');
+    if (existing) existing.remove();
+    var el = document.createElement('div');
+    el.id = 'secretNoteNotification';
+    el.className = 'secret-note-notification';
+    el.innerHTML = '<span class="note-notify-icon">💌</span> 你收到了一张小纸条';
+    el.onclick = function() { el.remove(); window.openReceivedNote(); };
+    document.body.appendChild(el);
+    setTimeout(function() { if (el.parentNode) el.remove(); }, 5000);
+};
+
+window.openReceivedNote = async function() {
+    var note = window._incomingNote;
+    if (!note) return;
+    var notif = document.getElementById('secretNoteNotification');
+    if (notif) notif.remove();
+    var modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.id = 'receivedNoteModal';
+    var time = new Date(note.created_at);
+    var timeStr = time.getHours().toString().padStart(2,'0') + ':' + time.getMinutes().toString().padStart(2,'0');
+    var fromName = note.from_user === 'laoda' ? '老大' : '小弟';
+    modal.innerHTML = '<div class="modal-content modal-small" style="max-width:380px;text-align:center;padding:0;overflow:hidden;">' +
+        '<div class="secret-note-paper" id="secretNotePaper">' +
+        '<div class="secret-note-paper-inner">' +
+        '<div class="secret-note-from">💌 来自 ' + escapeHtml(fromName) + '</div>' +
+        '<div class="secret-note-content">' + escapeHtml(note.content) + '</div>' +
+        '<div class="secret-note-time">' + timeStr + '</div>' +
+        '</div>' +
+        '</div>' +
+        '<button onclick="document.getElementById(\'receivedNoteModal\').remove();window.closeReceivedNote()" class="btn btn-primary" style="margin:16px;width:calc(100% - 32px);">💝 我知道了</button>' +
+        '</div>';
+    document.body.appendChild(modal);
+    setTimeout(function() {
+        var paper = document.getElementById('secretNotePaper');
+        if (paper) paper.classList.add('unfolded');
+    }, 50);
+};
+
+window.closeReceivedNote = async function() {
+    var note = window._incomingNote;
+    if (!note) return;
+    await supabase.from('secret_notes').update({ status: 'revealed', revealed_at: new Date().toISOString() }).eq('id', note.id);
+    window._incomingNote = null;
+    loadSecretNoteInbox();
 };
 
 // 点击外部收起已标记浮窗

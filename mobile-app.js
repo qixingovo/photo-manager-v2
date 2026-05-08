@@ -669,6 +669,7 @@ const mobile = {
             this.showPage('home');
             this.renderCoupleBanner();
             this.checkIncomingBottles();
+            this.checkIncomingNotes();
         } else if (tab === 'photos') {
             this.showPage('photos');
             this.renderPhotos();
@@ -714,6 +715,9 @@ const mobile = {
         } else if (tab === 'partnerProfile') {
             this.showPage('partnerProfile');
             this.loadPartnerProfile();
+        } else if (tab === 'secretNote') {
+            this.showPage('secretNote');
+            this.loadSecretNoteInbox();
         }
     },
 
@@ -6343,6 +6347,255 @@ const mobile = {
         if (!confirm('删除分类 "' + (this.partnerProfileData.categories[key]?.label || key) + '" ？')) return;
         delete this.partnerProfileData.categories[key];
         this.renderPartnerProfile();
+    },
+
+    // ========================================
+    // 悄悄话
+    // ========================================
+
+    async loadSecretNoteInbox() {
+        await this.checkIncomingNotes();
+        var inboxEl = document.getElementById('mobileSecretNoteInbox');
+        if (!inboxEl) return;
+        if (this._incomingNote) {
+            inboxEl.innerHTML = '<div class="secret-note-preview" onclick="mobile.openReceivedNote()">' +
+                '<div class="secret-note-icon">💌</div>' +
+                '<div class="secret-note-hint">你有一张新的小纸条</div>' +
+                '<div class="secret-note-action">点击打开</div>' +
+                '</div>';
+        } else {
+            inboxEl.innerHTML = '<p style="margin-top:60px;">还没有收到悄悄话 💭</p><small>写一张小纸条给对方吧</small>';
+        }
+    },
+
+    openSecretNoteSendModal() {
+        var self = this;
+        var modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'mobileSecretNoteSendModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '1000';
+        modal.innerHTML = '<div class="modal-card" style="max-width:92vw;padding:16px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+            '<h3 style="margin:0;">💌 写张小纸条</h3>' +
+            '<button onclick="document.getElementById(\'mobileSecretNoteSendModal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">×</button>' +
+            '</div>' +
+            '<textarea id="mobileSecretNoteContent" placeholder="想说点什么...（200字）" maxlength="200" rows="4" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;resize:none;box-sizing:border-box;margin-bottom:12px;"></textarea>' +
+            '<div style="margin-bottom:12px;">' +
+            '<div style="font-size:13px;color:#666;margin-bottom:6px;">发送方式：</div>' +
+            '<label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;cursor:pointer;font-size:14px;">' +
+            '<input type="radio" name="mSecretNoteMode" value="instant" checked onchange="mobile.onSecretNoteModeChange()"> 📨 即时发送' +
+            '</label>' +
+            '<label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;cursor:pointer;font-size:14px;">' +
+            '<input type="radio" name="mSecretNoteMode" value="scheduled" onchange="mobile.onSecretNoteModeChange()"> ⏰ 定时送达' +
+            '</label>' +
+            '<div id="mSecretNoteScheduledRow" style="display:none;margin-left:24px;margin-bottom:4px;">' +
+            '<input type="datetime-local" id="mSecretNoteRevealAt" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;">' +
+            '</div>' +
+            '<label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;cursor:pointer;font-size:14px;">' +
+            '<input type="radio" name="mSecretNoteMode" value="proximity" onchange="mobile.onSecretNoteModeChange()"> 📍 见面解锁' +
+            '</label>' +
+            '<div id="mSecretNoteProximityRow" style="display:none;margin-left:24px;margin-top:6px;">' +
+            '<div style="display:flex;gap:4px;margin-bottom:6px;">' +
+            '<input type="number" id="mSecretNoteRevealLat" placeholder="纬度" step="any" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px;">' +
+            '<input type="number" id="mSecretNoteRevealLng" placeholder="经度" step="any" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px;">' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:6px;">' +
+            '<span style="font-size:12px;color:#666;">半径:</span>' +
+            '<input type="range" id="mSecretNoteRadius" min="50" max="1000" value="200" step="50" style="flex:1;">' +
+            '<span id="mSecretNoteRadiusLabel" style="font-size:12px;color:#666;">200m</span>' +
+            '</div>' +
+            '</div>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;">' +
+            '<button onclick="document.getElementById(\'mobileSecretNoteSendModal\').remove()" class="btn-secondary" style="flex:1;">取消</button>' +
+            '<button onclick="mobile.sendSecretNote()" class="btn-primary" style="flex:1;">送出 💌</button>' +
+            '</div>' +
+            '</div>';
+        document.body.appendChild(modal);
+        setTimeout(function() {
+            var slider = document.getElementById('mSecretNoteRadius');
+            if (slider) {
+                slider.addEventListener('input', function() {
+                    document.getElementById('mSecretNoteRadiusLabel').textContent = this.value + 'm';
+                });
+            }
+            // Try get current location for proximity mode
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(pos) {
+                    var latEl = document.getElementById('mSecretNoteRevealLat');
+                    var lngEl = document.getElementById('mSecretNoteRevealLng');
+                    if (latEl && lngEl && !latEl.value) {
+                        latEl.value = pos.coords.latitude.toFixed(5);
+                        lngEl.value = pos.coords.longitude.toFixed(5);
+                    }
+                }, function() {}, { timeout: 5000 });
+            }
+        }, 100);
+    },
+
+    onSecretNoteModeChange() {
+        var mode = document.querySelector('input[name="mSecretNoteMode"]:checked').value;
+        document.getElementById('mSecretNoteScheduledRow').style.display = mode === 'scheduled' ? 'block' : 'none';
+        document.getElementById('mSecretNoteProximityRow').style.display = mode === 'proximity' ? 'block' : 'none';
+    },
+
+    async sendSecretNote() {
+        var content = document.getElementById('mobileSecretNoteContent').value.trim();
+        if (!content) { this.showToast('请写点什么吧 💌'); return; }
+        var supabase = this.initSupabase();
+        var mode = document.querySelector('input[name="mSecretNoteMode"]:checked').value;
+        var toUser = this.currentUser.username === 'laoda' ? 'xiaodi' : 'laoda';
+        var note = { from_user: this.currentUser.username, to_user: toUser, content: content, send_mode: mode };
+        if (mode === 'scheduled') {
+            var revealAt = document.getElementById('mSecretNoteRevealAt').value;
+            if (!revealAt) { this.showToast('请选择送达时间'); return; }
+            note.reveal_at = new Date(revealAt).toISOString();
+        } else if (mode === 'proximity') {
+            var lat = parseFloat(document.getElementById('mSecretNoteRevealLat').value);
+            var lng = parseFloat(document.getElementById('mSecretNoteRevealLng').value);
+            if (isNaN(lat) || isNaN(lng)) { this.showToast('请输入解锁坐标'); return; }
+            note.reveal_lat = lat;
+            note.reveal_lng = lng;
+            note.reveal_radius = parseInt(document.getElementById('mSecretNoteRadius').value) || 200;
+        }
+        try {
+            await supabase.from('secret_notes').insert(note);
+            document.getElementById('mobileSecretNoteSendModal').remove();
+            this.showToast('小纸条已送出 💌');
+        } catch (e) { this.showToast('送出失败: ' + e.message); }
+    },
+
+    async checkIncomingNotes() {
+        if (!this.currentUser) return;
+        try {
+            var supabase = this.initSupabase();
+            if (!supabase) return;
+            await supabase.from('secret_notes')
+                .update({ status: 'expired' })
+                .eq('status', 'hidden')
+                .eq('to_user', this.currentUser.username)
+                .lt('expires_at', new Date().toISOString());
+            var data = null;
+            var instantResult = await supabase
+                .from('secret_notes')
+                .select('*')
+                .eq('to_user', this.currentUser.username)
+                .eq('status', 'hidden')
+                .eq('send_mode', 'instant')
+                .order('created_at', { ascending: false })
+                .limit(1);
+            data = instantResult.data;
+            if (!data || data.length === 0) {
+                var schedResult = await supabase
+                    .from('secret_notes')
+                    .select('*')
+                    .eq('to_user', this.currentUser.username)
+                    .eq('status', 'hidden')
+                    .eq('send_mode', 'scheduled')
+                    .lte('reveal_at', new Date().toISOString())
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+                data = schedResult.data;
+            }
+            // Check proximity notes
+            if ((!data || data.length === 0) && navigator.geolocation) {
+                var self = this;
+                var proxResult = await supabase
+                    .from('secret_notes')
+                    .select('*')
+                    .eq('to_user', this.currentUser.username)
+                    .eq('status', 'hidden')
+                    .eq('send_mode', 'proximity')
+                    .order('created_at', { ascending: false });
+                if (proxResult.data && proxResult.data.length > 0) {
+                    navigator.geolocation.getCurrentPosition(function(pos) {
+                        for (var i = 0; i < proxResult.data.length; i++) {
+                            var note = proxResult.data[i];
+                            if (note.reveal_lat && note.reveal_lng) {
+                                var dist = self._calcDistance(pos.coords.latitude, pos.coords.longitude, note.reveal_lat, note.reveal_lng);
+                                if (dist <= (note.reveal_radius || 200)) {
+                                    data = [note];
+                                    break;
+                                }
+                            }
+                        }
+                        if (data && data.length > 0) {
+                            self._incomingNote = data[0];
+                            self.showPaperNotification();
+                        }
+                    }, function() {}, { timeout: 5000 });
+                }
+            }
+            if (data && data.length > 0 && !this._geoPending) {
+                this._incomingNote = data[0];
+                this.showPaperNotification();
+            }
+        } catch (e) { /* silent */ }
+    },
+
+    _calcDistance(lat1, lng1, lat2, lng2) {
+        var R = 6371000;
+        var dLat = (lat2 - lat1) * Math.PI / 180;
+        var dLng = (lng2 - lng1) * Math.PI / 180;
+        var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    },
+
+    showPaperNotification() {
+        if (!this._incomingNote) return;
+        var existing = document.getElementById('mobileSecretNoteNotification');
+        if (existing) existing.remove();
+        var self = this;
+        var el = document.createElement('div');
+        el.id = 'mobileSecretNoteNotification';
+        el.className = 'secret-note-notification';
+        el.innerHTML = '<span class="note-notify-icon">💌</span> 你收到了一张小纸条';
+        el.onclick = function() { el.remove(); self.openReceivedNote(); };
+        document.body.appendChild(el);
+        setTimeout(function() { if (el.parentNode) el.remove(); }, 5000);
+    },
+
+    async openReceivedNote() {
+        var note = this._incomingNote;
+        if (!note) return;
+        var notif = document.getElementById('mobileSecretNoteNotification');
+        if (notif) notif.remove();
+        var self = this;
+        var modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'mobileReceivedNoteModal';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '1000';
+        var time = new Date(note.created_at);
+        var timeStr = time.getHours().toString().padStart(2,'0') + ':' + time.getMinutes().toString().padStart(2,'0');
+        var fromName = note.from_user === 'laoda' ? '老大' : '小弟';
+        modal.innerHTML = '<div class="modal-card" style="max-width:90vw;padding:0;overflow:hidden;text-align:center;">' +
+            '<div class="secret-note-paper" id="mobileSecretNotePaper">' +
+            '<div class="secret-note-paper-inner">' +
+            '<div class="secret-note-from">💌 来自 ' + self.escapeHtml(fromName) + '</div>' +
+            '<div class="secret-note-content">' + self.escapeHtml(note.content) + '</div>' +
+            '<div class="secret-note-time">' + timeStr + '</div>' +
+            '</div>' +
+            '</div>' +
+            '<button onclick="document.getElementById(\'mobileReceivedNoteModal\').remove();mobile.closeReceivedNote()" class="btn-primary" style="margin:14px;width:calc(100% - 28px);">💝 我知道了</button>' +
+            '</div>';
+        document.body.appendChild(modal);
+        setTimeout(function() {
+            var paper = document.getElementById('mobileSecretNotePaper');
+            if (paper) paper.classList.add('unfolded');
+        }, 50);
+    },
+
+    async closeReceivedNote() {
+        var note = this._incomingNote;
+        if (!note) return;
+        var supabase = this.initSupabase();
+        await supabase.from('secret_notes').update({ status: 'revealed', revealed_at: new Date().toISOString() }).eq('id', note.id);
+        this._incomingNote = null;
+        this.loadSecretNoteInbox();
     },
 
 };
