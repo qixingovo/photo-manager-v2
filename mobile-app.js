@@ -6025,7 +6025,7 @@ const mobile = {
     _incomingBottle: null,
 
     openThrowBottleModal() {
-        const photo = this.currentPhoto;
+        const photo = this.photos.find(p => p.id === this.currentPhotoId);
         if (!photo) return;
         const self = this;
         const url = this.getPhotoUrl(photo.storage_path);
@@ -6063,7 +6063,7 @@ const mobile = {
     },
 
     async throwBottle() {
-        const photo = this.currentPhoto;
+        const photo = this.photos.find(p => p.id === this.currentPhotoId);
         if (!photo || !this.currentUser) return;
         const message = document.getElementById('mThrowMsg').value.trim();
         const timeMode = document.querySelector('input[name="mDriftTime"]:checked')?.value || 'random';
