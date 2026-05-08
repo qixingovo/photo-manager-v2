@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=53">
+    <link rel="stylesheet" href="mobile.css?v=56">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -75,7 +75,7 @@
             <p id="mobileNudgeCooldown" style="font-size:11px;color:#999;text-align:center;margin-top:4px;display:none;"></p>
         </div>
 
-        <!-- 功能入口卡片 3x3 -->
+        <!-- 功能入口卡片 2x4 -->
         <div class="feature-cards">
             <div class="feature-card" onclick="mobile.switchTab('moodDiary')" style="background:linear-gradient(135deg,#FFE0E6,#FFD4DD);">
                 <span class="feature-icon">📝</span>
@@ -756,7 +756,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=53"></script>
+    <script type="module" src="mobile-app.js?v=56"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;

@@ -1295,8 +1295,8 @@ window.openBatchLocationModal = function() {
 
     setTimeout(() => {
         const pickerMap = L.map('batchPickerMap').setView([35.86, 104.19], 4);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OSM',
+        L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+            attribution: '&copy; 高德地图',
             maxZoom: 18
         }).addTo(pickerMap);
 
@@ -2129,8 +2129,8 @@ async function initMapView() {
     if (!container || mapView) return;
 
     mapView = L.map('mapContainer').setView([35.86, 104.19], 4);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
+    L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+        attribution: '&copy; 高德地图',
         maxZoom: 18
     }).addTo(mapView);
 
@@ -2240,8 +2240,8 @@ window.pickLocationOnMap = function() {
 
     setTimeout(() => {
         const pickerMap = L.map('pickerMap').setView([35.86, 104.19], 4);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OSM',
+        L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+            attribution: '&copy; 高德地图',
             maxZoom: 18
         }).addTo(pickerMap);
 
@@ -5638,6 +5638,17 @@ window.openSecretNoteSendModal = function() {
                 document.getElementById('secretNoteRadiusLabel').textContent = this.value + 'm';
             });
         }
+        // Auto-fill coordinates for proximity mode
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(pos) {
+                var latEl = document.getElementById('secretNoteRevealLat');
+                var lngEl = document.getElementById('secretNoteRevealLng');
+                if (latEl && lngEl && !latEl.value) {
+                    latEl.value = pos.coords.latitude.toFixed(5);
+                    lngEl.value = pos.coords.longitude.toFixed(5);
+                }
+            }, function() {}, { timeout: 5000 });
+        }
     }, 100);
 };
 
@@ -5672,14 +5683,19 @@ window.sendSecretNote = async function() {
     } catch (e) { alert('送出失败: ' + e.message); }
 };
 
+window._notesExpiredCleaned = false;
+
 window.checkIncomingNotes = async function() {
     if (!currentUser) return;
     try {
-        await supabase.from('secret_notes')
-            .update({ status: 'expired' })
-            .eq('status', 'hidden')
-            .eq('to_user', currentUser.username)
-            .lt('expires_at', new Date().toISOString());
+        if (!window._notesExpiredCleaned) {
+            await supabase.from('secret_notes')
+                .update({ status: 'expired' })
+                .eq('status', 'hidden')
+                .eq('to_user', currentUser.username)
+                .lt('expires_at', new Date().toISOString());
+            window._notesExpiredCleaned = true;
+        }
         var data = null;
         var instantResult = await supabase
             .from('secret_notes')
@@ -5874,16 +5890,16 @@ window.fetchEmotionTimeline = async function() {
             supabase.from('photos').select('id, name, storage_path, created_at, location_name, taken_at')
                 .gte('created_at', startStr).order('created_at', { ascending: false }).limit(200),
             // 2. mood_diary
-            supabase.from('mood_diary').select('id, mood_emoji, content, created_at, user_id')
+            supabase.from('mood_diary').select('id, mood, content, created_at, user_name')
                 .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
             // 3. daily_chatter
-            supabase.from('daily_chatter').select('id, content, created_at, user_id')
+            supabase.from('daily_chatter').select('id, content, created_at, user_name')
                 .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
             // 4. milestones
             supabase.from('milestones').select('id, title, milestone_date, description, created_at')
                 .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
             // 5. couple_checkins
-            supabase.from('couple_checkins').select('id, note, checked_at, couple_tasks(title)')
+            supabase.from('couple_checkins').select('id, note, checked_at, user_name, couple_tasks(title)')
                 .gte('checked_at', startStr).order('checked_at', { ascending: false }).limit(100),
             // 6. drift_bottles (revealed)
             supabase.from('drift_bottles').select('id, message, thrown_at, revealed_at, from_user')
@@ -5978,17 +5994,17 @@ window.renderEmotionItem = function(item) {
 
     if (item.type === 'photo') {
         var url = getPhotoUrl(data.storage_path);
-        inner = '<div class="emotion-photo-wrap"><img src="' + url + '" class="emotion-photo-thumb" loading="lazy"></div>' +
+        inner = '<div class="emotion-photo-wrap"><img src="' + escapeHtml(url) + '" class="emotion-photo-thumb" loading="lazy"></div>' +
             '<div class="emotion-photo-name">' + escapeHtml(data.name || '照片') + '</div>';
         if (data.location_name) {
             inner += '<div class="emotion-loc">📍 ' + escapeHtml(data.location_name) + '</div>';
         }
     } else if (item.type === 'mood') {
-        userLabel = data.user_id === 'laoda' ? '老大' : '小弟';
-        inner = '<div class="emotion-mood-emoji">' + escapeHtml(data.mood_emoji || '😊') + '</div>' +
+        userLabel = data.user_name === 'laoda' ? '老大' : '小弟';
+        inner = '<div class="emotion-mood-emoji">' + escapeHtml(data.mood || '😊') + '</div>' +
             '<div class="emotion-mood-text">' + escapeHtml(data.content || '') + '</div>';
     } else if (item.type === 'chatter') {
-        userLabel = data.user_id === 'laoda' ? '老大' : '小弟';
+        userLabel = data.user_name === 'laoda' ? '老大' : '小弟';
         inner = '<div class="emotion-chatter-text">' + escapeHtml(data.content || '') + '</div>';
     } else if (item.type === 'milestone') {
         inner = '<div class="emotion-milestone-title">🎉 ' + escapeHtml(data.title || '纪念日') + '</div>';
@@ -5996,6 +6012,7 @@ window.renderEmotionItem = function(item) {
             inner += '<div class="emotion-milestone-desc">' + escapeHtml(data.description) + '</div>';
         }
     } else if (item.type === 'checkin') {
+        userLabel = data.user_name === 'laoda' ? '老大' : '小弟';
         var taskTitle = (data.couple_tasks && data.couple_tasks.title) ? data.couple_tasks.title : '打卡';
         inner = '<div class="emotion-checkin-task">✅ ' + escapeHtml(taskTitle) + '</div>';
         if (data.note) { inner += '<div class="emotion-checkin-note">' + escapeHtml(data.note) + '</div>'; }

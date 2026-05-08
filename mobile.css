@@ -259,8 +259,8 @@ body {
    ======================================== */
 .feature-cards {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
     padding: 0 12px;
     margin-bottom: 12px;
 }
@@ -268,12 +268,12 @@ body {
 
 .feature-card {
     border-radius: var(--radius);
-    padding: 12px 8px;
+    padding: 14px 12px;
     cursor: pointer;
     transition: all 0.25s ease;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     -webkit-tap-highlight-color: transparent;
 }
@@ -284,17 +284,17 @@ body {
 }
 
 .feature-icon {
-    font-size: 24px;
+    font-size: 28px;
 }
 
 .feature-title {
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--text);
 }
 
 .feature-sub {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-light);
 }
 
