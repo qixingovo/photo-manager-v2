@@ -24,6 +24,8 @@ const mobile = {
     _mainTabs: ['home', 'photos', 'upload', 'category', 'profile'],
     _currentMainTab: 'home',
     _tabTouchStartX: 0,
+    _gridTouchStartX: 0,
+    _gridTouchStartY: 0,
     previewFiles: [],
     pendingDeleteId: null,
     pendingDeleteType: null,
@@ -538,6 +540,21 @@ const mobile = {
             this._tabSwipeBound = false;
             document.body.removeEventListener('touchstart', this._boundTabTouchStart);
             document.body.removeEventListener('touchend', this._boundTabTouchEnd);
+        }
+
+        // 照片列表页支持滑动翻页
+        if (page === 'photos') {
+            if (!this._gridSwipeBound) {
+                this._gridSwipeBound = true;
+                this._boundGridTouchStart = this._gridTouchStart.bind(this);
+                this._boundGridTouchEnd = this._gridTouchEnd.bind(this);
+                document.body.addEventListener('touchstart', this._boundGridTouchStart, { passive: true });
+                document.body.addEventListener('touchend', this._boundGridTouchEnd, { passive: true });
+            }
+        } else if (this._gridSwipeBound) {
+            this._gridSwipeBound = false;
+            document.body.removeEventListener('touchstart', this._boundGridTouchStart);
+            document.body.removeEventListener('touchend', this._boundGridTouchEnd);
         }
 
         // 隐藏底部导航在详情页和登录页
@@ -1217,6 +1234,24 @@ const mobile = {
             if (newIdx >= 0 && newIdx < this._mainTabs.length) {
                 this.switchTab(this._mainTabs[newIdx]);
             }
+        }
+    },
+
+    // 照片列表滑动翻页（下一页/上一页）
+    _gridTouchStart(e) {
+        if (e.target.closest('button, input, textarea, a, .photo-card, .pagination-btn, .bottom-nav')) return;
+        this._gridTouchStartX = e.touches[0].clientX;
+        this._gridTouchStartY = e.touches[0].clientY;
+    },
+
+    _gridTouchEnd(e) {
+        if (!this._gridTouchStartX) return;
+        const dx = e.changedTouches[0].clientX - this._gridTouchStartX;
+        const dy = e.changedTouches[0].clientY - this._gridTouchStartY;
+        this._gridTouchStartX = 0;
+        // 必须是明显水平滑动（|dx| > |dy|）且距离 > 80px
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 80) {
+            if (dx > 0) { this.prevPage(); } else { this.nextPage(); }
         }
     },
 
