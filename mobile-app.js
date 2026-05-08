@@ -6753,11 +6753,32 @@ const mobile = {
     // 情感时间轴
     // ========================================
 
+    _timelineHiddenPhotos: new Set(),
+
+    async loadTimelineHiddenPhotos() {
+        try { var cached = JSON.parse(localStorage.getItem('timeline_hidden_photos') || '[]'); this._timelineHiddenPhotos = new Set(cached); } catch(e) {}
+        var supabase = this.initSupabase();
+        if (!supabase) return;
+        try {
+            var { data } = await supabase.from('app_settings').select('value').eq('key', 'timeline_hidden_photos').maybeSingle();
+            if (data && data.value) { var serverList = JSON.parse(data.value); this._timelineHiddenPhotos = new Set(serverList); localStorage.setItem('timeline_hidden_photos', JSON.stringify(serverList)); }
+        } catch(e) {}
+    },
+
+    async saveTimelineHiddenPhotos() {
+        var arr = Array.from(this._timelineHiddenPhotos);
+        localStorage.setItem('timeline_hidden_photos', JSON.stringify(arr));
+        var supabase = this.initSupabase();
+        if (!supabase) return;
+        try { await supabase.from('app_settings').upsert({ key: 'timeline_hidden_photos', value: JSON.stringify(arr) }); } catch(e) {}
+    },
+
     async loadEmotionTimeline() {
         var self = this;
         var container = document.getElementById('mobileEmotionTimelineContainer');
         if (!container) return;
         container.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">加载中...</p>';
+        await this.loadTimelineHiddenPhotos();
         this._emotionTimelinePage = 1;
         this._emotionTimelineData = [];
         await this.fetchEmotionTimeline();
@@ -6793,7 +6814,7 @@ const mobile = {
 
             var self = this;
             if (results[0].status === 'fulfilled' && results[0].value.data) {
-                results[0].value.data.forEach(function(p) { items.push({ type: 'photo', time: p.created_at, data: p }); });
+                results[0].value.data.forEach(function(p) { if (!self._timelineHiddenPhotos.has(p.id)) { items.push({ type: 'photo', time: p.created_at, data: p }); } });
             }
             if (results[1].status === 'fulfilled' && results[1].value.data) {
                 results[1].value.data.forEach(function(m) { items.push({ type: 'mood', time: m.created_at, data: m }); });
@@ -6886,14 +6907,18 @@ const mobile = {
             inner = '<div class="emotion-bottle-msg">🍾 ' + this.escapeHtml(data.message || '一张照片') + '</div>';
         }
 
-        var deleteBtn = item.type === 'photo' ? '<span class="emotion-item-delete" onclick="event.stopPropagation();mobile.deleteTimelinePhoto(\'' + data.id + '\')" title="删除">×</span>' : '';
+        var toggleBtn = '';
+        if (item.type === 'photo') {
+            var hidden = this._timelineHiddenPhotos.has(data.id);
+            toggleBtn = '<span class="emotion-item-delete emotion-item-toggle' + (hidden ? ' emotion-item-hidden' : '') + '" onclick="event.stopPropagation();mobile.toggleTimelinePhotoVisibility(\'' + data.id + '\')" title="' + (hidden ? '重新显示在时间线' : '从时间线隐藏') + '">' + (hidden ? '👁' : '×') + '</span>';
+        }
 
         return '<div class="emotion-item emotion-item-' + item.type + '">' +
             '<div class="emotion-item-header">' +
             '<span class="emotion-item-icon">' + icon + '</span>' +
             (userLabel ? '<span class="emotion-item-user">' + userLabel + '</span>' : '') +
             '<span class="emotion-item-time">' + timeStr + '</span>' +
-            deleteBtn +
+            toggleBtn +
             '</div>' +
             '<div class="emotion-item-body">' + inner + '</div>' +
             '</div>';
@@ -6904,27 +6929,26 @@ const mobile = {
         this.renderEmotionTimeline();
     },
 
-    async deleteTimelinePhoto(photoId) {
-        if (!confirm('确定要删除这张照片吗？')) return;
-        try {
-            var supabase = this.initSupabase();
-            if (!supabase) return;
-            var photoItem = this._emotionTimelineData.find(function(item) {
-                return item.type === 'photo' && item.data && item.data.id === photoId;
-            });
-            if (photoItem && photoItem.data && photoItem.data.storage_path) {
-                await supabase.storage.from('photo').remove([photoItem.data.storage_path]);
-            }
-            await supabase.from('photo_categories').delete().eq('photo_id', photoId);
-            await supabase.from('comments').delete().eq('photo_id', photoId);
-            await supabase.from('photos').delete().eq('id', photoId);
+    async toggleTimelinePhotoVisibility(photoId) {
+        var self = this;
+        if (this._timelineHiddenPhotos.has(photoId)) {
+            // 取消隐藏
+            this._timelineHiddenPhotos.delete(photoId);
+            await this.saveTimelineHiddenPhotos();
+            await this.fetchEmotionTimeline();
+            this.renderEmotionTimeline();
+            this.showToast('照片已重新显示');
+        } else {
+            // 从时间轴隐藏
+            if (!confirm('要从时间线中隐藏这张照片吗？\n（照片本身不会被删除，仍然在相册中保留）')) return;
+            this._timelineHiddenPhotos.add(photoId);
+            await this.saveTimelineHiddenPhotos();
             this._emotionTimelineData = this._emotionTimelineData.filter(function(item) {
                 return !(item.type === 'photo' && item.data && item.data.id === photoId);
             });
-            this.photos = this.photos.filter(function(p) { return p.id !== photoId; });
             this.renderEmotionTimeline();
-            this.showToast('照片已删除');
-        } catch (e) { this.showToast('删除失败: ' + e.message); }
+            this.showToast('照片已从时间线隐藏');
+        }
     },
 
     renderEmotionTimelineFilters() {

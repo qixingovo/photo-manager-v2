@@ -2276,6 +2276,8 @@ mark {
     transition: color 0.15s;
 }
 .emotion-item-delete:hover { color: #e55; }
+.emotion-item-toggle.emotion-item-hidden { color: #64B5F6; opacity: 0.7; }
+.emotion-item-toggle.emotion-item-hidden:hover { color: #42A5F5; opacity: 1; }
 
 .emotion-item-body {
     padding-left: 22px;

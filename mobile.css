@@ -3112,6 +3112,8 @@ mark {
     line-height: 1;
 }
 .emotion-item-delete:active { color: #e55; }
+.emotion-item-toggle.emotion-item-hidden { color: #64B5F6; }
+.emotion-item-toggle.emotion-item-hidden:active { color: #42A5F5; }
 
 .emotion-item-body {
     padding-left: 18px;
