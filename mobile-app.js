@@ -21,6 +21,9 @@ const mobile = {
     currentPhotoId: null,
     _detailTouchX: 0,
     _timelinePage: 1,
+    _mainTabs: ['home', 'photos', 'upload', 'category', 'profile'],
+    _currentMainTab: 'home',
+    _tabTouchStartX: 0,
     previewFiles: [],
     pendingDeleteId: null,
     pendingDeleteType: null,
@@ -519,6 +522,23 @@ const mobile = {
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.toggle('active', item.dataset.page === page);
         });
+
+        // 主 tab 支持滑动切换，子页面禁用
+        const isMainTab = this._mainTabs.includes(page);
+        if (isMainTab) {
+            this._currentMainTab = page;
+            if (!this._tabSwipeBound) {
+                this._tabSwipeBound = true;
+                this._boundTabTouchStart = this._tabTouchStart.bind(this);
+                this._boundTabTouchEnd = this._tabTouchEnd.bind(this);
+                document.body.addEventListener('touchstart', this._boundTabTouchStart, { passive: true });
+                document.body.addEventListener('touchend', this._boundTabTouchEnd, { passive: true });
+            }
+        } else if (this._tabSwipeBound) {
+            this._tabSwipeBound = false;
+            document.body.removeEventListener('touchstart', this._boundTabTouchStart);
+            document.body.removeEventListener('touchend', this._boundTabTouchEnd);
+        }
 
         // 隐藏底部导航在详情页和登录页
         const bottomNav = document.getElementById('bottomNav');
@@ -1179,6 +1199,25 @@ const mobile = {
         const nextBtn = document.getElementById('detailNextBtn');
         if (prevBtn) prevBtn.style.opacity = idx > 0 ? '1' : '0.3';
         if (nextBtn) nextBtn.style.opacity = idx < this.photos.length - 1 ? '1' : '0.3';
+    },
+
+    // 主 tab 滑动切换
+    _tabTouchStart(e) {
+        if (e.target.closest('button, input, textarea, a, .nav-item, .bottom-nav, .feature-card, .photo-card, .menu-item')) return;
+        this._tabTouchStartX = e.touches[0].clientX;
+    },
+
+    _tabTouchEnd(e) {
+        if (!this._tabTouchStartX) return;
+        const dx = e.changedTouches[0].clientX - this._tabTouchStartX;
+        this._tabTouchStartX = 0;
+        if (Math.abs(dx) > 60) {
+            const currentIdx = this._mainTabs.indexOf(this._currentMainTab);
+            const newIdx = currentIdx + (dx > 0 ? -1 : 1);
+            if (newIdx >= 0 && newIdx < this._mainTabs.length) {
+                this.switchTab(this._mainTabs[newIdx]);
+            }
+        }
     },
 
     async toggleFavorite() {
