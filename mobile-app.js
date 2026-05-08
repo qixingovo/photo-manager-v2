@@ -5978,7 +5978,8 @@ const mobile = {
     async loadPartnerProfile() {
         const supabase = this.initSupabase();
         try {
-            const { data } = await supabase.from('app_settings').select('value').eq('key', 'partner_profile').single();
+            const profileKey = 'partner_profile_' + (this.currentUser?.username || 'default');
+            const { data } = await supabase.from('app_settings').select('value').eq('key', profileKey).single();
             if (data && data.value) {
                 this.partnerProfileData = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
             } else {
@@ -6117,7 +6118,8 @@ const mobile = {
         const supabase = this.initSupabase();
         if (!supabase) { this.showToast('数据库未连接'); return; }
         try {
-            await supabase.from('app_settings').upsert({ key: 'partner_profile', value: JSON.stringify(p) });
+            const profileKey = 'partner_profile_' + (this.currentUser?.username || 'default');
+            await supabase.from('app_settings').upsert({ key: profileKey, value: JSON.stringify(p) });
             this._partnerProfileEditing = false;
             this.renderPartnerProfile();
             this.showToast('已保存');

@@ -5253,8 +5253,9 @@ const DEFAULT_PROFILE = {
 };
 
 async function loadPartnerProfile() {
+    const profileKey = 'partner_profile_' + (currentUser?.username || 'default');
     try {
-        const { data } = await supabase.from('app_settings').select('value').eq('key', 'partner_profile').single();
+        const { data } = await supabase.from('app_settings').select('value').eq('key', profileKey).single();
         if (data && data.value) {
             window.partnerProfileData = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
         } else {
@@ -5370,7 +5371,8 @@ async function savePartnerProfile() {
     });
 
     try {
-        await supabase.from('app_settings').upsert({ key: 'partner_profile', value: JSON.stringify(p) });
+        const profileKey = 'partner_profile_' + (currentUser?.username || 'default');
+        await supabase.from('app_settings').upsert({ key: profileKey, value: JSON.stringify(p) });
         window._partnerProfileEditing = false;
         renderPartnerProfile();
         showToast('已保存');
