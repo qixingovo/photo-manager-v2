@@ -1211,7 +1211,7 @@ const mobile = {
         if (!this._tabTouchStartX) return;
         const dx = e.changedTouches[0].clientX - this._tabTouchStartX;
         this._tabTouchStartX = 0;
-        if (Math.abs(dx) > 60) {
+        if (Math.abs(dx) > window.innerWidth / 2) {
             const currentIdx = this._mainTabs.indexOf(this._currentMainTab);
             const newIdx = currentIdx + (dx > 0 ? -1 : 1);
             if (newIdx >= 0 && newIdx < this._mainTabs.length) {
