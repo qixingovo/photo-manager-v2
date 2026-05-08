@@ -719,6 +719,9 @@ const mobile = {
         } else if (tab === 'secretNote') {
             this.showPage('secretNote');
             this.loadSecretNoteInbox();
+        } else if (tab === 'emotionTimeline') {
+            this.showPage('emotionTimeline');
+            this.loadEmotionTimeline();
         }
     },
 
@@ -6673,6 +6676,211 @@ const mobile = {
         popup.onclick = function() { popup.remove(); };
         document.body.appendChild(popup);
         setTimeout(function() { if (popup.parentNode) { popup.classList.add('nudge-popup-out'); setTimeout(function() { if (popup.parentNode) popup.remove(); }, 400); } }, 3000);
+    },
+
+    // ========================================
+    // 情感时间轴
+    // ========================================
+
+    async loadEmotionTimeline() {
+        var self = this;
+        var container = document.getElementById('mobileEmotionTimelineContainer');
+        if (!container) return;
+        container.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">加载中...</p>';
+        this._emotionTimelinePage = 1;
+        this._emotionTimelineData = [];
+        await this.fetchEmotionTimeline();
+        this.renderEmotionTimeline();
+        this.renderEmotionTimelineFilters();
+    },
+
+    async fetchEmotionTimeline() {
+        var supabase = this.initSupabase();
+        if (!supabase) return;
+        var now = new Date();
+        var threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+        var startStr = threeMonthsAgo.toISOString();
+        var items = [];
+
+        try {
+            var results = await Promise.allSettled([
+                supabase.from('photos').select('id, name, storage_path, created_at, location_name, taken_at')
+                    .gte('created_at', startStr).order('created_at', { ascending: false }).limit(200),
+                supabase.from('mood_diary').select('id, mood_emoji, content, created_at, user_id')
+                    .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
+                supabase.from('daily_chatter').select('id, content, created_at, user_id')
+                    .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
+                supabase.from('milestones').select('id, title, milestone_date, description, created_at')
+                    .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
+                supabase.from('couple_checkins').select('id, note, checked_at, couple_tasks(title)')
+                    .gte('checked_at', startStr).order('checked_at', { ascending: false }).limit(100),
+                supabase.from('drift_bottles').select('id, message, thrown_at, revealed_at, from_user')
+                    .eq('status', 'revealed').gte('revealed_at', startStr)
+                    .order('revealed_at', { ascending: false }).limit(50)
+            ]);
+
+            var self = this;
+            if (results[0].status === 'fulfilled' && results[0].value.data) {
+                results[0].value.data.forEach(function(p) { items.push({ type: 'photo', time: p.taken_at || p.created_at, data: p }); });
+            }
+            if (results[1].status === 'fulfilled' && results[1].value.data) {
+                results[1].value.data.forEach(function(m) { items.push({ type: 'mood', time: m.created_at, data: m }); });
+            }
+            if (results[2].status === 'fulfilled' && results[2].value.data) {
+                results[2].value.data.forEach(function(c) { items.push({ type: 'chatter', time: c.created_at, data: c }); });
+            }
+            if (results[3].status === 'fulfilled' && results[3].value.data) {
+                results[3].value.data.forEach(function(m) { items.push({ type: 'milestone', time: m.milestone_date || m.created_at, data: m }); });
+            }
+            if (results[4].status === 'fulfilled' && results[4].value.data) {
+                results[4].value.data.forEach(function(c) { items.push({ type: 'checkin', time: c.checked_at, data: c }); });
+            }
+            if (results[5].status === 'fulfilled' && results[5].value.data) {
+                results[5].value.data.forEach(function(b) { items.push({ type: 'bottle', time: b.revealed_at, data: b }); });
+            }
+        } catch (e) { /* silent */ }
+
+        items.sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
+        this._emotionTimelineData = items;
+    },
+
+    renderEmotionTimeline() {
+        var container = document.getElementById('mobileEmotionTimelineContainer');
+        if (!container) return;
+        var self = this;
+        var items = this._emotionTimelineData;
+        var filters = this._emotionTimelineFilters;
+        if (filters) {
+            items = items.filter(function(item) { return filters[item.type]; });
+        }
+        var visible = items.slice(0, this._emotionTimelinePage * 30);
+
+        if (visible.length === 0) {
+            container.innerHTML = '<p style="text-align:center;color:#999;padding:60px;">这段时间还没有记录 💭</p>';
+            return;
+        }
+
+        var html = '';
+        var lastDate = '';
+
+        visible.forEach(function(item) {
+            var dateStr = new Date(item.time).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+            if (dateStr !== lastDate) {
+                lastDate = dateStr;
+                html += '<div class="emotion-date-divider emotion-date-divider-mobile"><span>' + dateStr + '</span></div>';
+            }
+            html += self.renderEmotionItem(item);
+        });
+
+        if (visible.length < items.length) {
+            html += '<div style="text-align:center;padding:16px;"><button class="btn-secondary" onclick="mobile.loadMoreEmotionTimeline()" style="width:100%;">加载更多</button></div>';
+        }
+
+        container.innerHTML = html;
+    },
+
+    renderEmotionItem(item) {
+        var EMOTION_TYPES = [
+            { key: 'photo', icon: '📷' }, { key: 'mood', icon: '📝' }, { key: 'chatter', icon: '💬' },
+            { key: 'milestone', icon: '🎉' }, { key: 'checkin', icon: '✅' }, { key: 'bottle', icon: '🍾' }
+        ];
+        var def = EMOTION_TYPES.find(function(t) { return t.key === item.type; });
+        var icon = def ? def.icon : '📌';
+        var data = item.data;
+        var timeStr = new Date(item.time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        var inner = '';
+        var userLabel = '';
+
+        if (item.type === 'photo') {
+            var url = this.getPhotoUrl(data.storage_path);
+            inner = '<div class="emotion-photo-wrap"><img src="' + url + '" class="emotion-photo-thumb" loading="lazy"></div>' +
+                '<div class="emotion-photo-name">' + this.escapeHtml(data.name || '照片') + '</div>';
+            if (data.location_name) {
+                inner += '<div class="emotion-loc">📍 ' + this.escapeHtml(data.location_name) + '</div>';
+            }
+        } else if (item.type === 'mood') {
+            userLabel = data.user_id === 'laoda' ? '老大' : '小弟';
+            inner = '<div class="emotion-mood-emoji">' + this.escapeHtml(data.mood_emoji || '😊') + '</div>' +
+                '<div class="emotion-mood-text">' + this.escapeHtml(data.content || '') + '</div>';
+        } else if (item.type === 'chatter') {
+            userLabel = data.user_id === 'laoda' ? '老大' : '小弟';
+            inner = '<div class="emotion-chatter-text">' + this.escapeHtml(data.content || '') + '</div>';
+        } else if (item.type === 'milestone') {
+            inner = '<div class="emotion-milestone-title">🎉 ' + this.escapeHtml(data.title || '纪念日') + '</div>';
+            if (data.description) { inner += '<div class="emotion-milestone-desc">' + this.escapeHtml(data.description) + '</div>'; }
+        } else if (item.type === 'checkin') {
+            var taskTitle = (data.couple_tasks && data.couple_tasks.title) ? data.couple_tasks.title : '打卡';
+            inner = '<div class="emotion-checkin-task">✅ ' + this.escapeHtml(taskTitle) + '</div>';
+            if (data.note) { inner += '<div class="emotion-checkin-note">' + this.escapeHtml(data.note) + '</div>'; }
+        } else if (item.type === 'bottle') {
+            userLabel = data.from_user === 'laoda' ? '老大' : '小弟';
+            inner = '<div class="emotion-bottle-msg">🍾 ' + this.escapeHtml(data.message || '一张照片') + '</div>';
+        }
+
+        return '<div class="emotion-item emotion-item-' + item.type + '">' +
+            '<div class="emotion-item-header">' +
+            '<span class="emotion-item-icon">' + icon + '</span>' +
+            (userLabel ? '<span class="emotion-item-user">' + userLabel + '</span>' : '') +
+            '<span class="emotion-item-time">' + timeStr + '</span>' +
+            '</div>' +
+            '<div class="emotion-item-body">' + inner + '</div>' +
+            '</div>';
+    },
+
+    loadMoreEmotionTimeline() {
+        this._emotionTimelinePage++;
+        this.renderEmotionTimeline();
+    },
+
+    renderEmotionTimelineFilters() {
+        var container = document.getElementById('mobileEmotionTimelineTypeFilters');
+        if (!container) return;
+        var EMOTION_TYPES = [
+            { key: 'photo', icon: '📷', label: '照片' }, { key: 'mood', icon: '📝', label: '心情' },
+            { key: 'chatter', icon: '💬', label: '叨叨' }, { key: 'milestone', icon: '🎉', label: '纪念日' },
+            { key: 'checkin', icon: '✅', label: '打卡' }, { key: 'bottle', icon: '🍾', label: '漂流瓶' }
+        ];
+        var filters = this._emotionTimelineFilters;
+        container.innerHTML = EMOTION_TYPES.map(function(t) {
+            var checked = !filters || filters[t.key];
+            return '<label class="emotion-filter-chip' + (checked ? ' active' : '') + '" data-type="' + t.key + '">' +
+                t.icon + ' ' + t.label + '</label>';
+        }).join('');
+        var self = this;
+        container.querySelectorAll('.emotion-filter-chip').forEach(function(chip) {
+            chip.addEventListener('click', function() {
+                this.classList.toggle('active');
+            });
+        });
+    },
+
+    toggleEmotionTimelineFilter() {
+        var el = document.getElementById('mobileEmotionTimelineFilter');
+        if (el) { el.style.display = el.style.display === 'none' ? 'block' : 'none'; }
+    },
+
+    applyEmotionTimelineFilter() {
+        var chips = document.querySelectorAll('#mobileEmotionTimelineTypeFilters .emotion-filter-chip');
+        var filters = {};
+        var allOn = true;
+        chips.forEach(function(chip) {
+            var type = chip.dataset.type;
+            var checked = chip.classList.contains('active');
+            filters[type] = checked;
+            if (!checked) allOn = false;
+        });
+        this._emotionTimelineFilters = allOn ? null : filters;
+        this._emotionTimelinePage = 1;
+        this.renderEmotionTimeline();
+        document.getElementById('mobileEmotionTimelineFilter').style.display = 'none';
+    },
+
+    resetEmotionTimelineFilter() {
+        this._emotionTimelineFilters = null;
+        this._emotionTimelinePage = 1;
+        this.renderEmotionTimelineFilters();
+        this.renderEmotionTimeline();
+        document.getElementById('mobileEmotionTimelineFilter').style.display = 'none';
     },
 
 };

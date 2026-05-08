@@ -2202,3 +2202,163 @@ mark {
     0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
     100% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
 }
+
+/* ========================================
+   情感时间轴
+   ======================================== */
+
+.emotion-timeline {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 8px 0;
+}
+
+.emotion-date-divider {
+    text-align: center;
+    margin: 20px 0 12px;
+    position: relative;
+}
+
+.emotion-date-divider span {
+    display: inline-block;
+    background: #f0f0f0;
+    color: #888;
+    padding: 4px 16px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.emotion-item {
+    background: white;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    border-left: 3px solid #e0e0e0;
+}
+
+.emotion-item-photo { border-left-color: #64B5F6; }
+.emotion-item-mood { border-left-color: #F48FB1; }
+.emotion-item-chatter { border-left-color: #81C784; }
+.emotion-item-milestone { border-left-color: #FFD54F; }
+.emotion-item-checkin { border-left-color: #4DB6AC; }
+.emotion-item-bottle { border-left-color: #CE93D8; }
+
+.emotion-item-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.emotion-item-icon { font-size: 14px; }
+
+.emotion-item-user {
+    font-size: 12px;
+    color: #999;
+    font-weight: 500;
+}
+
+.emotion-item-time {
+    font-size: 12px;
+    color: #bbb;
+    margin-left: auto;
+}
+
+.emotion-item-body {
+    padding-left: 22px;
+}
+
+.emotion-photo-wrap {
+    margin-bottom: 6px;
+}
+
+.emotion-photo-thumb {
+    width: 100%;
+    max-height: 260px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.emotion-photo-name {
+    font-size: 14px;
+    color: #555;
+    font-weight: 500;
+}
+
+.emotion-loc {
+    font-size: 12px;
+    color: #999;
+    margin-top: 2px;
+}
+
+.emotion-mood-emoji {
+    font-size: 28px;
+    margin-bottom: 4px;
+}
+
+.emotion-mood-text {
+    font-size: 15px;
+    color: #555;
+    line-height: 1.5;
+}
+
+.emotion-chatter-text {
+    font-size: 15px;
+    color: #555;
+    line-height: 1.5;
+}
+
+.emotion-milestone-title {
+    font-size: 16px;
+    color: #B8860B;
+    font-weight: 600;
+}
+
+.emotion-milestone-desc {
+    font-size: 13px;
+    color: #888;
+    margin-top: 4px;
+}
+
+.emotion-checkin-task {
+    font-size: 15px;
+    color: #00796B;
+    font-weight: 500;
+}
+
+.emotion-checkin-note {
+    font-size: 13px;
+    color: #888;
+    margin-top: 2px;
+}
+
+.emotion-bottle-msg {
+    font-size: 15px;
+    color: #555;
+    line-height: 1.5;
+    font-style: italic;
+}
+
+/* 筛选芯片 */
+.emotion-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 13px;
+    cursor: pointer;
+    border: 1px solid #ddd;
+    background: white;
+    color: #888;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.emotion-filter-chip.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}

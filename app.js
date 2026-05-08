@@ -582,6 +582,16 @@ window.toggleSection = function(section) {
         } else {
             sec.style.display = 'none'
         }
+    } else if (section === 'emotionTimeline') {
+        const sec = document.getElementById('emotionTimelineSection')
+        if (!sec) return
+        if (sec.style.display === 'none' || !sec.style.display) {
+            hideAll()
+            sec.style.display = 'block'
+            window.loadEmotionTimeline()
+        } else {
+            sec.style.display = 'none'
+        }
     }
 }
 
@@ -5822,6 +5832,240 @@ window.showNudgePopup = function(fromName, timeStr, suffix) {
     popup.onclick = function() { popup.remove(); };
     document.body.appendChild(popup);
     setTimeout(function() { if (popup.parentNode) { popup.classList.add('nudge-popup-out'); setTimeout(function() { if (popup.parentNode) popup.remove(); }, 400); } }, 3000);
+};
+
+// ========================================
+// 情感时间轴
+// ========================================
+window._emotionTimelineData = [];
+window._emotionTimelinePage = 1;
+window._emotionTimelinePageSize = 30;
+window._emotionTimelineFilters = null; // null = all types
+
+var EMOTION_TYPES = [
+    { key: 'photo', icon: '📷', label: '照片' },
+    { key: 'mood', icon: '📝', label: '心情日记' },
+    { key: 'chatter', icon: '💬', label: '每日叨叨' },
+    { key: 'milestone', icon: '🎉', label: '纪念日' },
+    { key: 'checkin', icon: '✅', label: '情侣打卡' },
+    { key: 'bottle', icon: '🍾', label: '漂流瓶' }
+];
+
+window.loadEmotionTimeline = async function() {
+    var container = document.getElementById('emotionTimelineContainer');
+    if (!container) return;
+    container.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">加载中...</p>';
+    window._emotionTimelinePage = 1;
+    window._emotionTimelineData = [];
+    await window.fetchEmotionTimeline();
+    window.renderEmotionTimeline();
+    window.renderEmotionTimelineFilters();
+};
+
+window.fetchEmotionTimeline = async function() {
+    var now = new Date();
+    var threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+    var startStr = threeMonthsAgo.toISOString();
+    var items = [];
+
+    try {
+        var results = await Promise.allSettled([
+            // 1. photos
+            supabase.from('photos').select('id, name, storage_path, created_at, location_name, taken_at')
+                .gte('created_at', startStr).order('created_at', { ascending: false }).limit(200),
+            // 2. mood_diary
+            supabase.from('mood_diary').select('id, mood_emoji, content, created_at, user_id')
+                .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
+            // 3. daily_chatter
+            supabase.from('daily_chatter').select('id, content, created_at, user_id')
+                .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
+            // 4. milestones
+            supabase.from('milestones').select('id, title, milestone_date, description, created_at')
+                .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
+            // 5. couple_checkins
+            supabase.from('couple_checkins').select('id, note, checked_at, couple_tasks(title)')
+                .gte('checked_at', startStr).order('checked_at', { ascending: false }).limit(100),
+            // 6. drift_bottles (revealed)
+            supabase.from('drift_bottles').select('id, message, thrown_at, revealed_at, from_user')
+                .eq('status', 'revealed').gte('revealed_at', startStr)
+                .order('revealed_at', { ascending: false }).limit(50)
+        ]);
+
+        // Parse photos
+        if (results[0].status === 'fulfilled' && results[0].value.data) {
+            results[0].value.data.forEach(function(p) {
+                items.push({ type: 'photo', time: p.taken_at || p.created_at, data: p });
+            });
+        }
+        // Parse mood_diary
+        if (results[1].status === 'fulfilled' && results[1].value.data) {
+            results[1].value.data.forEach(function(m) {
+                items.push({ type: 'mood', time: m.created_at, data: m });
+            });
+        }
+        // Parse daily_chatter
+        if (results[2].status === 'fulfilled' && results[2].value.data) {
+            results[2].value.data.forEach(function(c) {
+                items.push({ type: 'chatter', time: c.created_at, data: c });
+            });
+        }
+        // Parse milestones (use milestone_date as time)
+        if (results[3].status === 'fulfilled' && results[3].value.data) {
+            results[3].value.data.forEach(function(m) {
+                items.push({ type: 'milestone', time: m.milestone_date || m.created_at, data: m });
+            });
+        }
+        // Parse couple_checkins
+        if (results[4].status === 'fulfilled' && results[4].value.data) {
+            results[4].value.data.forEach(function(c) {
+                items.push({ type: 'checkin', time: c.checked_at, data: c });
+            });
+        }
+        // Parse drift_bottles
+        if (results[5].status === 'fulfilled' && results[5].value.data) {
+            results[5].value.data.forEach(function(b) {
+                items.push({ type: 'bottle', time: b.revealed_at, data: b });
+            });
+        }
+    } catch (e) { /* silent */ }
+
+    // Sort by time descending
+    items.sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
+    window._emotionTimelineData = items;
+};
+
+window.renderEmotionTimeline = function() {
+    var container = document.getElementById('emotionTimelineContainer');
+    if (!container) return;
+
+    var items = window._emotionTimelineData;
+    var filters = window._emotionTimelineFilters;
+    if (filters) {
+        items = items.filter(function(item) { return filters[item.type]; });
+    }
+
+    var visible = items.slice(0, window._emotionTimelinePage * window._emotionTimelinePageSize);
+    var loadMore = document.getElementById('emotionTimelineLoadMore');
+    if (loadMore) { loadMore.style.display = visible.length < items.length ? 'block' : 'none'; }
+
+    if (visible.length === 0) {
+        container.innerHTML = '<p style="text-align:center;color:#999;padding:60px;">这段时间还没有记录 💭</p>';
+        return;
+    }
+
+    var html = '';
+    var lastDate = '';
+
+    visible.forEach(function(item) {
+        var dateStr = new Date(item.time).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+        if (dateStr !== lastDate) {
+            lastDate = dateStr;
+            html += '<div class="emotion-date-divider"><span>' + dateStr + '</span></div>';
+        }
+        html += window.renderEmotionItem(item);
+    });
+
+    container.innerHTML = html;
+};
+
+window.renderEmotionItem = function(item) {
+    var def = EMOTION_TYPES.find(function(t) { return t.key === item.type; });
+    var icon = def ? def.icon : '📌';
+    var data = item.data;
+    var timeStr = new Date(item.time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    var inner = '';
+    var userLabel = '';
+
+    if (item.type === 'photo') {
+        var url = getPhotoUrl(data.storage_path);
+        inner = '<div class="emotion-photo-wrap"><img src="' + url + '" class="emotion-photo-thumb" loading="lazy"></div>' +
+            '<div class="emotion-photo-name">' + escapeHtml(data.name || '照片') + '</div>';
+        if (data.location_name) {
+            inner += '<div class="emotion-loc">📍 ' + escapeHtml(data.location_name) + '</div>';
+        }
+    } else if (item.type === 'mood') {
+        userLabel = data.user_id === 'laoda' ? '老大' : '小弟';
+        inner = '<div class="emotion-mood-emoji">' + escapeHtml(data.mood_emoji || '😊') + '</div>' +
+            '<div class="emotion-mood-text">' + escapeHtml(data.content || '') + '</div>';
+    } else if (item.type === 'chatter') {
+        userLabel = data.user_id === 'laoda' ? '老大' : '小弟';
+        inner = '<div class="emotion-chatter-text">' + escapeHtml(data.content || '') + '</div>';
+    } else if (item.type === 'milestone') {
+        inner = '<div class="emotion-milestone-title">🎉 ' + escapeHtml(data.title || '纪念日') + '</div>';
+        if (data.description) {
+            inner += '<div class="emotion-milestone-desc">' + escapeHtml(data.description) + '</div>';
+        }
+    } else if (item.type === 'checkin') {
+        var taskTitle = (data.couple_tasks && data.couple_tasks.title) ? data.couple_tasks.title : '打卡';
+        inner = '<div class="emotion-checkin-task">✅ ' + escapeHtml(taskTitle) + '</div>';
+        if (data.note) { inner += '<div class="emotion-checkin-note">' + escapeHtml(data.note) + '</div>'; }
+    } else if (item.type === 'bottle') {
+        userLabel = data.from_user === 'laoda' ? '老大' : '小弟';
+        inner = '<div class="emotion-bottle-msg">🍾 ' + escapeHtml(data.message || '一张照片') + '</div>';
+    }
+
+    return '<div class="emotion-item emotion-item-' + item.type + '">' +
+        '<div class="emotion-item-header">' +
+        '<span class="emotion-item-icon">' + icon + '</span>' +
+        (userLabel ? '<span class="emotion-item-user">' + userLabel + '</span>' : '') +
+        '<span class="emotion-item-time">' + timeStr + '</span>' +
+        '</div>' +
+        '<div class="emotion-item-body">' + inner + '</div>' +
+        '</div>';
+};
+
+window.loadMoreEmotionTimeline = function() {
+    window._emotionTimelinePage++;
+    window.renderEmotionTimeline();
+};
+
+window.renderEmotionTimelineFilters = function() {
+    var container = document.getElementById('emotionTimelineTypeFilters');
+    if (!container) return;
+    var filters = window._emotionTimelineFilters;
+    container.innerHTML = EMOTION_TYPES.map(function(t) {
+        var checked = !filters || filters[t.key];
+        return '<label class="emotion-filter-chip' + (checked ? ' active' : '') + '" data-type="' + t.key + '">' +
+            '<input type="checkbox" ' + (checked ? 'checked' : '') + ' style="display:none;">' + t.icon + ' ' + t.label +
+            '</label>';
+    }).join('');
+    // Toggle on click
+    container.querySelectorAll('.emotion-filter-chip').forEach(function(chip) {
+        chip.addEventListener('click', function() {
+            this.classList.toggle('active');
+            var cb = this.querySelector('input');
+            cb.checked = this.classList.contains('active');
+        });
+    });
+};
+
+window.toggleEmotionTimelineFilter = function() {
+    var el = document.getElementById('emotionTimelineFilter');
+    if (el) { el.style.display = el.style.display === 'none' ? 'block' : 'none'; }
+};
+
+window.applyEmotionTimelineFilter = function() {
+    var chips = document.querySelectorAll('#emotionTimelineTypeFilters .emotion-filter-chip');
+    var filters = {};
+    var allOn = true;
+    chips.forEach(function(chip) {
+        var type = chip.dataset.type;
+        var checked = chip.classList.contains('active');
+        filters[type] = checked;
+        if (!checked) allOn = false;
+    });
+    window._emotionTimelineFilters = allOn ? null : filters;
+    window._emotionTimelinePage = 1;
+    window.renderEmotionTimeline();
+    document.getElementById('emotionTimelineFilter').style.display = 'none';
+};
+
+window.resetEmotionTimelineFilter = function() {
+    window._emotionTimelineFilters = null;
+    window._emotionTimelinePage = 1;
+    window.renderEmotionTimelineFilters();
+    window.renderEmotionTimeline();
+    document.getElementById('emotionTimelineFilter').style.display = 'none';
 };
 
 // 点击外部收起已标记浮窗

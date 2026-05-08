@@ -11,7 +11,7 @@
         window.location.href = 'index-mobile.html';
     }
     </script>
-    <link rel="stylesheet" href="style.css?v=34">
+    <link rel="stylesheet" href="style.css?v=35">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -119,6 +119,11 @@
             <div class="nav-section" onclick="window.toggleSection('nudge')" title="戳一戳">
                 <span class="nav-icon">💗</span>
                 <span class="nav-text">戳一戳</span>
+            </div>
+            <div class="nav-divider"></div>
+            <div class="nav-section" onclick="window.toggleSection('emotionTimeline')" title="情感时间轴">
+                <span class="nav-icon">📜</span>
+                <span class="nav-text">情感时间轴</span>
             </div>
             <div class="nav-divider"></div>
             <div class="nav-section" onclick="window.refreshData()" title="刷新">
@@ -384,6 +389,28 @@
             </div>
         </section>
 
+        <!-- 情感时间轴 -->
+        <section id="emotionTimelineSection" style="display:none;" class="feature-section">
+            <h2>📜 情感时间轴</h2>
+            <div class="feature-toolbar">
+                <button class="btn btn-secondary" onclick="window.toggleEmotionTimelineFilter()">🔍 筛选</button>
+            </div>
+            <div id="emotionTimelineFilter" style="display:none;background:#f8f8f8;border-radius:8px;padding:12px;margin-bottom:12px;">
+                <div style="font-size:13px;font-weight:600;margin-bottom:8px;">显示类型：</div>
+                <div id="emotionTimelineTypeFilters" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-secondary" style="font-size:12px;" onclick="window.resetEmotionTimelineFilter()">重置</button>
+                    <button class="btn btn-primary" style="font-size:12px;" onclick="window.applyEmotionTimelineFilter()">应用</button>
+                </div>
+            </div>
+            <div id="emotionTimelineContainer" class="emotion-timeline">
+                <p style="text-align:center;color:#999;padding:40px;">加载中...</p>
+            </div>
+            <div id="emotionTimelineLoadMore" style="text-align:center;padding:16px;display:none;">
+                <button class="btn btn-secondary" onclick="window.loadMoreEmotionTimeline()">加载更多</button>
+            </div>
+        </section>
+
         <!-- 照片浏览 -->
         <section class="photos-section">
             <div class="photos-header">
@@ -579,6 +606,6 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="app.js?v=38"></script>
+    <script type="module" src="app.js?v=39"></script>
 </body>
 </html>
