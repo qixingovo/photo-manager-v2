@@ -58,7 +58,7 @@ const mobile = {
 
     // 主题状态
     isDarkMode: false,
-    currentColorTheme: 'blue', // 'blue' | 'suki'
+    currentColorTheme: 'blue', // 'blue' | 'warm'
 
     // 分类加锁状态 (categoryId -> password)
     lockedCategories: {},
@@ -216,14 +216,14 @@ const mobile = {
         // 夜间模式优先（覆盖颜色主题）
         if (this.isDarkMode) {
             document.body.classList.add('dark');
-            document.body.classList.remove('suki');
+            document.body.classList.remove('warm');
         } else {
             document.body.classList.remove('dark');
             // 颜色主题仅在日间模式下生效
-            if (this.currentColorTheme === 'suki') {
-                document.body.classList.add('suki');
+            if (this.currentColorTheme === 'warm') {
+                document.body.classList.add('warm');
             } else {
-                document.body.classList.remove('suki');
+                document.body.classList.remove('warm');
             }
         }
     },
@@ -232,7 +232,7 @@ const mobile = {
         this.currentColorTheme = mode;
         localStorage.setItem('photoColorTheme', mode);
         this.applyTheme();
-        const label = mode === 'suki' ? '🌸 Suki暖粉' : '💙 蓝色经典';
+        const label = mode === 'warm' ? '🌸 暖粉' : '💙 蓝色经典';
         this.showToast(label);
         // 同步到 DB
         this._syncThemeToDB();
@@ -266,15 +266,15 @@ const mobile = {
         const modal = document.createElement('div');
         modal.id = 'settingsModal';
         modal.className = 'modal-overlay';
-        const isSuki = this.currentColorTheme === 'suki';
+        const isWarm = this.currentColorTheme === 'warm';
         modal.innerHTML = `
             <div class="modal-card">
                 <h3>⚙️ 设置</h3>
                 <div class="settings-item">
                     <span class="settings-label">🎨 颜色主题</span>
                     <div class="settings-theme-selector">
-                        <button class="settings-theme-btn${isSuki ? '' : ' active'}" onclick="mobile.setColorTheme('blue')">💙 蓝色经典</button>
-                        <button class="settings-theme-btn${isSuki ? ' active' : ''}" onclick="mobile.setColorTheme('suki')">🌸 Suki暖粉</button>
+                        <button class="settings-theme-btn${isWarm ? '' : ' active'}" onclick="mobile.setColorTheme('blue')">💙 蓝色经典</button>
+                        <button class="settings-theme-btn${isWarm ? ' active' : ''}" onclick="mobile.setColorTheme('warm')">🌸 暖粉</button>
                     </div>
                 </div>
                 <div class="settings-item">
@@ -706,7 +706,7 @@ const mobile = {
         }
     },
 
-    // 渲染 Suki 风格情侣横幅
+    // 渲染暖粉风格情侣横幅
     async renderCoupleBanner() {
         if (!this._startDateLoaded) {
             await this._loadStartDate();

@@ -35,8 +35,8 @@ body.dark {
     --shadow: 0 4px 20px rgba(0,0,0,0.3);
 }
 
-/* Suki 暖粉主题 */
-body.suki {
+/* 暖粉主题 */
+body.warm {
     --primary: #FFB5C2;
     --primary-dark: #F098A8;
     --secondary: #FFD4B2;
@@ -166,7 +166,7 @@ body {
 }
 
 /* ========================================
-   Suki 风格首页 - 情侣横幅
+   暖粉风格首页 - 情侣横幅
    ======================================== */
 .couple-banner {
     text-align: center;
@@ -273,7 +273,7 @@ body {
 }
 
 /* ========================================
-   Suki 风格首页 - 功能入口卡片
+   暖粉风格首页 - 功能入口卡片
    ======================================== */
 .feature-cards {
     display: grid;
@@ -324,7 +324,7 @@ body {
     padding: 8px 16px 4px;
 }
 
-/* 更新照片卡片为 Suki 风格 */
+/* 更新照片卡片为暖粉风格 */
 .photo-feed {
     padding: 0 12px;
     gap: 10px;
