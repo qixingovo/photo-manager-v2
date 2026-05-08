@@ -58,6 +58,7 @@ const mobile = {
 
     // 主题状态
     isDarkMode: false,
+    currentColorTheme: 'blue', // 'blue' | 'suki'
 
     // 分类加锁状态 (categoryId -> password)
     lockedCategories: {},
@@ -199,8 +200,9 @@ const mobile = {
     initTheme() {
         const savedTheme = localStorage.getItem('photoTheme');
         this.isDarkMode = savedTheme === 'dark';
+        this.currentColorTheme = localStorage.getItem('photoColorTheme') || 'blue';
         this.applyTheme();
-        
+
         // 加载加锁的分类
         try {
             const saved = localStorage.getItem('lockedCategories');
@@ -211,10 +213,43 @@ const mobile = {
     },
 
     applyTheme() {
+        // 夜间模式优先（覆盖颜色主题）
         if (this.isDarkMode) {
             document.body.classList.add('dark');
+            document.body.classList.remove('suki');
         } else {
             document.body.classList.remove('dark');
+            // 颜色主题仅在日间模式下生效
+            if (this.currentColorTheme === 'suki') {
+                document.body.classList.add('suki');
+            } else {
+                document.body.classList.remove('suki');
+            }
+        }
+    },
+
+    setColorTheme(mode) {
+        this.currentColorTheme = mode;
+        localStorage.setItem('photoColorTheme', mode);
+        this.applyTheme();
+        const label = mode === 'suki' ? '🌸 Suki暖粉' : '💙 蓝色经典';
+        this.showToast(label);
+        // 同步到 DB
+        this._syncThemeToDB();
+    },
+
+    async _syncThemeToDB() {
+        try {
+            if (!window.supabase || !this.currentUser) return;
+            await window.supabase.from('app_settings').upsert({
+                key: 'mobile_color_theme',
+                value: JSON.stringify({
+                    color_theme: this.currentColorTheme,
+                    dark_mode: this.isDarkMode
+                })
+            }, { onConflict: 'key' });
+        } catch (e) {
+            // 非关键操作，静默失败
         }
     },
 
@@ -223,6 +258,7 @@ const mobile = {
         localStorage.setItem('photoTheme', this.isDarkMode ? 'dark' : 'light');
         this.applyTheme();
         this.showToast(this.isDarkMode ? '🌙 夜间模式' : '☀️ 日间模式');
+        this._syncThemeToDB();
     },
 
     showSettings() {
@@ -230,9 +266,17 @@ const mobile = {
         const modal = document.createElement('div');
         modal.id = 'settingsModal';
         modal.className = 'modal-overlay';
+        const isSuki = this.currentColorTheme === 'suki';
         modal.innerHTML = `
             <div class="modal-card">
                 <h3>⚙️ 设置</h3>
+                <div class="settings-item">
+                    <span class="settings-label">🎨 颜色主题</span>
+                    <div class="settings-theme-selector">
+                        <button class="settings-theme-btn${isSuki ? '' : ' active'}" onclick="mobile.setColorTheme('blue')">💙 蓝色经典</button>
+                        <button class="settings-theme-btn${isSuki ? ' active' : ''}" onclick="mobile.setColorTheme('suki')">🌸 Suki暖粉</button>
+                    </div>
+                </div>
                 <div class="settings-item">
                     <span class="settings-label">🌙 夜间模式</span>
                     <label class="switch">

@@ -35,6 +35,22 @@ body.dark {
     --shadow: 0 4px 20px rgba(0,0,0,0.3);
 }
 
+/* Suki 暖粉主题 */
+body.suki {
+    --primary: #FFB5C2;
+    --primary-dark: #F098A8;
+    --secondary: #FFD4B2;
+    --accent: #FF9B9B;
+    --danger: #FF6B6B;
+    --bg: #FFF5F5;
+    --card: #FFFFFF;
+    --text: #5D4E4E;
+    --text-light: #8B7B7B;
+    --text-muted: #BAAAAA;
+    --border: #F0E0E0;
+    --shadow: 0 4px 20px rgba(255, 150, 150, 0.12);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -1700,6 +1716,38 @@ body.dark .login-page {
 .settings-label {
     font-size: 15px;
     color: var(--text);
+}
+
+/* 颜色主题选择器 */
+.settings-theme-selector {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.settings-theme-btn {
+    flex: 1;
+    padding: 10px 12px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.settings-theme-btn.active {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+}
+
+.settings-theme-btn:active {
+    transform: scale(0.96);
 }
 
 /* Toggle Switch */
