@@ -2245,7 +2245,7 @@ function getDefaultMilestones() {
 }
 
 // 检测是否有 localStorage 数据（用于判断是否应从 localStorage 加载）
-let _milestonesSupabaseFailed = false
+
 
 async function loadMilestones() {
     let shouldMigrate = false
@@ -2311,9 +2311,6 @@ async function loadMilestones() {
     if (shouldMigrate) {
         await migrateMilestonesToSupabase();
     }
-    // 仅当 SELECT 本身出错时才标记 Supabase 不可用
-    _milestonesSupabaseFailed = !selectOk
-
     await loadStartDate()
 }
 
@@ -2336,7 +2333,6 @@ async function loadStartDate() {
 }
 
 async function migrateMilestonesToSupabase() {
-    if (_milestonesSupabaseFailed) return;
     try {
         const rows = anniversaryMilestones.map(m => ({
             id: parseInt(m.id) || Date.now() + Math.floor(Math.random() * 1000),
@@ -2352,19 +2348,14 @@ async function migrateMilestonesToSupabase() {
             repeat_yearly: m.repeat_yearly || false
         }));
         const { error } = await supabase.from('milestones').upsert(rows);
-        if (error) { _milestonesSupabaseFailed = true; return; }
+        if (error) { console.error('迁移纪念日失败:', error); return; }
         localStorage.removeItem('anniversary_milestones');
-        _milestonesSupabaseFailed = false;
     } catch (e) {
-        _milestonesSupabaseFailed = true;
+        console.error('迁移纪念日异常:', e);
     }
 }
 
 async function saveMilestonesToSupabase() {
-    if (_milestonesSupabaseFailed) {
-        localStorage.setItem('anniversary_milestones', JSON.stringify(anniversaryMilestones));
-        return;
-    }
     try {
         const rows = anniversaryMilestones.map(m => ({
             id: parseInt(m.id) || Date.now(),
@@ -2380,31 +2371,24 @@ async function saveMilestonesToSupabase() {
             repeat_yearly: m.repeat_yearly || false
         }));
         const { error } = await supabase.from('milestones').upsert(rows);
-        if (error) {
-            _milestonesSupabaseFailed = true;
-            localStorage.setItem('anniversary_milestones', JSON.stringify(anniversaryMilestones));
-            return;
-        }
+        if (error) { console.error('保存纪念日失败:', error); return; }
         localStorage.removeItem('anniversary_milestones');
     } catch (e) {
-        _milestonesSupabaseFailed = true;
-        localStorage.setItem('anniversary_milestones', JSON.stringify(anniversaryMilestones));
+        console.error('保存纪念日异常:', e);
     }
 }
 
 async function saveStartDateToSupabase() {
-    if (_milestonesSupabaseFailed) {
-        localStorage.setItem('anniversary_start_date', anniversaryStartDate);
-        return;
-    }
     try {
         const { error } = await supabase.from('app_settings').upsert({ key: 'anniversary_start_date', value: anniversaryStartDate });
         if (!error) {
             localStorage.removeItem('anniversary_start_date');
             return;
         }
-    } catch (e) { /* 静默 */ }
-    localStorage.setItem('anniversary_start_date', anniversaryStartDate);
+        console.error('保存开始日期失败:', error);
+    } catch (e) {
+        console.error('保存开始日期异常:', e);
+    }
 }
 
 function updateDaysCounter() {

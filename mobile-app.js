@@ -51,7 +51,6 @@ const mobile = {
     // 纪念日时间线
     anniversaryMilestones: [],
     anniversaryStartDate: null,
-    _milestonesSupabaseFailed: false,
 
     // 相册状态
     albums: [],
@@ -3360,7 +3359,6 @@ const mobile = {
         if (shouldMigrate) {
             await this.migrateMilestonesToSupabase();
         }
-        this._milestonesSupabaseFailed = !selectOk;
 
         await this._loadStartDate();
     },
@@ -3384,7 +3382,6 @@ const mobile = {
     },
 
     async migrateMilestonesToSupabase() {
-        if (this._milestonesSupabaseFailed) return;
         const supabase = this.initSupabase();
         if (!supabase) return;
         try {
@@ -3402,22 +3399,17 @@ const mobile = {
                 repeat_yearly: m.repeat_yearly || false
             }));
             const { error } = await supabase.from('milestones').upsert(rows);
-            if (error) { this._milestonesSupabaseFailed = true; return; }
+            if (error) { console.error('迁移纪念日失败:', error); return; }
             localStorage.removeItem('anniversary_milestones');
-            this._milestonesSupabaseFailed = false;
         } catch (e) {
-            this._milestonesSupabaseFailed = true;
+            console.error('迁移纪念日异常:', e);
         }
     },
 
     async saveMilestonesToSupabase() {
-        if (this._milestonesSupabaseFailed) {
-            localStorage.setItem('anniversary_milestones', JSON.stringify(this.anniversaryMilestones));
-            return;
-        }
         const supabase = this.initSupabase();
         if (!supabase) {
-            localStorage.setItem('anniversary_milestones', JSON.stringify(this.anniversaryMilestones));
+            console.warn('Supabase 未初始化，无法保存纪念日');
             return;
         }
         try {
@@ -3435,26 +3427,17 @@ const mobile = {
                 repeat_yearly: m.repeat_yearly || false
             }));
             const { error } = await supabase.from('milestones').upsert(rows);
-            if (error) {
-                this._milestonesSupabaseFailed = true;
-                localStorage.setItem('anniversary_milestones', JSON.stringify(this.anniversaryMilestones));
-                return;
-            }
+            if (error) { console.error('保存纪念日失败:', error); return; }
             localStorage.removeItem('anniversary_milestones');
         } catch (e) {
-            this._milestonesSupabaseFailed = true;
-            localStorage.setItem('anniversary_milestones', JSON.stringify(this.anniversaryMilestones));
+            console.error('保存纪念日异常:', e);
         }
     },
 
     async saveStartDateToSupabase() {
-        if (this._milestonesSupabaseFailed) {
-            localStorage.setItem('anniversary_start_date', this.anniversaryStartDate);
-            return;
-        }
         const supabase = this.initSupabase();
         if (!supabase) {
-            localStorage.setItem('anniversary_start_date', this.anniversaryStartDate);
+            console.warn('Supabase 未初始化，无法保存开始日期');
             return;
         }
         try {
@@ -3463,8 +3446,10 @@ const mobile = {
                 localStorage.removeItem('anniversary_start_date');
                 return;
             }
-        } catch (e) { /* 静默 */ }
-        localStorage.setItem('anniversary_start_date', this.anniversaryStartDate);
+            console.error('保存开始日期失败:', error);
+        } catch (e) {
+            console.error('保存开始日期异常:', e);
+        }
     },
 
     async initTimeline() {
