@@ -6712,18 +6712,19 @@ const mobile = {
         var now = new Date();
         var threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
         var startStr = threeMonthsAgo.toISOString();
+        var dateStr = startStr.split('T')[0];
         var items = [];
 
         try {
             var results = await Promise.allSettled([
-                supabase.from('photos').select('id, name, storage_path, created_at, location_name, taken_at')
+                supabase.from('photos').select('id, name, storage_path, created_at, location_name')
                     .gte('created_at', startStr).order('created_at', { ascending: false }).limit(200),
                 supabase.from('mood_diary').select('id, mood, content, created_at, user_name')
                     .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
                 supabase.from('daily_chatter').select('id, content, created_at, user_name')
                     .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
-                supabase.from('milestones').select('id, title, milestone_date, description, created_at')
-                    .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
+                supabase.from('milestones').select('id, title, date, description')
+                    .gte('date', dateStr).order('date', { ascending: false }).limit(100),
                 supabase.from('couple_checkins').select('id, note, checked_at, user_name, couple_tasks(title)')
                     .gte('checked_at', startStr).order('checked_at', { ascending: false }).limit(100),
                 supabase.from('drift_bottles').select('id, message, thrown_at, revealed_at, from_user')
@@ -6733,7 +6734,7 @@ const mobile = {
 
             var self = this;
             if (results[0].status === 'fulfilled' && results[0].value.data) {
-                results[0].value.data.forEach(function(p) { items.push({ type: 'photo', time: p.taken_at || p.created_at, data: p }); });
+                results[0].value.data.forEach(function(p) { items.push({ type: 'photo', time: p.created_at, data: p }); });
             }
             if (results[1].status === 'fulfilled' && results[1].value.data) {
                 results[1].value.data.forEach(function(m) { items.push({ type: 'mood', time: m.created_at, data: m }); });
@@ -6742,7 +6743,7 @@ const mobile = {
                 results[2].value.data.forEach(function(c) { items.push({ type: 'chatter', time: c.created_at, data: c }); });
             }
             if (results[3].status === 'fulfilled' && results[3].value.data) {
-                results[3].value.data.forEach(function(m) { items.push({ type: 'milestone', time: m.milestone_date || m.created_at, data: m }); });
+                results[3].value.data.forEach(function(m) { items.push({ type: 'milestone', time: m.date, data: m }); });
             }
             if (results[4].status === 'fulfilled' && results[4].value.data) {
                 results[4].value.data.forEach(function(c) { items.push({ type: 'checkin', time: c.checked_at, data: c }); });

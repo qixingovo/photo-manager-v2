@@ -5882,12 +5882,13 @@ window.fetchEmotionTimeline = async function() {
     var now = new Date();
     var threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
     var startStr = threeMonthsAgo.toISOString();
+    var dateStr = startStr.split('T')[0];
     var items = [];
 
     try {
         var results = await Promise.allSettled([
             // 1. photos
-            supabase.from('photos').select('id, name, storage_path, created_at, location_name, taken_at')
+            supabase.from('photos').select('id, name, storage_path, created_at, location_name')
                 .gte('created_at', startStr).order('created_at', { ascending: false }).limit(200),
             // 2. mood_diary
             supabase.from('mood_diary').select('id, mood, content, created_at, user_name')
@@ -5896,8 +5897,8 @@ window.fetchEmotionTimeline = async function() {
             supabase.from('daily_chatter').select('id, content, created_at, user_name')
                 .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
             // 4. milestones
-            supabase.from('milestones').select('id, title, milestone_date, description, created_at')
-                .gte('created_at', startStr).order('created_at', { ascending: false }).limit(100),
+            supabase.from('milestones').select('id, title, date, description')
+                .gte('date', dateStr).order('date', { ascending: false }).limit(100),
             // 5. couple_checkins
             supabase.from('couple_checkins').select('id, note, checked_at, user_name, couple_tasks(title)')
                 .gte('checked_at', startStr).order('checked_at', { ascending: false }).limit(100),
@@ -5910,7 +5911,7 @@ window.fetchEmotionTimeline = async function() {
         // Parse photos
         if (results[0].status === 'fulfilled' && results[0].value.data) {
             results[0].value.data.forEach(function(p) {
-                items.push({ type: 'photo', time: p.taken_at || p.created_at, data: p });
+                items.push({ type: 'photo', time: p.created_at, data: p });
             });
         }
         // Parse mood_diary
@@ -5928,7 +5929,7 @@ window.fetchEmotionTimeline = async function() {
         // Parse milestones (use milestone_date as time)
         if (results[3].status === 'fulfilled' && results[3].value.data) {
             results[3].value.data.forEach(function(m) {
-                items.push({ type: 'milestone', time: m.milestone_date || m.created_at, data: m });
+                items.push({ type: 'milestone', time: m.date, data: m });
             });
         }
         // Parse couple_checkins
