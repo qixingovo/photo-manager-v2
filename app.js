@@ -898,9 +898,74 @@ window.showCapsuleDetail = function(capsuleId) {
         '</div></div>' +
         '<div style="text-align:center;padding:0 16px 20px;">' +
         (isLocked ? '<button class="btn-primary" style="width:100%;border-radius:25px;" onclick="this.closest(\'.modal-overlay\').remove();window.tryUnlockCapsule(' + c.id + ')">🔓 尝试解锁</button>' : '') +
-        '</div></div>';
+        '<div style="display:flex;gap:8px;margin-top:' + (isLocked ? '8px' : '0') + ';">' +
+        '<button class="btn-secondary" style="flex:1;border-radius:25px;" onclick="this.closest(\'.modal-overlay\').remove();window.openEditCapsuleModal(' + c.id + ')">✏️ 编辑</button>' +
+        '<button class="btn-danger" style="flex:1;border-radius:25px;" onclick="this.closest(\'.modal-overlay\').remove();window.deleteTimeCapsule(' + c.id + ')">🗑️ 删除</button>' +
+        '</div></div></div>';
 
     document.body.appendChild(modal);
+};
+
+// 编辑时光胶囊
+window.openEditCapsuleModal = function(capsuleId) {
+    var c = window._timeCapsulesData ? window._timeCapsulesData.find(function(x) { return x.id === capsuleId; }) : null;
+    if (!c) return;
+
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'editCapsuleModal';
+    modal.innerHTML = '<div class="modal-card">' +
+        '<h3>✏️ 编辑时光胶囊</h3>' +
+        '<div class="form-group"><label>标题</label><input id="editCapsuleTitle" class="form-input" value="' + escapeHtml(c.title) + '"></div>' +
+        '<div class="form-group"><label>内容</label><textarea id="editCapsuleContent" class="form-input" rows="4">' + escapeHtml(c.content || '') + '</textarea></div>' +
+        '<div class="modal-actions">' +
+        '<button class="btn-primary" onclick="window.updateTimeCapsule(' + capsuleId + ')">💾 保存</button>' +
+        '<button class="btn-secondary" onclick="document.getElementById(\'editCapsuleModal\').remove()">取消</button></div></div>';
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+};
+
+// 保存编辑
+window.updateTimeCapsule = async function(capsuleId) {
+    var title = (document.getElementById('editCapsuleTitle').value || '').trim();
+    var content = (document.getElementById('editCapsuleContent').value || '').trim();
+    if (!title) { showToast('请输入标题'); return; }
+    try {
+        await supabase.from('time_capsules').update({ title: title, content: content }).eq('id', capsuleId);
+        var modal = document.getElementById('editCapsuleModal');
+        if (modal) modal.remove();
+        window.loadTimeCapsules();
+        showToast('✅ 已保存');
+    } catch (e) {
+        showToast('保存失败');
+    }
+};
+
+// 删除时光胶囊
+window.deleteTimeCapsule = function(capsuleId) {
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal-card" style="max-width:320px;text-align:center;">' +
+        '<div style="font-size:48px;margin-bottom:12px;">🗑️</div>' +
+        '<div style="font-size:16px;font-weight:600;margin-bottom:8px;">确定删除这个时光胶囊？</div>' +
+        '<div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">删除后不可恢复</div>' +
+        '<div class="modal-actions">' +
+        '<button class="btn-danger" style="flex:1;" onclick="this.closest(\'.modal-overlay\').remove();window._doDeleteCapsule(' + capsuleId + ')">确认删除</button>' +
+        '<button class="btn-secondary" style="flex:1;" onclick="this.closest(\'.modal-overlay\').remove()">取消</button></div></div>';
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+};
+
+window._doDeleteCapsule = async function(capsuleId) {
+    try {
+        await supabase.from('time_capsules').delete().eq('id', capsuleId);
+        window.loadTimeCapsules();
+        showToast('🗑️ 已删除');
+    } catch (e) {
+        showToast('删除失败');
+    }
 };
 
 // Haversine 距离计算（供时光胶囊和悄悄话共用）

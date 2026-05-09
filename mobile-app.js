@@ -7230,9 +7230,83 @@ const mobile = {
             '</div></div>' +
             '<div style="text-align:center;padding:0 16px 20px;">' +
             (isLocked ? '<button class="btn-primary" style="width:100%;border-radius:25px;" onclick="modal.remove();mobile.tryUnlockCapsule(' + c.id + ')">🔓 尝试解锁</button>' : '') +
-            '</div></div>';
+            '<div style="display:flex;gap:8px;margin-top:' + (isLocked ? '8px' : '0') + ';">' +
+            '<button class="btn-secondary" style="flex:1;border-radius:25px;" onclick="modal.remove();mobile.openEditCapsuleModal(' + c.id + ')">✏️ 编辑</button>' +
+            '<button class="btn-danger" style="flex:1;border-radius:25px;" onclick="modal.remove();mobile.deleteTimeCapsule(' + c.id + ')">🗑️ 删除</button>' +
+            '</div></div></div>';
 
         document.body.appendChild(modal);
+    },
+
+    // 编辑时光胶囊
+    openEditCapsuleModal(capsuleId) {
+        var capsules = this._timeCapsulesData || [];
+        var c = capsules.find(function(x) { return x.id === capsuleId; });
+        if (!c) return;
+        var self = this;
+
+        var modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'mobileEditCapsuleModal';
+        modal.innerHTML = '<div class="modal-card">' +
+            '<h3>✏️ 编辑时光胶囊</h3>' +
+            '<div class="form-group"><label>标题</label><input id="mobileEditCapsuleTitle" class="form-input" value="' + self.escapeHtml(c.title) + '"></div>' +
+            '<div class="form-group"><label>内容</label><textarea id="mobileEditCapsuleContent" class="form-input" rows="4">' + self.escapeHtml(c.content || '') + '</textarea></div>' +
+            '<div class="modal-actions">' +
+            '<button class="btn-primary" onclick="mobile.updateTimeCapsule(' + capsuleId + ')">💾 保存</button>' +
+            '<button class="btn-secondary" onclick="document.getElementById(\'mobileEditCapsuleModal\').remove()">取消</button></div></div>';
+        document.body.appendChild(modal);
+        modal.style.display = 'flex';
+        modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+    },
+
+    // 保存编辑
+    async updateTimeCapsule(capsuleId) {
+        var titleEl = document.getElementById('mobileEditCapsuleTitle');
+        var contentEl = document.getElementById('mobileEditCapsuleContent');
+        var title = (titleEl.value || '').trim();
+        var content = (contentEl.value || '').trim();
+        if (!title) { this.showToast('请输入标题'); return; }
+        try {
+            var supabase = this.initSupabase();
+            if (!supabase) return;
+            await supabase.from('time_capsules').update({ title: title, content: content }).eq('id', capsuleId);
+            var modal = document.getElementById('mobileEditCapsuleModal');
+            if (modal) modal.remove();
+            this.loadTimeCapsules();
+            this.showToast('✅ 已保存');
+        } catch (e) {
+            this.showToast('保存失败');
+        }
+    },
+
+    // 删除时光胶囊
+    async deleteTimeCapsule(capsuleId) {
+        var self = this;
+        var modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = '<div class="modal-card" style="max-width:320px;text-align:center;">' +
+            '<div style="font-size:48px;margin-bottom:12px;">🗑️</div>' +
+            '<div style="font-size:16px;font-weight:600;margin-bottom:8px;">确定删除这个时光胶囊？</div>' +
+            '<div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">删除后不可恢复</div>' +
+            '<div class="modal-actions">' +
+            '<button class="btn-danger" style="flex:1;" onclick="this.closest(\'.modal-overlay\').remove();mobile._doDeleteCapsule(' + capsuleId + ')">确认删除</button>' +
+            '<button class="btn-secondary" style="flex:1;" onclick="this.closest(\'.modal-overlay\').remove()">取消</button></div></div>';
+        document.body.appendChild(modal);
+        modal.style.display = 'flex';
+        modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+    },
+
+    async _doDeleteCapsule(capsuleId) {
+        try {
+            var supabase = this.initSupabase();
+            if (!supabase) return;
+            await supabase.from('time_capsules').delete().eq('id', capsuleId);
+            this.loadTimeCapsules();
+            this.showToast('🗑️ 已删除');
+        } catch (e) {
+            this.showToast('删除失败');
+        }
     },
 
     formatRelativeTime(dateStr) {
