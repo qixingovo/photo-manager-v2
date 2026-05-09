@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=64">
+    <link rel="stylesheet" href="mobile.css?v=65">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -75,53 +75,12 @@
             <p id="mobileNudgeCooldown" style="font-size:11px;color:#999;text-align:center;margin-top:4px;display:none;"></p>
         </div>
 
-        <!-- 功能入口卡片 2x4 -->
-        <div class="feature-cards">
-            <div class="feature-card" onclick="mobile.switchTab('moodDiary')" style="background:linear-gradient(135deg,#FFE0E6,#FFD4DD);">
-                <span class="feature-icon">📝</span>
-                <span class="feature-title">心情日记</span>
-                <span class="feature-sub">记录每一天的心情</span>
-            </div>
-            <div class="feature-card" onclick="mobile.switchTab('dailyChatter')" style="background:linear-gradient(135deg,#E0F0FF,#CCE5FF);">
-                <span class="feature-icon">💬</span>
-                <span class="feature-title">每日叨叨</span>
-                <span class="feature-sub">想说什么就说什么</span>
-            </div>
-            <div class="feature-card" onclick="mobile.switchTab('coupleTasks')" style="background:linear-gradient(135deg,#FFF3E0,#FFE8CC);">
-                <span class="feature-icon">✅</span>
-                <span class="feature-title">情侣打卡</span>
-                <span class="feature-sub">一起完成100件事</span>
-            </div>
-            <div class="feature-card" onclick="mobile.switchTab('map')" style="background:linear-gradient(135deg,#E8F5E9,#C8E6C9);">
-                <span class="feature-icon">🗺️</span>
-                <span class="feature-title">我们的地图</span>
-                <span class="feature-sub">走过的地方</span>
-            </div>
-            <div class="feature-card" onclick="mobile.switchTab('timeline')" style="background:linear-gradient(135deg,#FCE4EC,#F8BBD0);">
-                <span class="feature-icon">💝</span>
-                <span class="feature-title">纪念日</span>
-                <span class="feature-sub">重要的日子</span>
-            </div>
-            <div class="feature-card" onclick="mobile.switchTab('secretNote')" style="background:linear-gradient(135deg,#FFF0F5,#FFDEE9);">
-                <span class="feature-icon">💌</span>
-                <span class="feature-title">悄悄话</span>
-                <span class="feature-sub">写张小纸条给Ta</span>
-            </div>
-            <div class="feature-card" onclick="mobile.switchTab('emotionTimeline')" style="background:linear-gradient(135deg,#FFF8E1,#FFECB3);">
-                <span class="feature-icon">📜</span>
-                <span class="feature-title">情感时间轴</span>
-                <span class="feature-sub">我们的故事</span>
-            </div>
-            <div class="feature-card" onclick="mobile.switchTab('albums')" style="background:linear-gradient(135deg,#E3F2FD,#BBDEFB);">
-                <span class="feature-icon">📸</span>
-                <span class="feature-title">相册</span>
-                <span class="feature-sub">我们的回忆</span>
-            </div>
-            <div class="feature-card" onclick="mobile.switchTab('timeCapsule')" style="background:linear-gradient(135deg,#F3E5F5,#E1BEE7);">
-                <span class="feature-icon">⏳</span>
-                <span class="feature-title">时光胶囊</span>
-                <span class="feature-sub">封存此刻</span>
-            </div>
+        <!-- 功能入口卡片 3x2（可编辑排序） -->
+        <div id="featureCardEditBar" class="feature-card-edit-bar" style="display:none;">
+            <button id="featureCardEditToggle" class="feature-edit-toggle" onclick="mobile.toggleFeatureCardEdit()">✏️ 编辑排序</button>
+        </div>
+        <div class="feature-cards" id="featureCardsContainer">
+            <!-- JS 动态渲染 -->
         </div>
     </div>
 
@@ -769,7 +728,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=64"></script>
+    <script type="module" src="mobile-app.js?v=65"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;

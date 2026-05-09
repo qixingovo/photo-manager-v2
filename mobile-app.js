@@ -20,6 +20,18 @@ var EMOTION_TYPES = [
     { key: 'bottle', icon: '🍾', label: '漂流瓶' }
 ];
 
+// 首页功能卡片配置（6 张，3×2 网格，可编辑排序）
+const FEATURE_CARD_CONFIG = {
+    moodDiary:       { id:'moodDiary', icon:'📝', title:'心情日记',   sub:'记录每一天的心情', gradient:'linear-gradient(135deg,#FFE0E6,#FFD4DD)' },
+    dailyChatter:    { id:'dailyChatter', icon:'💬', title:'每日叨叨', sub:'含悄悄话',         gradient:'linear-gradient(135deg,#E0F0FF,#CCE5FF)' },
+    coupleTasks:     { id:'coupleTasks', icon:'✅', title:'情侣打卡',   sub:'一起完成100件事',  gradient:'linear-gradient(135deg,#FFF3E0,#FFE8CC)' },
+    map:             { id:'map', icon:'🗺️', title:'我们的地图',  sub:'走过的地方',        gradient:'linear-gradient(135deg,#E8F5E9,#C8E6C9)' },
+    emotionTimeline: { id:'emotionTimeline', icon:'📜', title:'情感时间轴', sub:'纪念日·时光胶囊',  gradient:'linear-gradient(135deg,#FFF8E1,#FFECB3)' },
+    albums:          { id:'albums', icon:'📸', title:'相册',      sub:'我们的回忆',        gradient:'linear-gradient(135deg,#E3F2FD,#BBDEFB)' }
+};
+
+const DEFAULT_FEATURE_CARD_ORDER = ['moodDiary','dailyChatter','coupleTasks','map','emotionTimeline','albums'];
+
 const mobile = {
     // 状态
     currentUser: null,
@@ -38,7 +50,9 @@ const mobile = {
     previewFiles: [],
     pendingDeleteId: null,
     pendingDeleteType: null,
-    
+    _featureCardOrder: null,
+    _featureCardEditMode: false,
+
     // 分页状态
     currentPage: 1,
     photosPerPage: 6,
@@ -474,6 +488,8 @@ const mobile = {
         if (session) {
             this.currentUser = this.getUserFromSession(session);
             this.showPage('home');
+            this.renderFeatureCards();
+            this._loadFeatureCardOrderFromServer().then(() => this.renderFeatureCards());
             this.loadData().catch(err => {
                 console.error('加载数据失败:', err);
                 this.showToast('数据加载失败，请刷新重试');
@@ -529,7 +545,9 @@ const mobile = {
         
         // 先跳转页面
         this.showPage('home');
-        
+        this.renderFeatureCards();
+        this._loadFeatureCardOrderFromServer().then(() => this.renderFeatureCards());
+
         // 再加载数据（不阻塞页面显示）
         this.loadData().catch(err => {
             console.error('加载数据失败:', err);
@@ -733,9 +751,168 @@ const mobile = {
         await this._loadAvatars();
     },
 
+    // ========================================
+    // 功能卡片 编辑模式
+    // ========================================
+
+    // 加载功能卡片顺序
+    loadFeatureCardOrder() {
+        try {
+            const saved = localStorage.getItem('featureCardOrder');
+            if (saved) {
+                const order = JSON.parse(saved);
+                const validIds = Object.keys(FEATURE_CARD_CONFIG);
+                if (Array.isArray(order) && order.length === validIds.length &&
+                    validIds.every(id => order.includes(id))) {
+                    this._featureCardOrder = order;
+                    return;
+                }
+            }
+        } catch (e) { /* fall through to default */ }
+        this._featureCardOrder = [...DEFAULT_FEATURE_CARD_ORDER];
+    },
+
+    // 保存功能卡片顺序（localStorage + app_settings）
+    async saveFeatureCardOrder(order) {
+        this._featureCardOrder = [...order];
+        localStorage.setItem('featureCardOrder', JSON.stringify(order));
+        try {
+            if (window.supabase && this.currentUser) {
+                await window.supabase.from('app_settings').upsert({
+                    key: 'feature_card_order',
+                    value: JSON.stringify(order)
+                }, { onConflict: 'key' });
+            }
+        } catch (e) { /* 非关键操作 */ }
+    },
+
+    // 从 Supabase 加载卡片顺序（登录后调用）
+    async _loadFeatureCardOrderFromServer() {
+        try {
+            if (!window.supabase || !this.currentUser) return;
+            const { data } = await window.supabase.from('app_settings')
+                .select('value').eq('key', 'feature_card_order').maybeSingle();
+            if (data?.value) {
+                const order = JSON.parse(data.value);
+                const validIds = Object.keys(FEATURE_CARD_CONFIG);
+                if (Array.isArray(order) && order.length === validIds.length &&
+                    validIds.every(id => order.includes(id))) {
+                    this._featureCardOrder = order;
+                    localStorage.setItem('featureCardOrder', JSON.stringify(order));
+                }
+            }
+        } catch (e) { /* fallback to localStorage */ }
+    },
+
+    // 渲染功能卡片
+    renderFeatureCards() {
+        const container = document.getElementById('featureCardsContainer');
+        if (!container) return;
+
+        if (!this._featureCardOrder) this.loadFeatureCardOrder();
+
+        container.innerHTML = '';
+
+        this._featureCardOrder.forEach((id, index) => {
+            const cfg = FEATURE_CARD_CONFIG[id];
+            if (!cfg) return;
+
+            const card = document.createElement('div');
+            card.className = 'feature-card';
+            card.setAttribute('data-card-id', id);
+            card.setAttribute('data-card-index', index);
+            card.style.background = cfg.gradient;
+
+            card.addEventListener('click', (e) => {
+                if (this._featureCardEditMode) return;
+                if (e.target.closest('.feature-card-order-arrows')) return;
+                this.switchTab(cfg.id);
+            });
+
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'feature-icon';
+            iconSpan.textContent = cfg.icon;
+            card.appendChild(iconSpan);
+
+            const titleSpan = document.createElement('span');
+            titleSpan.className = 'feature-title';
+            titleSpan.textContent = cfg.title;
+            card.appendChild(titleSpan);
+
+            const subSpan = document.createElement('span');
+            subSpan.className = 'feature-sub';
+            subSpan.textContent = cfg.sub;
+            card.appendChild(subSpan);
+
+            // 编辑模式箭头
+            const arrows = document.createElement('div');
+            arrows.className = 'feature-card-order-arrows';
+            arrows.style.display = this._featureCardEditMode ? 'flex' : 'none';
+            arrows.innerHTML = `
+                <button class="feature-arrow-btn" data-action="up" ${index === 0 ? 'disabled' : ''}>▲</button>
+                <button class="feature-arrow-btn" data-action="down" ${index === this._featureCardOrder.length - 1 ? 'disabled' : ''}>▼</button>
+            `;
+
+            arrows.querySelectorAll('.feature-arrow-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const action = btn.getAttribute('data-action');
+                    this.moveFeatureCard(id, action);
+                });
+            });
+            card.appendChild(arrows);
+
+            container.appendChild(card);
+        });
+
+        this._updateEditBar();
+    },
+
+    // 更新编辑栏状态
+    _updateEditBar() {
+        const bar = document.getElementById('featureCardEditBar');
+        const btn = document.getElementById('featureCardEditToggle');
+        if (!bar || !btn) return;
+        bar.style.display = this.currentUser ? 'flex' : 'none';
+        btn.textContent = this._featureCardEditMode ? '✅ 完成排序' : '✏️ 编辑排序';
+        btn.className = 'feature-edit-toggle' + (this._featureCardEditMode ? ' editing' : '');
+        document.getElementById('featureCardsContainer').classList.toggle('edit-mode', this._featureCardEditMode);
+    },
+
+    // 切换编辑模式
+    toggleFeatureCardEdit() {
+        this._featureCardEditMode = !this._featureCardEditMode;
+        if (!this._featureCardEditMode) {
+            this.saveFeatureCardOrder(this._featureCardOrder);
+        }
+        this.renderFeatureCards();
+    },
+
+    // 移动卡片
+    async moveFeatureCard(cardId, direction) {
+        if (!this._featureCardEditMode) return;
+        const order = [...this._featureCardOrder];
+        const idx = order.indexOf(cardId);
+        if (idx === -1) return;
+
+        let targetIdx;
+        if (direction === 'up') {
+            if (idx === 0) return;
+            targetIdx = idx - 1;
+        } else {
+            if (idx === order.length - 1) return;
+            targetIdx = idx + 1;
+        }
+
+        [order[idx], order[targetIdx]] = [order[targetIdx], order[idx]];
+        await this.saveFeatureCardOrder(order);
+        this.renderFeatureCards();
+    },
+
     switchTab(tab) {
         if (tab === 'home') {
             this.showPage('home');
+            this.renderFeatureCards();
             this.renderCoupleBanner();
             this.checkIncomingBottles();
             this.checkIncomingNotes();
@@ -1301,7 +1478,7 @@ const mobile = {
 
     // 主 tab 滑动切换
     _tabTouchStart(e) {
-        if (e.target.closest('button, input, textarea, a, .nav-item, .bottom-nav, .feature-card, .photo-card, .menu-item')) return;
+        if (e.target.closest('button, input, textarea, a, .nav-item, .bottom-nav, .feature-card, .feature-arrow-btn, .photo-card, .menu-item')) return;
         this._tabTouchStartX = e.touches[0].clientX;
     },
 

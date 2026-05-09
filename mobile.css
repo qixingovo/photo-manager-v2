@@ -277,7 +277,7 @@ body {
    ======================================== */
 .feature-cards {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
     padding: 0 12px;
     margin-bottom: 12px;
@@ -314,6 +314,87 @@ body {
 .feature-sub {
     font-size: 10px;
     color: var(--text-light);
+}
+
+/* 功能卡片编辑栏 */
+.feature-card-edit-bar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 12px 8px;
+}
+
+.feature-edit-toggle {
+    font-size: 12px;
+    color: var(--text-muted);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 4px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.feature-edit-toggle:active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.feature-edit-toggle.editing {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    font-weight: 600;
+}
+
+/* 编辑模式 - 卡片增加操作提示 */
+.feature-cards.edit-mode .feature-card {
+    position: relative;
+    border: 2px dashed var(--primary);
+    animation: editPulse 2s ease-in-out infinite;
+}
+
+@keyframes editPulse {
+    0%, 100% { border-color: var(--primary); }
+    50% { border-color: var(--accent); }
+}
+
+/* 编辑模式 - 方向箭头按钮容器 */
+.feature-card-order-arrows {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 5;
+}
+
+.feature-arrow-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.85);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.feature-arrow-btn:active {
+    transform: scale(0.9);
+    background: var(--primary);
+    color: white;
+}
+
+.feature-arrow-btn:disabled {
+    opacity: 0.25;
+    pointer-events: none;
 }
 
 /* 照片区域标题 */
@@ -1653,6 +1734,16 @@ body.dark .btn-secondary {
 body.dark .btn-danger {
     background: var(--danger);
     color: white;
+}
+
+body.dark .feature-edit-toggle {
+    border-color: var(--border);
+    color: var(--text-muted);
+}
+
+body.dark .feature-arrow-btn {
+    background: rgba(40, 44, 62, 0.9);
+    color: var(--text);
 }
 
 body.dark .batch-actions {
