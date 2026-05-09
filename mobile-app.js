@@ -17,7 +17,8 @@ var EMOTION_TYPES = [
     { key: 'chatter', icon: '💬', label: '每日叨叨' },
     { key: 'milestone', icon: '🎉', label: '纪念日' },
     { key: 'checkin', icon: '✅', label: '情侣打卡' },
-    { key: 'bottle', icon: '🍾', label: '漂流瓶' }
+    { key: 'bottle', icon: '🍾', label: '漂流瓶' },
+    { key: 'time_capsule', icon: '⏳', label: '时光胶囊' }
 ];
 
 // 首页功能卡片配置（6 张，3×2 网格，可编辑排序）
@@ -7387,7 +7388,10 @@ const mobile = {
                     .gte('checked_at', startStr).order('checked_at', { ascending: false }).limit(100),
                 supabase.from('drift_bottles').select('id, message, thrown_at, revealed_at, from_user')
                     .eq('status', 'revealed').gte('revealed_at', startStr)
-                    .order('revealed_at', { ascending: false }).limit(50)
+                    .order('revealed_at', { ascending: false }).limit(50),
+                supabase.from('time_capsules').select('id, title, content, created_by, unlocked_at')
+                    .eq('status', 'unlocked').gte('unlocked_at', startStr)
+                    .order('unlocked_at', { ascending: false }).limit(50)
             ]);
 
             var self = this;
@@ -7408,6 +7412,9 @@ const mobile = {
             }
             if (results[5].status === 'fulfilled' && results[5].value.data) {
                 results[5].value.data.forEach(function(b) { items.push({ type: 'bottle', time: b.revealed_at, data: b }); });
+            }
+            if (results[6].status === 'fulfilled' && results[6].value.data) {
+                results[6].value.data.forEach(function(tc) { items.push({ type: 'time_capsule', time: tc.unlocked_at, data: tc }); });
             }
         } catch (e) { /* silent */ }
 
@@ -7483,6 +7490,10 @@ const mobile = {
         } else if (item.type === 'bottle') {
             userLabel = data.from_user === 'laoda' ? '老大' : '小弟';
             inner = '<div class="emotion-bottle-msg">🍾 ' + this.escapeHtml(data.message || '一张照片') + '</div>';
+        } else if (item.type === 'time_capsule') {
+            userLabel = data.created_by === 'laoda' ? '老大' : '小弟';
+            inner = '<div class="emotion-capsule-title">⏳ ' + this.escapeHtml(data.title || '时光胶囊') + '</div>';
+            if (data.content) { inner += '<div class="emotion-capsule-content">' + this.escapeHtml(data.content) + '</div>'; }
         }
 
         var toggleBtn = '';

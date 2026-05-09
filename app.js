@@ -3069,8 +3069,7 @@ function renderTimeline() {
 window.loadMoreTimeline = function() {
     _timelinePage++;
     renderTimeline();
-}
-}
+};
 
 function renderFilterCategoryCascadePath(catId) {
     const container = document.getElementById('filterCategoryCascade');
@@ -6283,7 +6282,8 @@ var EMOTION_TYPES = [
     { key: 'chatter', icon: '💬', label: '每日叨叨' },
     { key: 'milestone', icon: '🎉', label: '纪念日' },
     { key: 'checkin', icon: '✅', label: '情侣打卡' },
-    { key: 'bottle', icon: '🍾', label: '漂流瓶' }
+    { key: 'bottle', icon: '🍾', label: '漂流瓶' },
+    { key: 'time_capsule', icon: '⏳', label: '时光胶囊' }
 ];
 
 window.loadEmotionTimeline = async function() {
@@ -6325,7 +6325,11 @@ window.fetchEmotionTimeline = async function() {
             // 6. drift_bottles (revealed)
             supabase.from('drift_bottles').select('id, message, thrown_at, revealed_at, from_user')
                 .eq('status', 'revealed').gte('revealed_at', startStr)
-                .order('revealed_at', { ascending: false }).limit(50)
+                .order('revealed_at', { ascending: false }).limit(50),
+            // 7. time_capsules (unlocked)
+            supabase.from('time_capsules').select('id, title, content, created_by, unlocked_at')
+                .eq('status', 'unlocked').gte('unlocked_at', startStr)
+                .order('unlocked_at', { ascending: false }).limit(50)
         ]);
 
         // Parse photos
@@ -6364,6 +6368,12 @@ window.fetchEmotionTimeline = async function() {
         if (results[5].status === 'fulfilled' && results[5].value.data) {
             results[5].value.data.forEach(function(b) {
                 items.push({ type: 'bottle', time: b.revealed_at, data: b });
+            });
+        }
+        // Parse time_capsules
+        if (results[6].status === 'fulfilled' && results[6].value.data) {
+            results[6].value.data.forEach(function(tc) {
+                items.push({ type: 'time_capsule', time: tc.unlocked_at, data: tc });
             });
         }
     } catch (e) { /* silent */ }
@@ -6442,6 +6452,10 @@ window.renderEmotionItem = function(item) {
     } else if (item.type === 'bottle') {
         userLabel = data.from_user === 'laoda' ? '老大' : '小弟';
         inner = '<div class="emotion-bottle-msg">🍾 ' + escapeHtml(data.message || '一张照片') + '</div>';
+    } else if (item.type === 'time_capsule') {
+        userLabel = data.created_by === 'laoda' ? '老大' : '小弟';
+        inner = '<div class="emotion-capsule-title">⏳ ' + escapeHtml(data.title || '时光胶囊') + '</div>';
+        if (data.content) { inner += '<div class="emotion-capsule-content">' + escapeHtml(data.content) + '</div>'; }
     }
 
     var toggleBtn = '';
