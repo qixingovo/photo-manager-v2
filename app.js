@@ -635,6 +635,7 @@ window.renderTimeCapsuleList = function(capsules) {
     var html = '';
     capsules.forEach(function(c) {
         var isLocked = c.status === 'locked';
+        var isCreator = (c.created_by === 'laoda' && currentUser.isLaoda) || (c.created_by === 'xiaodi' && !currentUser.isLaoda);
         var createdLabel = c.created_by === 'laoda' ? '老大' : '小弟';
         if (isLocked) {
             var hint = '';
@@ -654,7 +655,7 @@ window.renderTimeCapsuleList = function(capsules) {
                 hint = '⏰📍 定时+定位解锁';
             }
             html += '<div class="time-capsule-card locked" onclick="window.showCapsuleDetail(' + c.id + ')">' +
-                '<div class="capsule-icon">🔒</div>' +
+                '<div class="capsule-icon">' + (isCreator ? '✍️' : '🔒') + '</div>' +
                 '<div class="capsule-info">' +
                 '<div class="capsule-title">' + escapeHtml(c.title) + '</div>' +
                 '<div class="capsule-hint">' + hint + '</div>' +
@@ -869,6 +870,8 @@ window.showCapsuleDetail = function(capsuleId) {
     var c = window._timeCapsulesData ? window._timeCapsulesData.find(function(x) { return x.id === capsuleId; }) : null;
     if (!c) return;
     var isLocked = c.status === 'locked';
+    var isCreator = (c.created_by === 'laoda' && currentUser.isLaoda) || (c.created_by === 'xiaodi' && !currentUser.isLaoda);
+    var canView = isCreator || !isLocked;
     var createdLabel = c.created_by === 'laoda' ? '老大' : '小弟';
     var unlockedLabel = c.unlocked_by === 'laoda' ? '老大' : (c.unlocked_by ? '小弟' : '');
 
@@ -877,18 +880,19 @@ window.showCapsuleDetail = function(capsuleId) {
     modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
 
     var photoHtml = '';
-    if (c.photo_storage_path && !isLocked) {
+    if (c.photo_storage_path && canView) {
         photoHtml = '<img src="' + escapeHtml(c.photo_storage_path) + '" style="width:100%;max-height:300px;object-fit:contain;border-radius:8px;margin:12px 0;" onerror="this.style.display=\'none\'">';
     }
 
     modal.innerHTML = '<div class="modal-sheet capsule-detail-modal" style="max-width:400px;">' +
         '<div style="text-align:center;padding:20px 16px 0;">' +
-        '<div style="font-size:48px;margin-bottom:8px;">' + (isLocked ? '🔒' : '💌') + '</div>' +
+        '<div style="font-size:48px;margin-bottom:8px;">' + (canView ? (isLocked ? '🔒' : '💌') : '🔐') + '</div>' +
         '<div style="font-size:18px;font-weight:700;margin-bottom:4px;">' + escapeHtml(c.title) + '</div>' +
-        (isLocked ? '<div style="color:var(--text-muted);font-size:13px;">🔒 尚未解锁</div>' : '') +
+        (isLocked && !isCreator ? '<div style="color:var(--text-muted);font-size:13px;">🔐 ' + createdLabel + ' 封存的秘密，等待解锁...</div>' : '') +
+        (isLocked && isCreator ? '<div style="color:var(--text-muted);font-size:13px;">🔒 你的胶囊，尚未被对方解锁</div>' : '') +
         '</div>' +
         '<div style="padding:16px;">' +
-        (!isLocked ? '<div style="font-size:15px;line-height:1.8;white-space:pre-wrap;margin-bottom:12px;">' + escapeHtml(c.content || '') + '</div>' : '') +
+        (canView ? '<div style="font-size:15px;line-height:1.8;white-space:pre-wrap;margin-bottom:12px;">' + escapeHtml(c.content || '') + '</div>' : '') +
         photoHtml +
         '<div style="font-size:12px;color:var(--text-muted);text-align:center;">' +
         createdLabel + ' 创建 · ' + formatRelativeTime(c.created_at) +
@@ -897,11 +901,12 @@ window.showCapsuleDetail = function(capsuleId) {
         (c.unlocked_at ? '<br>🔓 ' + unlockedLabel + ' 于 ' + formatRelativeTime(c.unlocked_at) + ' 解锁' : '') +
         '</div></div>' +
         '<div style="text-align:center;padding:0 16px 20px;">' +
-        (isLocked ? '<button class="btn-primary" style="width:100%;border-radius:25px;" onclick="this.closest(\'.modal-overlay\').remove();window.tryUnlockCapsule(' + c.id + ')">🔓 尝试解锁</button>' : '') +
-        '<div style="display:flex;gap:8px;margin-top:' + (isLocked ? '8px' : '0') + ';">' +
+        (!isCreator && isLocked ? '<button class="btn-primary" style="width:100%;border-radius:25px;" onclick="this.closest(\'.modal-overlay\').remove();window.tryUnlockCapsule(' + c.id + ')">🔓 尝试解锁</button>' : '') +
+        (isCreator ? '<div style="display:flex;gap:8px;margin-top:' + (isLocked && !isCreator ? '8px' : '0') + ';">' +
         '<button class="btn-secondary" style="flex:1;border-radius:25px;" onclick="this.closest(\'.modal-overlay\').remove();window.openEditCapsuleModal(' + c.id + ')">✏️ 编辑</button>' +
         '<button class="btn-danger" style="flex:1;border-radius:25px;" onclick="this.closest(\'.modal-overlay\').remove();window.deleteTimeCapsule(' + c.id + ')">🗑️ 删除</button>' +
-        '</div></div></div>';
+        '</div>' : '') +
+        '</div></div>';
 
     document.body.appendChild(modal);
 };
