@@ -738,6 +738,7 @@ window.openCapsuleMapPicker = function(prefix) {
     var mapEl = document.getElementById('capsuleMapPickerMap');
     var map = L.map(mapEl, { attributionControl: false, zoomControl: true }).setView([initLat, initLng], 15);
     L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+        subdomains: ['1','2','3','4'],
         maxZoom: 18
     }).addTo(map);
 
@@ -1587,6 +1588,7 @@ window.openBatchLocationModal = function() {
         const pickerMap = L.map('batchPickerMap').setView([35.86, 104.19], 4);
         L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
             attribution: '&copy; 高德地图',
+            subdomains: ['1','2','3','4'],
             maxZoom: 18
         }).addTo(pickerMap);
 
@@ -2421,6 +2423,7 @@ async function initMapView() {
     mapView = L.map('mapContainer').setView([35.86, 104.19], 4);
     L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
         attribution: '&copy; 高德地图',
+        subdomains: ['1','2','3','4'],
         maxZoom: 18
     }).addTo(mapView);
 
@@ -2532,6 +2535,7 @@ window.pickLocationOnMap = function() {
         const pickerMap = L.map('pickerMap').setView([35.86, 104.19], 4);
         L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
             attribution: '&copy; 高德地图',
+            subdomains: ['1','2','3','4'],
             maxZoom: 18
         }).addTo(pickerMap);
 
