@@ -584,9 +584,15 @@ const mobile = {
             if (topBar && !topBar.querySelector('.back-btn')) {
                 const backBtn = document.createElement('button');
                 backBtn.className = 'icon-btn back-btn';
-                const backTarget = (page === 'upload' || page === 'category') ? 'photos' : 'home';
+                const backTarget = (page === 'upload' || page === 'category') ? 'photos'
+                                 : (page === 'secretNote') ? 'dailyChatter'
+                                 : (page === 'timeline' || page === 'timeCapsule') ? 'emotionTimeline'
+                                 : 'home';
                 backBtn.innerHTML = '←';
-                backBtn.title = backTarget === 'photos' ? '返回照片' : '返回首页';
+                backBtn.title = backTarget === 'photos' ? '返回照片'
+                              : backTarget === 'dailyChatter' ? '返回每日叨叨'
+                              : backTarget === 'emotionTimeline' ? '返回情感时间轴'
+                              : '返回首页';
                 backBtn.onclick = function(e) { e.stopPropagation(); mobile.switchTab(backTarget); };
                 topBar.insertBefore(backBtn, topBar.firstChild);
             }

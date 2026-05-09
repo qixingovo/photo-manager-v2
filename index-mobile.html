@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=65">
+    <link rel="stylesheet" href="mobile.css?v=66">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -368,6 +368,8 @@
                 <span>情感时间轴</span>
             </div>
             <div class="top-actions">
+                <button class="icon-btn" onclick="mobile.switchTab('timeline')" title="纪念日">💝</button>
+                <button class="icon-btn" onclick="mobile.switchTab('timeCapsule')" title="时光胶囊">⏳</button>
                 <button class="icon-btn" onclick="mobile.toggleEmotionTimelineFilter()">🔍</button>
             </div>
         </header>
@@ -493,6 +495,9 @@
             <div class="logo">
                 <span>💬</span>
                 <span>每日叨叨</span>
+            </div>
+            <div class="top-actions">
+                <button class="icon-btn" onclick="mobile.switchTab('secretNote')" title="悄悄话">💌</button>
             </div>
         </header>
         <button class="btn-primary" style="margin:12px;border-radius:25px;" onclick="mobile.openDailyChatterModal()">+ 发布动态</button>
@@ -728,7 +733,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=65"></script>
+    <script type="module" src="mobile-app.js?v=66"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;
