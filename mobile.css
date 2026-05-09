@@ -277,7 +277,7 @@ body {
    ======================================== */
 .feature-cards {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     padding: 0 12px;
     margin-bottom: 12px;
@@ -286,12 +286,12 @@ body {
 
 .feature-card {
     border-radius: var(--radius);
-    padding: 14px 12px;
+    padding: 10px 8px;
     cursor: pointer;
     transition: all 0.25s ease;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     -webkit-tap-highlight-color: transparent;
 }
@@ -302,17 +302,17 @@ body {
 }
 
 .feature-icon {
-    font-size: 28px;
+    font-size: 24px;
 }
 
 .feature-title {
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text);
 }
 
 .feature-sub {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--text-light);
 }
 
@@ -3194,3 +3194,31 @@ mark {
     color: white;
     border-color: #667eea;
 }
+
+/* ========================================
+   时光胶囊
+   ======================================== */
+.time-capsule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.time-capsule-card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    gap: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.time-capsule-card.locked {
+    background: var(--bg);
+}
+.time-capsule-card:active { transform: scale(0.98); }
+.time-capsule-card .capsule-icon { font-size: 28px; flex-shrink: 0; }
+.time-capsule-card .capsule-info { flex: 1; min-width: 0; }
+.time-capsule-card .capsule-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.time-capsule-card .capsule-hint { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.time-capsule-card .capsule-content { font-size: 14px; color: var(--text-light); line-height: 1.6; white-space: pre-wrap; margin-top: 6px; }
+.time-capsule-card .capsule-photo { max-width: 100%; border-radius: 8px; margin-top: 8px; }
+.time-capsule-card .capsule-meta { font-size: 11px; color: var(--text-muted); margin-top: 6px; }

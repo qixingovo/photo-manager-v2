@@ -425,6 +425,7 @@ window.toggleSection = function(section) {
     const albumDetailSection = document.getElementById('albumDetailSection')
     const passportSection = document.getElementById('passportSection')
     const partnerProfileSection = document.getElementById('partnerProfileSection')
+    const timeCapsuleSection = document.getElementById('timeCapsuleSection')
 
     // 辅助：隐藏所有分区
     const hideAll = () => {
@@ -442,6 +443,7 @@ window.toggleSection = function(section) {
         if (document.getElementById('intimateRecordsSection')) document.getElementById('intimateRecordsSection').style.display = 'none'
         if (document.getElementById('coupleTasksSection')) document.getElementById('coupleTasksSection').style.display = 'none'
         if (partnerProfileSection) partnerProfileSection.style.display = 'none'
+        if (timeCapsuleSection) timeCapsuleSection.style.display = 'none'
     }
 
     if (section === 'upload') {
@@ -592,7 +594,244 @@ window.toggleSection = function(section) {
         } else {
             sec.style.display = 'none'
         }
+    } else if (section === 'timeCapsule') {
+        const sec = document.getElementById('timeCapsuleSection')
+        if (!sec) return
+        if (sec.style.display === 'none' || !sec.style.display) {
+            hideAll()
+            sec.style.display = 'block'
+            window.loadTimeCapsules()
+        } else {
+            sec.style.display = 'none'
+        }
     }
+}
+
+// ========================================
+// 时光胶囊
+// ========================================
+
+window.loadTimeCapsules = async function() {
+    var container = document.getElementById('timeCapsuleList');
+    if (!container) return;
+    container.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">加载中...</p>';
+    try {
+        var { data } = await supabase.from('time_capsules').select('*').order('created_at', { ascending: false });
+        window._timeCapsulesData = data || [];
+        window.renderTimeCapsuleList(window._timeCapsulesData);
+    } catch (e) {
+        container.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">加载失败</p>';
+    }
+};
+
+window.renderTimeCapsuleList = function(capsules) {
+    var container = document.getElementById('timeCapsuleList');
+    if (!container) return;
+    if (!capsules || capsules.length === 0) {
+        container.innerHTML = '<div class="empty-hint">⏳ 还没有时光胶囊<br><small>创建一个吧，把想说的话封存起来</small></div>';
+        return;
+    }
+    var now = new Date();
+    var html = '';
+    capsules.forEach(function(c) {
+        var isLocked = c.status === 'locked';
+        var createdLabel = c.created_by === 'laoda' ? '老大' : '小弟';
+        if (isLocked) {
+            var hint = '';
+            if (c.unlock_mode === 'time' && c.reveal_at) {
+                var revealDate = new Date(c.reveal_at);
+                var diff = revealDate - now;
+                if (diff > 0) {
+                    var days = Math.floor(diff / 86400000);
+                    var hours = Math.floor((diff % 86400000) / 3600000);
+                    hint = '⏰ ' + (days > 0 ? days + '天' : '') + hours + '小时后解锁';
+                } else {
+                    hint = '⏰ 已到解锁时间（刷新后解锁）';
+                }
+            } else if (c.unlock_mode === 'location') {
+                hint = '📍 在' + (c.reveal_lat ? c.reveal_lat.toFixed(2) + ',' + c.reveal_lng.toFixed(2) : '某个地方') + '等你';
+            } else if (c.unlock_mode === 'both') {
+                hint = '⏰📍 定时+定位解锁';
+            }
+            html += '<div class="time-capsule-card locked" onclick="window.tryUnlockCapsule(' + c.id + ')">' +
+                '<div class="capsule-icon">🔒</div>' +
+                '<div class="capsule-info">' +
+                '<div class="capsule-title">' + escapeHtml(c.title) + '</div>' +
+                '<div class="capsule-hint">' + hint + '</div>' +
+                '<div class="capsule-meta">' + createdLabel + ' · ' + formatRelativeTime(c.created_at) + '</div>' +
+                '</div></div>';
+        } else {
+            html += '<div class="time-capsule-card unlocked">' +
+                '<div class="capsule-icon">💌</div>' +
+                '<div class="capsule-info">' +
+                '<div class="capsule-title">' + escapeHtml(c.title) + '</div>' +
+                '<div class="capsule-content">' + escapeHtml(c.content || '') + '</div>' +
+                (c.photo_storage_path ? '<img src="' + escapeHtml(c.photo_storage_path) + '" class="capsule-photo" onerror="this.style.display=\'none\'">' : '') +
+                '<div class="capsule-meta">' + createdLabel + ' · ' + (c.unlocked_at ? formatRelativeTime(c.unlocked_at) + ' 解锁' : '') + '</div>' +
+                '</div></div>';
+        }
+    });
+    container.innerHTML = html;
+};
+
+window.openTimeCapsuleCreateModal = function() {
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'timeCapsuleModal';
+    modal.innerHTML = '<div class="modal-card" style="max-width:480px;">' +
+        '<h3>⏳ 封存时光胶囊</h3>' +
+        '<div class="form-group"><label>标题</label><input id="capsuleTitle" class="form-input" placeholder="给这个胶囊起个名字"></div>' +
+        '<div class="form-group"><label>内容</label><textarea id="capsuleContent" class="form-input" rows="4" placeholder="想对未来说的话..."></textarea></div>' +
+        '<div class="form-group"><label>解锁方式</label>' +
+        '<select id="capsuleUnlockMode" class="form-input" onchange="window.onCapsuleModeChange()">' +
+        '<option value="time">⏰ 定时解锁</option>' +
+        '<option value="location">📍 定位解锁</option>' +
+        '<option value="both">⏰📍 定时+定位</option></select></div>' +
+        '<div id="capsuleTimeField" class="form-group"><label>解锁时间</label><input id="capsuleRevealAt" type="datetime-local" class="form-input"></div>' +
+        '<div id="capsuleLocationFields" style="display:none;"><div class="form-group"><label>纬度</label><input id="capsuleRevealLat" type="number" step="0.00001" class="form-input" placeholder="例如 39.9042"></div>' +
+        '<div class="form-group"><label>经度</label><input id="capsuleRevealLng" type="number" step="0.00001" class="form-input" placeholder="例如 116.4074"></div>' +
+        '<div class="form-group"><label>解锁半径(米)</label><input id="capsuleRevealRadius" type="number" class="form-input" value="200" min="50" max="5000"></div></div>' +
+        '<div class="modal-actions">' +
+        '<button class="btn-primary" onclick="window.createTimeCapsule()">💾 封存</button>' +
+        '<button class="btn-secondary" onclick="document.getElementById(\'timeCapsuleModal\').remove()">取消</button></div></div>';
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+    // 自动填充当前坐标
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(pos) {
+            var latEl = document.getElementById('capsuleRevealLat');
+            var lngEl = document.getElementById('capsuleRevealLng');
+            if (latEl && lngEl && !latEl.value) {
+                latEl.value = pos.coords.latitude.toFixed(5);
+                lngEl.value = pos.coords.longitude.toFixed(5);
+            }
+        }, function() {}, { timeout: 5000 });
+    }
+};
+
+window.onCapsuleModeChange = function() {
+    var mode = document.getElementById('capsuleUnlockMode').value;
+    document.getElementById('capsuleTimeField').style.display = (mode === 'time' || mode === 'both') ? '' : 'none';
+    document.getElementById('capsuleLocationFields').style.display = (mode === 'location' || mode === 'both') ? '' : 'none';
+};
+
+window.createTimeCapsule = async function() {
+    var title = document.getElementById('capsuleTitle').value.trim();
+    var content = document.getElementById('capsuleContent').value.trim();
+    var mode = document.getElementById('capsuleUnlockMode').value;
+    if (!title) { alert('请输入标题'); return; }
+    var capsule = { created_by: currentUser.username, title: title, content: content, unlock_mode: mode };
+    if (mode === 'time' || mode === 'both') {
+        var revealAt = document.getElementById('capsuleRevealAt').value;
+        if (!revealAt) { alert('请选择解锁时间'); return; }
+        capsule.reveal_at = new Date(revealAt).toISOString();
+    }
+    if (mode === 'location' || mode === 'both') {
+        var lat = parseFloat(document.getElementById('capsuleRevealLat').value);
+        var lng = parseFloat(document.getElementById('capsuleRevealLng').value);
+        if (isNaN(lat) || isNaN(lng)) { alert('请输入有效坐标'); return; }
+        capsule.reveal_lat = lat;
+        capsule.reveal_lng = lng;
+        capsule.reveal_radius = parseInt(document.getElementById('capsuleRevealRadius').value) || 200;
+    }
+    try {
+        var { error } = await supabase.from('time_capsules').insert(capsule);
+        if (error) throw error;
+        document.getElementById('timeCapsuleModal').remove();
+        window.loadTimeCapsules();
+    } catch (e) { alert('封存失败: ' + e.message); }
+};
+
+window.checkTimeCapsules = async function() {
+    try {
+        var { data } = await supabase.from('time_capsules').select('*').eq('status', 'locked');
+        if (!data || data.length === 0) return;
+        var now = new Date();
+        var unlockedAny = false;
+        for (var i = 0; i < data.length; i++) {
+            var c = data[i];
+            var shouldUnlock = false;
+            if (c.unlock_mode === 'time') {
+                shouldUnlock = c.reveal_at && new Date(c.reveal_at) <= now;
+            } else if (c.unlock_mode === 'location') {
+                // 需要实时坐标，通过 tryUnlockCapsule 触发
+                continue;
+            } else if (c.unlock_mode === 'both') {
+                shouldUnlock = c.reveal_at && new Date(c.reveal_at) <= now;
+                // both 模式还需要位置检查，延迟到 tryUnlockCapsule
+                if (shouldUnlock) continue;
+            }
+            if (shouldUnlock) {
+                await window.unlockTimeCapsule(c.id);
+                unlockedAny = true;
+            }
+        }
+        if (unlockedAny) {
+            if (window._timeCapsulesData) window.loadTimeCapsules();
+        }
+    } catch (e) { /* silent */ }
+};
+
+window.tryUnlockCapsule = async function(capsuleId) {
+    var capsules = window._timeCapsulesData || [];
+    var c = capsules.find(function(x) { return x.id === capsuleId; });
+    if (!c || c.status !== 'locked') return;
+    var now = new Date();
+    // 检查时间条件
+    if ((c.unlock_mode === 'time' || c.unlock_mode === 'both') && c.reveal_at) {
+        if (new Date(c.reveal_at) > now) {
+            alert('⏰ 还没到解锁时间哦~');
+            return;
+        }
+    }
+    // 检查位置条件
+    if (c.unlock_mode === 'location' || c.unlock_mode === 'both') {
+        if (!navigator.geolocation) { alert('设备不支持定位'); return; }
+        navigator.geolocation.getCurrentPosition(async function(pos) {
+            var dist = window._calcDistance(pos.coords.latitude, pos.coords.longitude, c.reveal_lat, c.reveal_lng);
+            if (dist <= (c.reveal_radius || 200)) {
+                await window.unlockTimeCapsule(capsuleId);
+                window.loadTimeCapsules();
+            } else {
+                alert('📍 距离目标还有 ' + Math.round(dist) + ' 米（需在 ' + (c.reveal_radius || 200) + ' 米内）');
+            }
+        }, function() { alert('无法获取位置'); }, { timeout: 10000 });
+        return;
+    }
+    await window.unlockTimeCapsule(capsuleId);
+    window.loadTimeCapsules();
+};
+
+window.unlockTimeCapsule = async function(capsuleId) {
+    try {
+        await supabase.from('time_capsules').update({
+            status: 'unlocked',
+            unlocked_by: currentUser.username,
+            unlocked_at: new Date().toISOString()
+        }).eq('id', capsuleId);
+    } catch (e) { /* silent */ }
+};
+
+// Haversine 距离计算（供时光胶囊和悄悄话共用）
+window._calcDistance = function(lat1, lng1, lat2, lng2) {
+    var R = 6371000;
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLng = (lng2 - lng1) * Math.PI / 180;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+function formatRelativeTime(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr);
+    var now = new Date();
+    var diff = now - d;
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+    if (diff < 2592000000) return Math.floor(diff / 86400000) + '天前';
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
 }
 
 window.toggleMarkCategory = function(catId) {
