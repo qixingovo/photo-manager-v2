@@ -653,7 +653,7 @@ window.renderTimeCapsuleList = function(capsules) {
             } else if (c.unlock_mode === 'both') {
                 hint = '⏰📍 定时+定位解锁';
             }
-            html += '<div class="time-capsule-card locked" onclick="window.tryUnlockCapsule(' + c.id + ')">' +
+            html += '<div class="time-capsule-card locked" onclick="window.showCapsuleDetail(' + c.id + ')">' +
                 '<div class="capsule-icon">🔒</div>' +
                 '<div class="capsule-info">' +
                 '<div class="capsule-title">' + escapeHtml(c.title) + '</div>' +
@@ -661,12 +661,11 @@ window.renderTimeCapsuleList = function(capsules) {
                 '<div class="capsule-meta">' + createdLabel + ' · ' + formatRelativeTime(c.created_at) + '</div>' +
                 '</div></div>';
         } else {
-            html += '<div class="time-capsule-card unlocked">' +
+            html += '<div class="time-capsule-card unlocked" onclick="window.showCapsuleDetail(' + c.id + ')">' +
                 '<div class="capsule-icon">💌</div>' +
                 '<div class="capsule-info">' +
                 '<div class="capsule-title">' + escapeHtml(c.title) + '</div>' +
-                '<div class="capsule-content">' + escapeHtml(c.content || '') + '</div>' +
-                (c.photo_storage_path ? '<img src="' + escapeHtml(c.photo_storage_path) + '" class="capsule-photo" onerror="this.style.display=\'none\'">' : '') +
+                '<div class="capsule-content">' + escapeHtml((c.content || '').substring(0, 50) + ((c.content || '').length > 50 ? '...' : '')) + '</div>' +
                 '<div class="capsule-meta">' + createdLabel + ' · ' + (c.unlocked_at ? formatRelativeTime(c.unlocked_at) + ' 解锁' : '') + '</div>' +
                 '</div></div>';
         }
@@ -863,6 +862,45 @@ window.unlockTimeCapsule = async function(capsuleId) {
             unlocked_at: new Date().toISOString()
         }).eq('id', capsuleId);
     } catch (e) { /* silent */ }
+};
+
+// 时光胶囊详情弹窗
+window.showCapsuleDetail = function(capsuleId) {
+    var c = window._timeCapsulesData ? window._timeCapsulesData.find(function(x) { return x.id === capsuleId; }) : null;
+    if (!c) return;
+    var isLocked = c.status === 'locked';
+    var createdLabel = c.created_by === 'laoda' ? '老大' : '小弟';
+    var unlockedLabel = c.unlocked_by === 'laoda' ? '老大' : (c.unlocked_by ? '小弟' : '');
+
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+
+    var photoHtml = '';
+    if (c.photo_storage_path && !isLocked) {
+        photoHtml = '<img src="' + escapeHtml(c.photo_storage_path) + '" style="width:100%;max-height:300px;object-fit:contain;border-radius:8px;margin:12px 0;" onerror="this.style.display=\'none\'">';
+    }
+
+    modal.innerHTML = '<div class="modal-sheet capsule-detail-modal" style="max-width:400px;">' +
+        '<div style="text-align:center;padding:20px 16px 0;">' +
+        '<div style="font-size:48px;margin-bottom:8px;">' + (isLocked ? '🔒' : '💌') + '</div>' +
+        '<div style="font-size:18px;font-weight:700;margin-bottom:4px;">' + escapeHtml(c.title) + '</div>' +
+        (isLocked ? '<div style="color:var(--text-muted);font-size:13px;">🔒 尚未解锁</div>' : '') +
+        '</div>' +
+        '<div style="padding:16px;">' +
+        (!isLocked ? '<div style="font-size:15px;line-height:1.8;white-space:pre-wrap;margin-bottom:12px;">' + escapeHtml(c.content || '') + '</div>' : '') +
+        photoHtml +
+        '<div style="font-size:12px;color:var(--text-muted);text-align:center;">' +
+        createdLabel + ' 创建 · ' + formatRelativeTime(c.created_at) +
+        (c.reveal_at ? '<br>⏰ 定时: ' + new Date(c.reveal_at).toLocaleString() : '') +
+        (c.reveal_lat ? '<br>📍 定位: ' + c.reveal_lat.toFixed(2) + ', ' + c.reveal_lng.toFixed(2) + ' (±' + (c.reveal_radius || 200) + 'm)' : '') +
+        (c.unlocked_at ? '<br>🔓 ' + unlockedLabel + ' 于 ' + formatRelativeTime(c.unlocked_at) + ' 解锁' : '') +
+        '</div></div>' +
+        '<div style="text-align:center;padding:0 16px 20px;">' +
+        (isLocked ? '<button class="btn-primary" style="width:100%;border-radius:25px;" onclick="this.closest(\'.modal-overlay\').remove();window.tryUnlockCapsule(' + c.id + ')">🔓 尝试解锁</button>' : '') +
+        '</div></div>';
+
+    document.body.appendChild(modal);
 };
 
 // Haversine 距离计算（供时光胶囊和悄悄话共用）
