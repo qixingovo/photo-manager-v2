@@ -688,8 +688,10 @@ window.openTimeCapsuleCreateModal = function() {
         '<option value="location">📍 定位解锁</option>' +
         '<option value="both">⏰📍 定时+定位</option></select></div>' +
         '<div id="capsuleTimeField" class="form-group"><label>解锁时间</label><input id="capsuleRevealAt" type="datetime-local" class="form-input"></div>' +
-        '<div id="capsuleLocationFields" style="display:none;"><div class="form-group"><label>纬度</label><input id="capsuleRevealLat" type="number" step="0.00001" class="form-input" placeholder="例如 39.9042"></div>' +
-        '<div class="form-group"><label>经度</label><input id="capsuleRevealLng" type="number" step="0.00001" class="form-input" placeholder="例如 116.4074"></div>' +
+        '<div id="capsuleLocationFields" style="display:none;">' +
+        '<div class="form-row"><div class="form-group" style="flex:1;"><label>纬度</label><input id="capsuleRevealLat" type="number" step="0.00001" class="form-input" placeholder="例如 39.9042"></div>' +
+        '<div class="form-group" style="flex:1;"><label>经度</label><input id="capsuleRevealLng" type="number" step="0.00001" class="form-input" placeholder="例如 116.4074"></div></div>' +
+        '<button type="button" class="btn-secondary" style="width:100%;margin-bottom:10px;" onclick="window.openCapsuleMapPicker(\'\')">📍 在地图上选点</button>' +
         '<div class="form-group"><label>解锁半径(米)</label><input id="capsuleRevealRadius" type="number" class="form-input" value="200" min="50" max="5000"></div></div>' +
         '<div class="modal-actions">' +
         '<button class="btn-primary" onclick="window.createTimeCapsule()">💾 封存</button>' +
@@ -714,6 +716,55 @@ window.onCapsuleModeChange = function() {
     var mode = document.getElementById('capsuleUnlockMode').value;
     document.getElementById('capsuleTimeField').style.display = (mode === 'time' || mode === 'both') ? '' : 'none';
     document.getElementById('capsuleLocationFields').style.display = (mode === 'location' || mode === 'both') ? '' : 'none';
+};
+
+window.openCapsuleMapPicker = function(prefix) {
+    var latEl = document.getElementById(prefix + 'capsuleRevealLat');
+    var lngEl = document.getElementById(prefix + 'capsuleRevealLng');
+    var initLat = parseFloat(latEl.value) || 39.9042;
+    var initLng = parseFloat(lngEl.value) || 116.4074;
+
+    var overlay = document.createElement('div');
+    overlay.id = 'capsuleMapPickerOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:10000;background:rgba(0,0,0,0.5);';
+    overlay.innerHTML = '<div id="capsuleMapPickerMap" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:700px;max-width:92%;height:70%;border-radius:16px;overflow:hidden;background:#fff;"></div>' +
+        '<button style="position:absolute;top:10px;right:10px;z-index:10001;background:#fff;border:none;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2);">✕</button>' +
+        '<button id="capsuleMapConfirmBtn" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:10001;padding:10px 32px;background:#667eea;color:#fff;border:none;border-radius:25px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.15);">✓ 确认此位置</button>';
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('button').onclick = function() { overlay.remove(); };
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+
+    var mapEl = document.getElementById('capsuleMapPickerMap');
+    var map = L.map(mapEl, { attributionControl: false, zoomControl: true }).setView([initLat, initLng], 15);
+    L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+        maxZoom: 18
+    }).addTo(map);
+
+    var marker = L.marker([initLat, initLng], { draggable: true }).addTo(map);
+    marker.bindPopup('📍 解锁地点').openPopup();
+
+    marker.on('dragend', function() {
+        var pos = marker.getLatLng();
+        updateCoords(pos.lat, pos.lng);
+    });
+    map.on('click', function(e) {
+        marker.setLatLng(e.latlng);
+        updateCoords(e.latlng.lat, e.latlng.lng);
+    });
+
+    function updateCoords(lat, lng) {
+        if (latEl) latEl.value = lat.toFixed(5);
+        if (lngEl) lngEl.value = lng.toFixed(5);
+    }
+
+    document.getElementById('capsuleMapConfirmBtn').onclick = function() {
+        var pos = marker.getLatLng();
+        updateCoords(pos.lat, pos.lng);
+        overlay.remove();
+    };
+
+    setTimeout(function() { map.invalidateSize(); }, 200);
 };
 
 window.createTimeCapsule = async function() {

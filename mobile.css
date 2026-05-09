@@ -3198,6 +3198,7 @@ mark {
 /* ========================================
    时光胶囊
    ======================================== */
+.form-row { display: flex; gap: 10px; }
 .time-capsule-list {
     display: flex;
     flex-direction: column;

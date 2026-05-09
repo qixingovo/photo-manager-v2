@@ -2379,6 +2379,7 @@ mark {
 /* ========================================
    时光胶囊
    ======================================== */
+.form-row { display: flex; gap: 10px; }
 .time-capsule-list {
     padding: 12px;
     display: flex;
