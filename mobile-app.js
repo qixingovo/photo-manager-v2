@@ -30,7 +30,7 @@ const mobile = {
     currentPhotoId: null,
     _detailTouchX: 0,
     _timelinePage: 1,
-    _mainTabs: ['home', 'photos', 'upload', 'category', 'profile'],
+    _mainTabs: ['home', 'photos', 'profile'],
     _currentMainTab: 'home',
     _tabTouchStartX: 0,
     _gridTouchStartX: 0,
@@ -566,9 +566,10 @@ const mobile = {
             if (topBar && !topBar.querySelector('.back-btn')) {
                 const backBtn = document.createElement('button');
                 backBtn.className = 'icon-btn back-btn';
+                const backTarget = (page === 'upload' || page === 'category') ? 'photos' : 'home';
                 backBtn.innerHTML = '←';
-                backBtn.title = '返回首页';
-                backBtn.onclick = function(e) { e.stopPropagation(); mobile.switchTab('home'); };
+                backBtn.title = backTarget === 'photos' ? '返回照片' : '返回首页';
+                backBtn.onclick = function(e) { e.stopPropagation(); mobile.switchTab(backTarget); };
                 topBar.insertBefore(backBtn, topBar.firstChild);
             }
         }
