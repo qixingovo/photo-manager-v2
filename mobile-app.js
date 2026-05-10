@@ -3853,7 +3853,7 @@ const mobile = {
                 photo_id: m.photoId || null,
                 photo_path: m.photoPath || null,
                 photo_name: m.photoName || null,
-                category_id: safeBigint(m.categoryId, null),
+                category_id: m.categoryId || null,
                 category_name: m.categoryName || null,
                 milestone_type: m.milestone_type || 'anniversary',
                 repeat_yearly: m.repeat_yearly || false
@@ -3881,7 +3881,7 @@ const mobile = {
                 photo_id: m.photoId || null,
                 photo_path: m.photoPath || null,
                 photo_name: m.photoName || null,
-                category_id: safeBigint(m.categoryId, null),
+                category_id: m.categoryId || null,
                 category_name: m.categoryName || null,
                 milestone_type: m.milestone_type || 'anniversary',
                 repeat_yearly: m.repeat_yearly || false
