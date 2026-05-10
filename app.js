@@ -2868,6 +2868,7 @@ async function saveMilestonesToSupabase() {
         }));
         const { error } = await supabase.from('milestones').upsert(rows);
         if (error) { console.error('保存纪念日失败:', error); return; }
+        console.log('纪念日保存成功, 行数:', rows.length, '第一条:', JSON.stringify(rows[0]));
         localStorage.removeItem('anniversary_milestones');
     } catch (e) {
         console.error('保存纪念日异常:', e);
