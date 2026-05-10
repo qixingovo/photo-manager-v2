@@ -2747,6 +2747,7 @@ async function loadMilestones() {
             .order('date', { ascending: false });
 
         if (!error && data && data.length > 0) {
+            console.log('LOAD DEBUG:', JSON.stringify(data.map(r => ({id:r.id,title:r.title,category_id:r.category_id,category_name:r.category_name}))));
             anniversaryMilestones = data.map(m => ({
                 id: String(m.id),
                 date: m.date,
@@ -2866,9 +2867,11 @@ async function saveMilestonesToSupabase() {
             milestone_type: m.milestone_type || 'anniversary',
             repeat_yearly: m.repeat_yearly || false
         }));
+        // DEBUG: 打印所有 category_id
+        console.log('SAVE DEBUG:', JSON.stringify(rows.map(r => ({id:r.id,title:r.title,category_id:r.category_id,category_name:r.category_name}))));
         const { error } = await supabase.from('milestones').upsert(rows);
         if (error) { console.error('保存纪念日失败:', error); return; }
-        console.log('纪念日保存成功, 行数:', rows.length, '第一条:', JSON.stringify(rows[0]));
+        console.log('纪念日保存成功');
         localStorage.removeItem('anniversary_milestones');
     } catch (e) {
         console.error('保存纪念日异常:', e);
@@ -3432,6 +3435,7 @@ window.updateMilestone = function(id) {
     const catId = document.getElementById('milestoneCategoryId').value || null;
     m.categoryId = catId || null;
     m.categoryName = catId ? (categories.find(c => String(c.id) === String(catId)) || {}).name || '' : null;
+    console.log('UPDATE DEBUG: catId=', catId, 'categoryName=', m.categoryName, 'categoryId=', m.categoryId);
     const typeEl = document.getElementById('milestoneType');
     if (typeEl) m.milestone_type = typeEl.value || 'anniversary';
     const repeatEl = document.getElementById('milestoneRepeatYearly');
