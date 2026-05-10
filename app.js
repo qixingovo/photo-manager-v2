@@ -126,7 +126,21 @@ function saveBirthdayConfig(config) {
 
 // 检查登录状态
 async function checkLogin() {
-    const { data: { session } } = await supabase.auth.getSession();
+    let { data: { session } } = await supabase.auth.getSession();
+    // 如果 supabase-js 的 localStorage 没生效，手动恢复
+    if (!session) {
+        const saved = localStorage.getItem('pm2_session');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                const { data: { session: restored }, error: restoreErr } = await supabase.auth.setSession({
+                    access_token: parsed.access_token,
+                    refresh_token: parsed.refresh_token
+                });
+                if (!restoreErr && restored) session = restored;
+            } catch(e) {}
+        }
+    }
     if (session) {
         const { data: profile } = await supabase.from('profiles')
             .select('username, role').eq('user_id', session.user.id).single();
@@ -186,6 +200,15 @@ window.handleLogin = async function(e) {
         if (error) console.error('账号登录失败:', error)
         errorEl.textContent = '登录失败，请检查账号或密码'
         return
+    }
+
+    // 手动持久化 session（CDN 版 supabase-js 的 localStorage 可能不生效）
+    if (data?.session) {
+        localStorage.setItem('pm2_session', JSON.stringify({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+            expires_at: data.session.expires_at
+        }));
     }
 
     // 查 profiles 取 username/role
