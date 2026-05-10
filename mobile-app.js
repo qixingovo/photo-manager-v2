@@ -125,7 +125,7 @@ const mobile = {
     SUPABASE_URL: APP_CONFIG.SUPABASE_URL || '',
     SUPABASE_KEY: APP_CONFIG.SUPABASE_ANON_KEY || '',
     STORAGE_URL: APP_CONFIG.SUPABASE_STORAGE_URL || (APP_CONFIG.SUPABASE_URL ? `${APP_CONFIG.SUPABASE_URL}/storage/v1/object/public/photo/` : ''),
-    AUTH_SESSION_KEY: 'photo_manager_session',
+    USER_EMAIL_MAP: { laoda: 'laoda@couple.local', xiaodi: 'xiaodi@couple.local' },
     supabase: null,
     
     // 初始化 Supabase 客户端
@@ -141,7 +141,9 @@ const mobile = {
                 console.error('Supabase CDN 未加载');
                 return null;
             }
-            this.supabase = window.supabase.createClient(this.SUPABASE_URL, this.SUPABASE_KEY);
+            this.supabase = window.supabase.createClient(this.SUPABASE_URL, this.SUPABASE_KEY, {
+                auth: { persistSession: true, storage: window.localStorage, autoRefreshToken: true, detectSessionInUrl: true }
+            });
         }
         return this.supabase;
     },
@@ -158,27 +160,6 @@ const mobile = {
         };
     },
 
-    getStoredSession() {
-        try {
-            const raw = localStorage.getItem(this.AUTH_SESSION_KEY);
-            if (!raw) return null;
-            const session = JSON.parse(raw);
-            if (!session?.username || !session?.role) return null;
-            return session;
-        } catch (error) {
-            console.warn('读取本地登录态失败:', error);
-            return null;
-        }
-    },
-
-    saveSession(session) {
-        localStorage.setItem(this.AUTH_SESSION_KEY, JSON.stringify(session));
-    },
-
-    clearSession() {
-        localStorage.removeItem(this.AUTH_SESSION_KEY);
-    },
-    
     // 获取照片公开URL
     getPhotoUrl(storagePath) {
         if (!storagePath) return null;
@@ -485,17 +466,23 @@ const mobile = {
             return;
         }
 
-        const session = this.getStoredSession();
+        const { data: { session } } = await client.auth.getSession();
         if (session) {
-            this.currentUser = this.getUserFromSession(session);
-            this.showPage('home');
-            this.renderFeatureCards();
-            this._loadFeatureCardOrderFromServer().then(() => this.renderFeatureCards());
-            this.loadData().catch(err => {
-                console.error('加载数据失败:', err);
-                this.showToast('数据加载失败，请刷新重试');
-            });
-            return;
+            const { data: profile } = await client.from('profiles')
+                .select('username, role').eq('user_id', session.user.id).single();
+            if (profile) {
+                this.currentUser = this.getUserFromSession({ username: profile.username, role: profile.role });
+                this.showPage('home');
+                this.renderFeatureCards();
+                this._loadFeatureCardOrderFromServer().then(() => this.renderFeatureCards());
+                this.loadData().catch(err => {
+                    console.error('加载数据失败:', err);
+                    this.showToast('数据加载失败，请刷新重试');
+                });
+                return;
+            } else {
+                await client.auth.signOut();
+            }
         }
 
         this.currentUser = null;
@@ -519,31 +506,39 @@ const mobile = {
             return;
         }
 
-        const { data, error } = await client.rpc('authenticate_user', {
-            p_username: account,
-            p_password: password
-        });
+        const email = this.USER_EMAIL_MAP[account];
+        if (!email) {
+            errorEl.textContent = '账号不存在';
+            return;
+        }
 
-        if (error || !data?.success) {
-            if (error) console.error('账号登录 RPC 失败:', error);
+        const { data, error } = await client.auth.signInWithPassword({ email, password });
+
+        if (error) {
+            if (error) console.error('账号登录失败:', error);
             errorEl.textContent = '登录失败，请检查账号或密码';
             return;
         }
 
-        const session = {
-            username: data.username || account,
-            role: data.role || 'user'
-        };
-        this.saveSession(session);
-        this.currentUser = this.getUserFromSession(session);
+        // 查 profiles 取 username/role
+        const { data: profile } = await client.from('profiles')
+            .select('username, role').eq('user_id', data.user.id).single();
+
+        if (!profile) {
+            errorEl.textContent = '用户档案缺失，请联系管理员';
+            await client.auth.signOut();
+            return;
+        }
+
+        this.currentUser = this.getUserFromSession({ username: profile.username, role: profile.role });
         errorEl.textContent = '';
-        
+
         // 老大生日彩蛋
         if (this.currentUser.isLaoda && this.isBirthdayToday()) {
             this.showBirthdayWelcomeOverlay();
             return;
         }
-        
+
         // 先跳转页面
         this.showPage('home');
         this.renderFeatureCards();
@@ -556,9 +551,10 @@ const mobile = {
         });
     },
 
-    handleLogout() {
-        this.clearSession();
+    async handleLogout() {
+        const client = this.initSupabase();
         this.currentUser = null;
+        if (client) await client.auth.signOut();
         this.showPage('login');
         this.showToast('已退出登录');
     },
@@ -1913,7 +1909,16 @@ const mobile = {
         
         for (let i = 0; i < total; i++) {
             let file = this.previewFiles[i];
-            
+
+            // 文件类型校验
+            const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
+            const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'];
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+            if (!ALLOWED_TYPES.includes(file.type) && !ALLOWED_EXTENSIONS.includes(ext)) {
+                this.showToast('仅支持 JPG/PNG/GIF/WebP/HEIC 格式图片');
+                continue;
+            }
+
             // 压缩超过1.5MB的图片
             if (file.size > 1.5 * 1024 * 1024) {
                 this.showToast(`压缩第 ${i + 1} 张图片...`);
@@ -2225,7 +2230,7 @@ const mobile = {
                 <div class="category-header" onclick="mobile.toggleCategoryActions('${strCatId}')">
                     <div class="category-name">
                         <span>${icon}${isLocked ? ' 🔒' : ''}</span>
-                        <span class="category-name-text">${cat.name}</span>
+                        <span class="category-name-text">${this.escapeHtml(cat.name)}</span>
                         ${arrow}
                     </div>
                 </div>
@@ -3207,7 +3212,7 @@ const mobile = {
             if (!cat) return '';
             return `
                 <div class="marked-item" onclick="mobile.selectCategory('${strId}')">
-                    <span>📁 ${cat.name}</span>
+                    <span>📁 ${this.escapeHtml(cat.name)}</span>
                     <span class="unmark" onclick="event.stopPropagation();mobile.unmarkCategory('${strId}')">✕</span>
                 </div>
             `;
@@ -5790,6 +5795,12 @@ const mobile = {
     // 亲密记录
     // ========================================
 
+    async sha256(message) {
+        const msgBuffer = new TextEncoder().encode(message);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    },
+
     async getIntimatePassword() {
         try {
             const supabase = this.initSupabase();
@@ -5803,9 +5814,22 @@ const mobile = {
         try {
             const supabase = this.initSupabase();
             if (!supabase) return false;
-            await supabase.from('app_settings').upsert({ key: 'intimate_password', value: password });
+            const hash = await this.sha256(password + APP_CONFIG.PEPPER);
+            await supabase.from('app_settings').upsert({ key: 'intimate_password', value: hash });
             return true;
         } catch (e) { return false; }
+    },
+
+    async verifyIntimatePassword(input, stored) {
+        if (!stored) return false;
+        if (stored.length !== 64) {
+            if (input === stored) {
+                await this.setIntimatePassword(input);
+                return true;
+            }
+            return false;
+        }
+        return await this.sha256(input + APP_CONFIG.PEPPER) === stored;
     },
 
     checkIntimateLock() {
@@ -5850,7 +5874,7 @@ const mobile = {
             const ok = await this.setIntimatePassword(input);
             if (!ok) { document.getElementById('mobileIntimateLockError').textContent = '设置失败'; return; }
             this.unlockIntimateContent();
-        } else if (input === existingPwd) {
+        } else if (await this.verifyIntimatePassword(input, existingPwd)) {
             this.unlockIntimateContent();
         } else {
             document.getElementById('mobileIntimateLockError').textContent = '密码错误';

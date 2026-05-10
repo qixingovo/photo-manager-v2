@@ -73,28 +73,22 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 }
 
 // 直接初始化 Supabase（CDN 脚本是同步加载的）
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const AUTH_SESSION_KEY = 'photo_manager_session';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, storage: window.localStorage, autoRefreshToken: true, detectSessionInUrl: true }
+});
+const USER_EMAIL_MAP = { laoda: 'laoda@couple.local', xiaodi: 'xiaodi@couple.local' };
+let currentUser = null;
 
-function getStoredSession() {
-    try {
-        const raw = localStorage.getItem(AUTH_SESSION_KEY);
-        if (!raw) return null;
-        const session = JSON.parse(raw);
-        if (!session?.username || !session?.role) return null;
-        return session;
-    } catch (error) {
-        console.warn('读取本地登录态失败:', error)
-        return null;
-    }
-}
-
-function saveSession(session) {
-    localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
-}
-
-function clearSession() {
-    localStorage.removeItem(AUTH_SESSION_KEY);
+function getUserFromSession(session) {
+    const username = session?.username || '用户';
+    const metadataRole = session?.role || 'user';
+    const isLaoda = metadataRole === 'laoda';
+    return {
+        username,
+        role: metadataRole,
+        displayRole: isLaoda ? '老大' : '用户',
+        isLaoda
+    };
 }
 
 // ========== 初始化 ==========
@@ -132,15 +126,23 @@ function saveBirthdayConfig(config) {
 
 // 检查登录状态
 async function checkLogin() {
-    const session = getStoredSession()
+    const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-        showMainApp()
-        await Promise.all([loadCategories(), loadPhotos()])
-        window.checkIncomingBottles();
-        window.checkIncomingNotes();
-        window.checkIncomingNudges();
+        const { data: profile } = await supabase.from('profiles')
+            .select('username, role').eq('user_id', session.user.id).single();
+        if (profile) {
+            currentUser = getUserFromSession({ username: profile.username, role: profile.role });
+            showMainApp();
+            await Promise.all([loadCategories(), loadPhotos()]);
+            window.checkIncomingBottles();
+            window.checkIncomingNotes();
+            window.checkIncomingNudges();
+        } else {
+            await supabase.auth.signOut();
+            showLoginPage();
+        }
     } else {
-        showLoginPage()
+        showLoginPage();
     }
 }
 
@@ -162,7 +164,7 @@ function showMainApp() {
 
 window.handleLogin = async function(e) {
     e.preventDefault()
-    
+
     const account = document.getElementById('loginUsername').value.trim()
     const password = document.getElementById('loginPassword').value
     const errorEl = document.getElementById('loginError')
@@ -172,23 +174,36 @@ window.handleLogin = async function(e) {
         return
     }
 
-    const { data, error } = await supabase.rpc('authenticate_user', {
-        p_username: account,
-        p_password: password
-    })
+    const email = USER_EMAIL_MAP[account];
+    if (!email) {
+        errorEl.textContent = '账号不存在';
+        return;
+    }
 
-    if (error || !data?.success) {
-        if (error) console.error('账号登录 RPC 失败:', error)
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+        if (error) console.error('账号登录失败:', error)
         errorEl.textContent = '登录失败，请检查账号或密码'
         return
     }
 
-    const session = {
-        username: data.username || account,
-        role: data.role || 'user'
+    // 查 profiles 取 username/role
+    const { data: profile } = await supabase.from('profiles')
+        .select('username, role').eq('user_id', data.user.id).single();
+
+    if (!profile) {
+        errorEl.textContent = '用户档案缺失，请联系管理员';
+        await supabase.auth.signOut();
+        return;
     }
-    saveSession(session)
-    errorEl.textContent = ''
+
+    const session = {
+        username: profile.username,
+        role: profile.role
+    };
+    currentUser = getUserFromSession(session);
+    errorEl.textContent = '';
     // 如果是老大且今天是生日，显示生日快乐欢迎界面
     if (isLaodaFromSession(session) && isBirthdayToday()) {
         showBirthdayWelcome()
@@ -409,9 +424,10 @@ window.enterMainApp = function() {
     }
 }
 
-window.handleLogout = function() {
-    clearSession()
-    showLoginPage()
+window.handleLogout = async function() {
+    currentUser = null;
+    await supabase.auth.signOut();
+    showLoginPage();
 }
 
 window.toggleSection = function(section) {
@@ -1030,7 +1046,7 @@ window.renderMarkedCategoriesList = function() {
         const displayName = cat ? cat.name : '未知分类'
         return `
             <div class="marked-item" onclick="window.filterByCategory('${catId}')">
-                <span>${displayName}</span>
+                <span>${escapeHtml(displayName)}</span>
                 <span class="unmark-btn" onclick="event.stopPropagation(); window.toggleMarkCategory('${catId}')">×</span>
             </div>
         `
@@ -1201,7 +1217,7 @@ function updatePhotosTitle() {
         if (cat && cat.parent_id) {
             const parent = categories.find(c => c.id === cat.parent_id)
             if (parent) {
-                breadcrumb += ` / <a onclick="filterByCategory('${parent.id}')">${parent.name}</a>`
+                breadcrumb += ` / <a onclick="filterByCategory('${parent.id}')">${escapeHtml(parent.name)}</a>`
             }
         }
         
@@ -1249,7 +1265,7 @@ function updateEmptyState() {
                             return `<span class="category-tag" onclick="window.filterByCategory('${child.id}')" 
                                 style="cursor:pointer;background:${color};color:white;padding:12px 24px;border-radius:25px;font-size:16px;box-shadow:0 3px 10px rgba(0,0,0,0.2);transition:transform 0.2s;"
                                 onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                                ${child.name} (${count})
+                                ${escapeHtml(child.name)} (${count})
                             </span>`
                         }).join('')}
                     </div>
@@ -2391,8 +2407,19 @@ async function handleUpload(e) {
     
     for (let i = 0; i < files.length; i++) {
         const file = files[i]
+
+        // 文件类型校验
+        const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
+        const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'];
+        const ext = '.' + file.name.split('.').pop().toLowerCase();
+        if (!ALLOWED_TYPES.includes(file.type) && !ALLOWED_EXTENSIONS.includes(ext)) {
+            alert('仅支持 JPG/PNG/GIF/WebP/HEIC 格式图片');
+            failCount++;
+            continue;
+        }
+
         const fileName = namePrefix ? `${namePrefix}_${i + 1}` : file.name
-        
+
         try {
             // 压缩超过1.5MB的图片
             let fileToUpload = file
@@ -2962,7 +2989,7 @@ window.savePeriodRecord = async function() {
 
     try {
         await supabase.from('period_records').insert({
-            user_name: getStoredSession()?.username || '用户',
+            user_name: currentUser?.username || '用户',
             start_date: startDate,
             end_date: endDate,
             notes
@@ -3819,7 +3846,7 @@ function renderPhotos() {
                     <div class="photo-card category-card" onclick="window.filterByCategory('${cat.id}')">
                         <div class="category-icon">📁</div>
                         <div class="category-info">
-                            <h3>${cat.name}</h3>
+                            <h3>${escapeHtml(cat.name)}</h3>
                             <p>${photoCount} 张照片</p>
                         </div>
                     </div>
@@ -3854,20 +3881,20 @@ function renderPhotos() {
             return cat ? cat.name : ''
         }).filter(n => n)
         const categoryHtml = catNames.length > 0 
-            ? `<span class="photo-category">${catNames.join(', ')}</span>` 
+            ? `<span class="photo-category">${escapeHtml(catNames.join(', '))}</span>`
             : '<span class="photo-category" style="background:#e9ecef">未分类</span>'
         
         return `
             <div class="photo-card ${isSelected ? 'selected' : ''}" onclick="${selectMode ? "event.stopPropagation(); togglePhotoSelect('" + photo.id + "')" : "openPhotoModal('" + photo.id + "')"}">
                 ${checkboxHtml}
-                <img src="${photoUrl}" alt="${photo.name}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🖼️</text></svg>'">
+                <img src="${photoUrl}" alt="${escapeHtml(photo.name)}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🖼️</text></svg>'">
                 <div class="photo-info">
-                    <h3 title="${photo.name}">${favoriteIcon} ${highlightKeywords(photo.name, searchValue)}</h3>
+                    <h3 title="${escapeHtml(photo.name)}">${favoriteIcon} ${highlightKeywords(photo.name, searchValue)}</h3>
                     ${photo.description ? `<p>${highlightKeywords(photo.description, searchValue)}</p>` : ''}
                     <div class="photo-meta">
                         ${categoryHtml}
                         ${selectMode ? '' : `<div class="photo-actions" onclick="event.stopPropagation()">
-                            <button class="btn-delete" onclick="window.deletePhoto('${photo.id}', '${photo.storage_path}')" title="删除">🗑️</button>
+                            <button class="btn-delete" onclick="window.deletePhoto('${photo.id}', '${escapeHtml(photo.storage_path).replace(/'/g,"\\'")}')" title="删除">🗑️</button>
                         </div>`}
                     </div>
                 </div>
@@ -4955,7 +4982,7 @@ window.saveMoodDiary = async function(editId) {
     if (!mood) { alert('请选择一个心情'); return }
 
     const row = {
-        user_name: getStoredSession()?.username || '用户',
+        user_name: currentUser?.username || '用户',
         mood,
         content,
         photo_id: photoId || null
@@ -5085,7 +5112,7 @@ window.saveDailyChatter = async function() {
 
     try {
         await supabase.from('daily_chatter').insert({
-            user_name: getStoredSession()?.username || '用户',
+            user_name: currentUser?.username || '用户',
             content,
             photo_id: photoId || null
         })
@@ -5324,7 +5351,7 @@ window.saveCheckin = async function(taskId) {
     try {
         await supabase.from('couple_checkins').insert({
             task_id: parseInt(taskId),
-            user_name: getStoredSession()?.username || '用户',
+            user_name: currentUser?.username || '用户',
             note,
             photo_id: photoId || null
         })
@@ -5339,6 +5366,12 @@ window.saveCheckin = async function(taskId) {
 // 亲密记录
 // ========================================
 
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 async function getIntimatePassword() {
     try {
         const { data } = await supabase.from('app_settings').select('value').eq('key', 'intimate_password').single()
@@ -5348,9 +5381,24 @@ async function getIntimatePassword() {
 
 async function setIntimatePassword(password) {
     try {
-        await supabase.from('app_settings').upsert({ key: 'intimate_password', value: password })
+        const hash = await sha256(password + APP_CONFIG.PEPPER);
+        await supabase.from('app_settings').upsert({ key: 'intimate_password', value: hash })
         return true
     } catch (e) { return false }
+}
+
+async function verifyIntimatePassword(input, stored) {
+    if (!stored) return false;
+    // 兼容旧明文密码（长度非 64 = 不是 SHA-256 hex）
+    if (stored.length !== 64) {
+        if (input === stored) {
+            await setIntimatePassword(input);
+            return true;
+        }
+        return false;
+    }
+    // 新 hash 比较
+    return await sha256(input + APP_CONFIG.PEPPER) === stored;
 }
 
 function checkIntimateLock() {
@@ -5404,7 +5452,7 @@ window.handleIntimatePassword = async function() {
         const ok = await setIntimatePassword(input)
         if (!ok) { document.getElementById('intimateLockError').textContent = '设置失败'; return }
         unlockIntimateContent()
-    } else if (input === existingPwd) {
+    } else if (await verifyIntimatePassword(input, existingPwd)) {
         unlockIntimateContent()
     } else {
         document.getElementById('intimateLockError').textContent = '密码错误'
@@ -5536,7 +5584,7 @@ window.saveIntimateRecord = async function() {
 
     try {
         await supabase.from('intimate_records').insert({
-            user_name: getStoredSession()?.username || '用户',
+            user_name: currentUser?.username || '用户',
             record_date: recordDate,
             mood,
             notes,
@@ -5668,7 +5716,7 @@ window.openThrowBottleModal = function() {
             '<button onclick="document.getElementById(\'throwBottleModal\').remove()" class="btn-secondary" style="padding:4px 10px;">×</button>' +
         '</div>' +
         '<div style="text-align:center;margin-bottom:12px;">' +
-            '<img src="' + photoUrl + '" style="max-width:120px;max-height:120px;border-radius:8px;object-fit:cover;">' +
+            '<img src="' + escapeHtml(photoUrl) + '" style="max-width:120px;max-height:120px;border-radius:8px;object-fit:cover;">' +
             '<div style="font-size:12px;color:#888;margin-top:4px;">' + escapeHtml(currentPhoto.name || '') + '</div>' +
         '</div>' +
         '<textarea id="throwMsg" placeholder="想说的话（200字内）..." maxlength="200" style="width:100%;height:80px;padding:8px;border:1px solid #ddd;border-radius:8px;resize:none;font-size:14px;font-family:inherit;box-sizing:border-box;"></textarea>' +

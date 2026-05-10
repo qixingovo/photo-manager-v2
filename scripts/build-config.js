@@ -1,11 +1,14 @@
 // This script generates config.js from environment variables during deployment.
-// Set SUPABASE_URL and SUPABASE_ANON_KEY in your Vercel project settings.
+// Set these in your Vercel project settings → Environment Variables
 const fs = require('fs')
 const path = require('path')
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
 const SUPABASE_STORAGE_URL = process.env.SUPABASE_STORAGE_URL || ''
+const PEPPER = process.env.PEPPER || ''
+const USER_EMAILS_LAODA = process.env.USER_EMAILS_LAODA || ''
+const USER_EMAILS_XIAODI = process.env.USER_EMAILS_XIAODI || ''
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     console.error('错误：请在 Vercel 项目设置中配置环境变量 SUPABASE_URL 和 SUPABASE_ANON_KEY')
@@ -20,6 +23,17 @@ const lines = [
 
 if (SUPABASE_STORAGE_URL) {
     lines.push(`    SUPABASE_STORAGE_URL: '${SUPABASE_STORAGE_URL}',`)
+}
+
+if (PEPPER) {
+    lines.push(`    PEPPER: '${PEPPER}',`)
+}
+
+if (USER_EMAILS_LAODA && USER_EMAILS_XIAODI) {
+    lines.push(`    USER_EMAILS: {`)
+    lines.push(`        laoda: '${USER_EMAILS_LAODA}',`)
+    lines.push(`        xiaodi: '${USER_EMAILS_XIAODI}'`)
+    lines.push(`    }`)
 }
 
 lines.push(`}`)
