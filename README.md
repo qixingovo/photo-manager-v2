@@ -45,6 +45,36 @@
 - 照片分享链接（`share.html`）
 - 账号密码登录（laoda / xiaodi 双角色）
 - Service Worker 离线缓存
+- SHA-256 + PEPPER 密码哈希（亲密空间）
+- Supabase Auth JWT 认证（signInWithPassword）
+- RLS 策略收紧（anon → authenticated）
+
+## 安全加固记录 (2026-05-09 ~ 2026-05-10)
+
+### Phase 1: 紧急修复
+| 问题 | 修复 |
+|------|------|
+| XSS: innerHTML 未转义 | 所有用户可控数据包裹 `escapeHtml()` |
+| 密码明文存储 | SHA-256(PEPPER) 哈希 + 明文兼容升级 |
+| 文件上传无校验 | MIME 类型 + 扩展名白名单 |
+| 内容长度无限制 | CHECK 约束 (migration 009) |
+
+### Phase 2: Supabase Auth 迁移
+| 问题 | 修复 |
+|------|------|
+| 自建 RPC `authenticate_user` | 替换为 `signInWithPassword` + profiles 查表 |
+| localStorage session 存储 | 删除 `getStoredSession`/`saveSession`/`clearSession` |
+| RLS `TO anon,authenticated` | 收紧为 `TO authenticated`（15 个策略，migration 010） |
+| 无 profiles 表 | 创建 profiles 表 (user_id → username/role) |
+| 分享功能 RLS 受阻 | `get_shared_album` SECURITY DEFINER 函数 |
+
+### Phase 3: 生产部署修复
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| `app_settings` 406 | 页面加载时请求在登录前发出，anon 无权限 | 添加 anon SELECT 策略 |
+| 戳一戳 401 | CDN 版 supabase-js localStorage session 不持久化 | 手动 `pm2_session` 保存/恢复 + `setSession` |
+| 纪念日类别绑定丢失 | `milestones.category_id`(BIGINT) ≠ `categories.id`(UUID)；移动版 `safeBigint` 将 UUID 转 null | ALTER TYPE → text；去除 `safeBigint` |
+| upload 循环 SyntaxError | 文件校验新增 `const ext` 与原有声明重复 | 重命名为 `fileExtension` |
 
 ## 技术栈
 
@@ -92,6 +122,9 @@
 | `005_drift_bottles.sql` | 漂流瓶表（扔瓶/捞瓶/回复） |
 | `006_secret_notes.sql` | 秘密便签表（地理围栏/过期/已读） |
 | `007_nudges.sql` | 轻轻碰表（发送/已读状态） |
+| `008_time_capsules.sql` | 时光胶囊表 |
+| `009_add_length_checks.sql` | 内容长度 CHECK 约束 |
+| `010_fix_rls.sql` | RLS 收紧 + profiles 表 + SECURITY DEFINER 函数 |
 
 ### 配置 & 构建
 
@@ -128,7 +161,9 @@ npm run dev
 window.__APP_CONFIG__ = {
   SUPABASE_URL: 'https://your-project.supabase.co',
   SUPABASE_ANON_KEY: 'your-anon-key',
-  SUPABASE_STORAGE_URL: 'https://your-project.supabase.co/storage/v1/object/public/photo/'
+  SUPABASE_STORAGE_URL: 'https://your-project.supabase.co/storage/v1/object/public/photo/',
+  PEPPER: 'your-random-pepper-string',
+  USER_EMAILS: { laoda: 'laoda@couple.local', xiaodi: 'xiaodi@couple.local' }
 }
 ```
 
