@@ -1927,8 +1927,8 @@ const mobile = {
             }
             
             const fileName = namePrefix ? `${namePrefix}_${i + 1}` : file.name;
-            const ext = file.name.split('.').pop();
-            const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`;
+            const fileExtension = file.name.split('.').pop();
+            const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExtension}`;
             
             try {
                 // 上传到 Supabase Storage

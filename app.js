@@ -2427,8 +2427,8 @@ async function handleUpload(e) {
                 fileToUpload = await compressImage(file, 1.5)
             }
             
-            const ext = fileToUpload.name.split('.').pop()
-            const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`
+            const fileExtension = fileToUpload.name.split('.').pop()
+            const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExtension}`
             
             const { error: uploadError } = await supabase.storage
                 .from('photo')
