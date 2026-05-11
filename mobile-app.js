@@ -4,12 +4,8 @@
    ======================================== */
 
 const APP_CONFIG = window.__APP_CONFIG__ || {};
-
-function safeBigint(val, fallback) {
-    if (val === null || val === undefined) return fallback;
-    const n = parseInt(val, 10);
-    return Number.isFinite(n) ? n : fallback;
-}
+// 生产环境禁用 debug 日志（设置 DEBUG=true 可开启）
+if (!APP_CONFIG.DEBUG) { console.log = () => {}; }
 
 var EMOTION_TYPES = [
     { key: 'photo', icon: '📷', label: '照片' },
@@ -28,10 +24,10 @@ const FEATURE_CARD_CONFIG = {
     coupleTasks:     { id:'coupleTasks', icon:'✅', title:'情侣打卡',   sub:'一起完成100件事',  gradient:'linear-gradient(135deg,#FFF3E0,#FFE8CC)' },
     map:             { id:'map', icon:'🗺️', title:'我们的地图',  sub:'走过的地方',        gradient:'linear-gradient(135deg,#E8F5E9,#C8E6C9)' },
     emotionTimeline: { id:'emotionTimeline', icon:'📜', title:'情感时间轴', sub:'纪念日·时光胶囊',  gradient:'linear-gradient(135deg,#FFF8E1,#FFECB3)' },
-    albums:          { id:'albums', icon:'📸', title:'相册',      sub:'我们的回忆',        gradient:'linear-gradient(135deg,#E3F2FD,#BBDEFB)' }
+    periodTracker:   { id:'periodTracker', icon:'🩸', title:'周期追踪', sub:'经期记录与预测',   gradient:'linear-gradient(135deg,#FFE0E6,#FFD4DD)' }
 };
 
-const DEFAULT_FEATURE_CARD_ORDER = ['moodDiary','dailyChatter','coupleTasks','map','emotionTimeline','albums'];
+const DEFAULT_FEATURE_CARD_ORDER = ['moodDiary','dailyChatter','coupleTasks','map','emotionTimeline','periodTracker'];
 
 const mobile = {
     // 状态
@@ -125,9 +121,30 @@ const mobile = {
     SUPABASE_URL: APP_CONFIG.SUPABASE_URL || '',
     SUPABASE_KEY: APP_CONFIG.SUPABASE_ANON_KEY || '',
     STORAGE_URL: APP_CONFIG.SUPABASE_STORAGE_URL || (APP_CONFIG.SUPABASE_URL ? `${APP_CONFIG.SUPABASE_URL}/storage/v1/object/public/photo/` : ''),
-    USER_EMAIL_MAP: { laoda: 'laoda@couple.local', xiaodi: 'xiaodi@couple.local' },
+    USER_EMAIL_MAP: APP_CONFIG.USER_EMAILS || { laoda: 'laoda@couple.local', xiaodi: 'xiaodi@couple.local' },
+
+    escapeHtml: CommonUtils.escapeHtml,
+    sha256: CommonUtils.sha256,
+    safeBigint: CommonUtils.safeBigint,
+    highlightKeywords: CommonUtils.highlightKeywords,
+    formatRelativeTime: CommonUtils.formatRelativeTime,
+    getRelativeTime: CommonUtils.getRelativeTime,
+    formatFileSize: CommonUtils.formatFileSize,
+    generateShareToken: CommonUtils.generateShareToken,
+    getDefaultMilestones: CommonUtils.getDefaultMilestones,
+    getCategoryAndChildrenIds: function (id) { return CommonUtils.getCategoryAndChildrenIds(id, this.categories); },
+    getCategoryPath: function (id) { return CommonUtils.getCategoryPath(id, this.categories, 'name'); },
+
     supabase: null,
-    
+
+    // 周期追踪状态
+    _periodCalendarYear: null,
+    _periodCalendarMonth: null,
+    _periodEditingDate: null,
+    _periodRecords: {},
+    _periodAllRecords: [],
+    _periodPanelState: null,
+
     // 初始化 Supabase 客户端
     initSupabase() {
         if (!this.SUPABASE_URL || !this.SUPABASE_KEY) {
@@ -967,6 +984,9 @@ const mobile = {
         } else if (tab === 'albums') {
             this.showPage('albums');
             this.loadAlbums();
+        } else if (tab === 'periodTracker') {
+            this.showPage('periodTracker');
+            this.loadPeriodTracker();
         } else if (tab === 'passport') {
             this.showPage('passport');
             this.loadPassport();
@@ -2651,35 +2671,6 @@ const mobile = {
         this.renderCategories();
     },
 
-    // 获取分类及其所有子分类的 ID（递归）
-    getCategoryAndChildrenIds(categoryId) {
-        const strId = String(categoryId);
-        const ids = [strId];
-        const children = this.categories.filter(c => String(c.parent_id) === strId);
-        for (const child of children) {
-            ids.push(...this.getCategoryAndChildrenIds(child.id));
-        }
-        return ids;
-    },
-
-    // 获取分类的完整路径（从顶级父类到当前分类）
-    getCategoryPath(categoryId) {
-        if (!categoryId || categoryId === 'all') return [];
-        
-        const path = [];
-        let currentId = String(categoryId);
-
-        // 不断向上查找父类，直到找不到为止
-        while (currentId) {
-            const cat = this.categories.find(c => String(c.id) === currentId);
-            if (!cat) break;
-            path.unshift(cat.name); // 每次都插入到数组开头，保证顺序是从父到子
-            currentId = cat.parent_id;
-        }
-        
-        return path;
-    },
-
     // 更新分类路径显示
     updateCategoryPathDisplay() {
         const pathDisplay = document.getElementById('categoryPathDisplay');
@@ -3161,21 +3152,6 @@ const mobile = {
             console.error('留言失败:', err);
             this.showToast('留言失败，请重试');
         }
-    },
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    },
-
-    highlightKeywords(text, searchValue) {
-        if (!searchValue || !text) return text;
-        const keywords = searchValue.trim().split(/\s+/).filter(k => k.length > 0);
-        if (keywords.length === 0) return text;
-        const escaped = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-        const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
-        return text.replace(regex, '<mark>$1</mark>');
     },
 
     formatTime(timestamp) {
@@ -3739,15 +3715,6 @@ const mobile = {
     // ========================================
     // 纪念日时间线
     // ========================================
-    getDefaultMilestones() {
-        return [
-            { id: '1', date: '2020-06-15', title: '我们在一起的第一天', description: '故事从这里开始', photoId: null },
-            { id: '2', date: '2021-02-14', title: '第一个情人节', description: '', photoId: null },
-            { id: '3', date: '2021-01-01', title: '第一个新年', description: '', photoId: null },
-            { id: '4', date: '2021-12-25', title: '第一个圣诞节', description: '', photoId: null },
-        ];
-    },
-
     async loadMilestones() {
         const supabase = this.initSupabase();
         if (!supabase) {
@@ -3846,7 +3813,7 @@ const mobile = {
         if (!supabase) return;
         try {
             const rows = this.anniversaryMilestones.map(m => ({
-                id: safeBigint(m.id, Date.now() + Math.floor(Math.random() * 1000)),
+                id: this.safeBigint(m.id, Date.now() + Math.floor(Math.random() * 1000)),
                 date: m.date,
                 title: m.title,
                 description: m.description || '',
@@ -3874,7 +3841,7 @@ const mobile = {
         }
         try {
             const rows = this.anniversaryMilestones.map(m => ({
-                id: safeBigint(m.id, Date.now()),
+                id: this.safeBigint(m.id, Date.now()),
                 date: m.date,
                 title: m.title,
                 description: m.description || '',
@@ -5258,19 +5225,6 @@ const mobile = {
     //   分享链接（移动端）
     // ========================================
 
-    generateShareToken() {
-        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-            return crypto.randomUUID();
-        }
-        const arr = new Uint8Array(16);
-        if (typeof crypto !== 'undefined') {
-            crypto.getRandomValues(arr);
-        } else {
-            for (let i = 0; i < 16; i++) arr[i] = Math.floor(Math.random() * 256);
-        }
-        return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
-    },
-
     openCreateShareModal(albumId) {
         if (!albumId) { this.showToast('请先打开一个相册'); return; }
         const album = this.albums.find(a => a.id === albumId);
@@ -5817,12 +5771,6 @@ const mobile = {
     // 亲密记录
     // ========================================
 
-    async sha256(message) {
-        const msgBuffer = new TextEncoder().encode(message);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-        return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-    },
-
     async getIntimatePassword() {
         try {
             const supabase = this.initSupabase();
@@ -6129,25 +6077,6 @@ const mobile = {
     // ========================================
     // 每日叨叨
     // ========================================
-
-    getRelativeTime(dateStr) {
-        const now = new Date();
-        const date = new Date(dateStr);
-        const diff = now - date;
-        const mins = Math.floor(diff / 60000);
-        if (mins < 1) return '刚刚';
-        if (mins < 60) return mins + '分钟前';
-        const hours = Math.floor(mins / 60);
-        if (hours < 24) return hours + '小时前';
-        const days = Math.floor(hours / 24);
-        if (days < 7) return days + '天前';
-        const weeks = Math.floor(days / 7);
-        if (weeks < 4) return weeks + '周前';
-        const months = Math.floor(days / 30);
-        if (months < 12) return months + '个月前';
-        const y = Math.floor(days / 365);
-        return y + '年前';
-    },
 
     async loadDailyChatter() {
         try {
@@ -7362,18 +7291,6 @@ const mobile = {
         }
     },
 
-    formatRelativeTime(dateStr) {
-        if (!dateStr) return '';
-        var d = new Date(dateStr);
-        var now = new Date();
-        var diff = now - d;
-        if (diff < 60000) return '刚刚';
-        if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
-        if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
-        if (diff < 2592000000) return Math.floor(diff / 86400000) + '天前';
-        return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
-    },
-
     // ========================================
     // 情感时间轴
     // ========================================
@@ -7630,6 +7547,404 @@ const mobile = {
         this.renderEmotionTimelineFilters();
         this.renderEmotionTimeline();
         document.getElementById('mobileEmotionTimelineFilter').style.display = 'none';
+    },
+
+    // ========================================
+    // 周期追踪
+    // ========================================
+
+    async loadPeriodTracker() {
+        var now = new Date();
+        this._periodCalendarYear = now.getFullYear();
+        this._periodCalendarMonth = now.getMonth() + 1;
+        await this._loadPeriodRecords();
+        this._renderPeriodCalendar();
+        this._renderPeriodInfo();
+        this._renderPeriodRecent();
+        this._bindPeriodCalendarEvents();
+    },
+
+    async _loadPeriodRecords() {
+        var year = this._periodCalendarYear;
+        var month = this._periodCalendarMonth;
+        var startDate = year + '-' + String(month).padStart(2,'0') + '-01';
+        var endDateObj = new Date(year, month, 0);
+        var endDateStr = year + '-' + String(month).padStart(2,'0') + '-' + String(endDateObj.getDate()).padStart(2,'0');
+
+        var result = await supabase
+            .from('period_daily_records')
+            .select('*')
+            .gte('record_date', startDate)
+            .lte('record_date', endDateStr)
+            .order('record_date', { ascending: true });
+
+        this._periodRecords = {};
+        if (!result.error && result.data) {
+            result.data.forEach(function(r) {
+                this._periodRecords[r.record_date] = r;
+            }.bind(this));
+        }
+
+        // Load last 3 months for prediction
+        var threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        var threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0];
+
+        var allResult = await supabase
+            .from('period_daily_records')
+            .select('*')
+            .gte('record_date', threeMonthsAgoStr)
+            .order('record_date', { ascending: true });
+
+        if (!allResult.error) {
+            this._periodAllRecords = allResult.data || [];
+        }
+    },
+
+    _renderPeriodCalendar() {
+        var year = this._periodCalendarYear;
+        var month = this._periodCalendarMonth;
+
+        document.getElementById('periodMonthLabel').textContent = year + '年' + month + '月';
+
+        var firstDay = new Date(year, month - 1, 1).getDay();
+        var daysInMonth = new Date(year, month, 0).getDate();
+        var today = new Date();
+        var todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+
+        var predictedStart = this._getPredictedPeriodStart();
+        var ovulationDate = this._getOvulationDate(predictedStart);
+
+        var html = '';
+        for (var i = 0; i < firstDay; i++) {
+            html += '<div class="period-day empty"></div>';
+        }
+        for (var d = 1; d <= daysInMonth; d++) {
+            var dateStr = year + '-' + String(month).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+            var record = this._periodRecords[dateStr];
+            var cls = 'period-day';
+            if (dateStr === todayStr) cls += ' today';
+            if (record && record.is_period) cls += ' period';
+            if (dateStr === predictedStart) cls += ' predicted';
+            if (dateStr === ovulationDate) cls += ' ovulation';
+            html += '<div class="' + cls + '" data-date="' + dateStr + '" onclick="mobile._openPeriodRecordPanel(\'' + dateStr + '\')">' + d + '</div>';
+        }
+        document.getElementById('periodDaysGrid').innerHTML = html;
+    },
+
+    _getPredictedPeriodStart() {
+        var records = this._periodAllRecords || [];
+        var sortedRecords = records.slice().sort(function(a, b) {
+            return a.record_date.localeCompare(b.record_date);
+        });
+
+        // Find period segments (consecutive is_period=true days)
+        var periodSegments = [];
+        var currentSegment = null;
+
+        for (var i = 0; i < sortedRecords.length; i++) {
+            var r = sortedRecords[i];
+            if (r.is_period) {
+                if (!currentSegment) {
+                    currentSegment = { start: r.record_date, end: r.record_date };
+                } else {
+                    var lastDate = new Date(currentSegment.end);
+                    var thisDate = new Date(r.record_date);
+                    var diffDays = Math.round((thisDate - lastDate) / (1000 * 60 * 60 * 24));
+                    if (diffDays <= 1) {
+                        currentSegment.end = r.record_date;
+                    } else {
+                        periodSegments.push(currentSegment);
+                        currentSegment = { start: r.record_date, end: r.record_date };
+                    }
+                }
+            } else if (currentSegment) {
+                periodSegments.push(currentSegment);
+                currentSegment = null;
+            }
+        }
+        if (currentSegment) periodSegments.push(currentSegment);
+
+        if (periodSegments.length < 2) {
+            if (periodSegments.length === 1) {
+                var lastStart = new Date(periodSegments[periodSegments.length - 1].start);
+                lastStart.setDate(lastStart.getDate() + 28);
+                return lastStart.toISOString().split('T')[0];
+            }
+            return null;
+        }
+
+        // Average of last 3 intervals
+        var intervals = [];
+        for (var j = 1; j < periodSegments.length; j++) {
+            var prev = new Date(periodSegments[j-1].start);
+            var curr = new Date(periodSegments[j].start);
+            intervals.push(Math.round((curr - prev) / (1000 * 60 * 60 * 24)));
+        }
+
+        var recentIntervals = intervals.slice(-3);
+        var avgInterval = Math.round(recentIntervals.reduce(function(a, b) { return a + b; }, 0) / recentIntervals.length);
+
+        var lastSegStart = new Date(periodSegments[periodSegments.length - 1].start);
+        lastSegStart.setDate(lastSegStart.getDate() + avgInterval);
+        return lastSegStart.toISOString().split('T')[0];
+    },
+
+    _getOvulationDate(predictedStart) {
+        if (!predictedStart) return null;
+        var d = new Date(predictedStart);
+        d.setDate(d.getDate() - 14);
+        return d.toISOString().split('T')[0];
+    },
+
+    _renderPeriodInfo() {
+        var records = this._periodAllRecords || [];
+        var sortedRecords = records.filter(function(r) { return r.is_period; })
+            .sort(function(a, b) { return b.record_date.localeCompare(a.record_date); });
+
+        var phase = '--';
+        var dayInCycle = '--';
+        var nextDate = '--';
+        var countdown = '--';
+
+        if (sortedRecords.length > 0) {
+            var lastPeriodStart = new Date(sortedRecords[0].record_date + 'T00:00:00');
+            var today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            var diffDays = Math.floor((today - lastPeriodStart) / (1000 * 60 * 60 * 24));
+            dayInCycle = diffDays + 1;
+
+            if (dayInCycle <= 7) phase = '经期/卵泡早期';
+            else if (dayInCycle <= 14) phase = '卵泡期';
+            else if (dayInCycle <= 16) phase = '排卵期';
+            else phase = '黄体期';
+
+            var predictedStart = this._getPredictedPeriodStart();
+            if (predictedStart) {
+                nextDate = predictedStart;
+                var predDate = new Date(predictedStart + 'T00:00:00');
+                var daysLeft = Math.floor((predDate - today) / (1000 * 60 * 60 * 24));
+                if (daysLeft > 0) countdown = '还有 ' + daysLeft + ' 天';
+                else if (daysLeft === 0) countdown = '今天';
+                else countdown = '已过 ' + Math.abs(daysLeft) + ' 天';
+            }
+        }
+
+        document.getElementById('periodPhase').textContent = phase;
+        document.getElementById('periodDayLabel').textContent = typeof dayInCycle === 'number' ? '第 ' + dayInCycle + ' 天' : '--';
+        document.getElementById('periodNextDate').textContent = nextDate;
+        document.getElementById('periodCountdown').textContent = countdown;
+    },
+
+    _renderPeriodRecent() {
+        var list = document.getElementById('periodRecentList');
+        var empty = document.getElementById('periodRecentEmpty');
+        var allRecords = (this._periodAllRecords || [])
+            .filter(function(r) { return r.is_period || (r.symptoms && r.symptoms.length > 0) || r.notes; })
+            .sort(function(a, b) { return b.record_date.localeCompare(a.record_date); })
+            .slice(0, 10);
+
+        if (allRecords.length === 0) {
+            list.innerHTML = '';
+            if (empty) {
+                list.appendChild(empty);
+                empty.style.display = '';
+            }
+            return;
+        }
+
+        if (empty) empty.style.display = 'none';
+
+        var flowLabels = { 0: '', 1: '流量少', 2: '流量中', 3: '流量多' };
+        var symptomLabels = {
+            '痛经': '😣 痛经', '疲劳': '😴 疲劳', '情绪波动': '😤 情绪波动',
+            '头痛': '🤕 头痛', '腰酸': '💢 腰酸', '食欲变化': '🍔 食欲变化',
+            '焦虑': '😰 焦虑', '失眠': '🥱 失眠', '排卵期': '✨ 排卵期'
+        };
+
+        var html = '';
+        for (var i = 0; i < allRecords.length; i++) {
+            var r = allRecords[i];
+            var displayDate = r.record_date.slice(5);
+            var statusText = r.is_period ? '经期 · ' + (flowLabels[r.flow_level] || '') : '';
+
+            html += '<div class="period-record-item">';
+            html += '<div class="period-record-date">' + displayDate + '</div>';
+            if (statusText) {
+                html += '<div class="period-record-body">' + statusText + '</div>';
+            }
+
+            var symptoms = r.symptoms || [];
+            if (symptoms.length > 0) {
+                html += '<div class="period-record-tags">';
+                for (var j = 0; j < symptoms.length; j++) {
+                    var label = symptomLabels[symptoms[j]] || symptoms[j];
+                    html += '<span class="period-record-tag">' + label + '</span>';
+                }
+                html += '</div>';
+            }
+            if (r.notes) {
+                html += '<div class="period-record-notes">' + r.notes + '</div>';
+            }
+            html += '</div>';
+        }
+
+        list.innerHTML = html;
+    },
+
+    _bindPeriodCalendarEvents() {
+        var self = this;
+        document.getElementById('periodPrevMonth').onclick = function() {
+            if (self._periodCalendarMonth === 1) {
+                self._periodCalendarYear--;
+                self._periodCalendarMonth = 12;
+            } else {
+                self._periodCalendarMonth--;
+            }
+            self.loadPeriodTracker();
+        };
+        document.getElementById('periodNextMonth').onclick = function() {
+            if (self._periodCalendarMonth === 12) {
+                self._periodCalendarYear++;
+                self._periodCalendarMonth = 1;
+            } else {
+                self._periodCalendarMonth++;
+            }
+            self.loadPeriodTracker();
+        };
+        document.getElementById('periodRecordTodayBtn').onclick = function() {
+            var today = new Date().toISOString().split('T')[0];
+            self._openPeriodRecordPanel(today);
+        };
+    },
+
+    _openPeriodRecordPanel(dateStr) {
+        this._periodEditingDate = dateStr;
+        var record = this._periodRecords[dateStr] || { is_period: false, flow_level: 0, symptoms: [], notes: '' };
+
+        var modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'periodRecordModal';
+        var self = this;
+        modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+
+        var allSymptoms = ['痛经', '疲劳', '情绪波动', '头痛', '腰酸', '食欲变化', '焦虑', '失眠', '排卵期'];
+        var symptomIcons = { '痛经': '😣', '疲劳': '😴', '情绪波动': '😤', '头痛': '🤕', '腰酸': '💢', '食欲变化': '🍔', '焦虑': '😰', '失眠': '🥱', '排卵期': '✨' };
+
+        var flowHTML = '';
+        var flowLabels = ['', '💧 少', '💧💧 中', '💧💧💧 多'];
+        for (var i = 0; i < flowLabels.length; i++) {
+            var sel = i === record.flow_level ? ' selected' : '';
+            flowHTML += '<button class="period-flow-btn' + sel + '" data-level="' + i + '" onclick="mobile._onPeriodFlowClick(this)">' + (flowLabels[i] || '无') + '</button>';
+        }
+
+        var symptomHTML = '';
+        for (var j = 0; j < allSymptoms.length; j++) {
+            var s = allSymptoms[j];
+            var hasIt = (record.symptoms || []).indexOf(s) >= 0;
+            var selCls = hasIt ? ' selected' : '';
+            symptomHTML += '<span class="period-symptom-tag' + selCls + '" data-symptom="' + s + '" onclick="mobile._onPeriodSymptomClick(this)">' + symptomIcons[s] + ' ' + s + '</span>';
+        }
+
+        modal.innerHTML = '<div class="period-record-panel" onclick="event.stopPropagation()">' +
+            '<div class="period-panel-header">' +
+                '<button class="period-panel-cancel" onclick="document.getElementById(\'periodRecordModal\').remove()">取消</button>' +
+                '<span>' + dateStr + ' · 记录</span>' +
+                '<button class="period-panel-save" onclick="mobile._savePeriodRecord()">保存</button>' +
+            '</div>' +
+            '<div class="period-panel-body">' +
+                '<div class="period-panel-section">' +
+                    '<div class="period-panel-label">经期状态</div>' +
+                    '<div class="period-toggle-group">' +
+                        '<button class="period-toggle-btn' + (record.is_period ? ' active' : '') + '" data-value="period" onclick="mobile._onPeriodToggle(this)">🩸 经期中</button>' +
+                        '<button class="period-toggle-btn' + (!record.is_period ? ' active' : '') + '" data-value="clean" onclick="mobile._onPeriodToggle(this)">✅ 干净</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="period-panel-section period-flow-section" style="display:' + (record.is_period ? '' : 'none') + '">' +
+                    '<div class="period-panel-label">流量</div>' +
+                    '<div class="period-flow-group">' + flowHTML + '</div>' +
+                '</div>' +
+                '<div class="period-panel-section">' +
+                    '<div class="period-panel-label">症状（可多选）</div>' +
+                    '<div class="period-symptom-group">' + symptomHTML + '</div>' +
+                '</div>' +
+                '<div class="period-panel-section">' +
+                    '<div class="period-panel-label">备注</div>' +
+                    '<textarea class="period-panel-notes" id="periodPanelNotes" placeholder="记录今天的身体感受...">' + (record.notes || '') + '</textarea>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+
+        document.body.appendChild(modal);
+
+        this._periodPanelState = {
+            isPeriod: record.is_period,
+            flowLevel: record.flow_level,
+            symptoms: (record.symptoms || []).slice()
+        };
+    },
+
+    _onPeriodToggle(btn) {
+        var value = btn.dataset.value;
+        var container = btn.parentElement;
+        var buttons = container.querySelectorAll('.period-toggle-btn');
+        for (var i = 0; i < buttons.length; i++) buttons[i].classList.remove('active');
+        btn.classList.add('active');
+
+        this._periodPanelState.isPeriod = (value === 'period');
+
+        var flowSection = btn.closest('.period-record-panel').querySelector('.period-flow-section');
+        if (flowSection) flowSection.style.display = (value === 'period') ? '' : 'none';
+    },
+
+    _onPeriodFlowClick(btn) {
+        var container = btn.parentElement;
+        var buttons = container.querySelectorAll('.period-flow-btn');
+        for (var i = 0; i < buttons.length; i++) buttons[i].classList.remove('selected');
+        btn.classList.add('selected');
+        this._periodPanelState.flowLevel = parseInt(btn.dataset.level);
+    },
+
+    _onPeriodSymptomClick(span) {
+        span.classList.toggle('selected');
+        var symptom = span.dataset.symptom;
+        var idx = this._periodPanelState.symptoms.indexOf(symptom);
+        if (idx >= 0) {
+            this._periodPanelState.symptoms.splice(idx, 1);
+        } else {
+            this._periodPanelState.symptoms.push(symptom);
+        }
+    },
+
+    async _savePeriodRecord() {
+        var state = this._periodPanelState;
+        var dateStr = this._periodEditingDate;
+        var notesEl = document.getElementById('periodPanelNotes');
+        var notes = notesEl ? notesEl.value : '';
+
+        var record = {
+            user_name: (this.currentUser && this.currentUser.username) ? this.currentUser.username : 'default',
+            record_date: dateStr,
+            is_period: state.isPeriod,
+            flow_level: state.isPeriod ? state.flowLevel : 0,
+            symptoms: state.symptoms,
+            notes: notes
+        };
+
+        var result = await supabase
+            .from('period_daily_records')
+            .upsert(record, { onConflict: 'user_name,record_date' });
+
+        var modal = document.getElementById('periodRecordModal');
+        if (modal) modal.remove();
+
+        if (result.error) {
+            console.error('保存周期记录失败:', result.error);
+            return;
+        }
+
+        await this.loadPeriodTracker();
     },
 
 };

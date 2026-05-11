@@ -7,11 +7,12 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=67">
+    <link rel="stylesheet" href="mobile.css?v=73">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="config.js"></script>
+    <script src="common.js?v=1"></script>
 </head>
 <body>
     <!-- ========== 登录页面 ========== -->
@@ -92,6 +93,7 @@
                 <span>回忆相册</span>
             </div>
             <div class="top-actions">
+                <button class="icon-btn" onclick="mobile.switchTab('albums')" title="相册">📸</button>
                 <button class="icon-btn" onclick="mobile.switchTab('upload')" title="上传">📤</button>
                 <button class="icon-btn" onclick="mobile.switchTab('category')" title="分类">📁</button>
                 <button class="icon-btn" onclick="mobile.toggleSearch()">🔍</button>
@@ -420,6 +422,63 @@
         </div>
     </div>
 
+    <!-- ========== 周期追踪页 ========== -->
+    <div id="periodTrackerPage" class="page">
+        <header class="top-bar">
+            <div class="logo">
+                <span>🩸</span>
+                <span>周期追踪</span>
+            </div>
+        </header>
+        <div id="periodTrackerContent" style="flex:1;overflow-y:auto;">
+            <!-- 顶部周期信息卡 -->
+            <div id="periodInfoCard" class="period-info-card">
+                <div class="period-info-left">
+                    <div class="period-phase" id="periodPhase">--</div>
+                    <div class="period-day-label" id="periodDayLabel">--</div>
+                </div>
+                <div class="period-info-right">
+                    <div class="period-next-label">预计下次经期</div>
+                    <div class="period-next-date" id="periodNextDate">--</div>
+                    <div class="period-countdown" id="periodCountdown">--</div>
+                </div>
+            </div>
+            <!-- 月历 -->
+            <div class="period-calendar" id="periodCalendar">
+                <div class="period-calendar-header">
+                    <button class="period-month-btn" id="periodPrevMonth">◀</button>
+                    <span class="period-month-label" id="periodMonthLabel">--</span>
+                    <button class="period-month-btn" id="periodNextMonth">▶</button>
+                </div>
+                <div class="period-weekdays">
+                    <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+                </div>
+                <div class="period-days-grid" id="periodDaysGrid"></div>
+                <div class="period-legend">
+                    <span><i class="period-dot today"></i> 今天</span>
+                    <span><i class="period-dot period"></i> 经期</span>
+                    <span><i class="period-dot predicted"></i> 预测经期</span>
+                    <span><i class="period-dot ovulation"></i> 排卵期</span>
+                </div>
+            </div>
+            <!-- 记录按钮 -->
+            <div style="padding:0 12px 12px;">
+                <button class="period-record-btn" id="periodRecordTodayBtn">📝 记录今天</button>
+            </div>
+            <!-- 近期记录列表 -->
+            <div class="period-recent" id="periodRecent">
+                <div class="period-recent-title">📋 近期记录</div>
+                <div id="periodRecentList">
+                    <div class="empty-state" id="periodRecentEmpty">
+                        <span class="empty-icon">📋</span>
+                        <p>还没有记录</p>
+                        <small>点击"记录今天"开始追踪周期</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ========== 相册详情页 ========== -->
     <div id="albumDetailPage" class="page">
         <header class="top-bar">
@@ -733,7 +792,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="mobile-app.js?v=73"></script>
+    <script type="module" src="mobile-app.js?v=76"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;
