@@ -986,6 +986,9 @@ const mobile = {
             this.loadAlbums();
         } else if (tab === 'periodTracker') {
             this.showPage('periodTracker');
+            var now = new Date();
+            this._periodCalendarYear = now.getFullYear();
+            this._periodCalendarMonth = now.getMonth() + 1;
             this.loadPeriodTracker();
         } else if (tab === 'passport') {
             this.showPage('passport');
@@ -7554,9 +7557,6 @@ const mobile = {
     // ========================================
 
     async loadPeriodTracker() {
-        var now = new Date();
-        this._periodCalendarYear = now.getFullYear();
-        this._periodCalendarMonth = now.getMonth() + 1;
         await this._loadPeriodRecords();
         this._renderPeriodCalendar();
         this._renderPeriodInfo();
@@ -7565,13 +7565,16 @@ const mobile = {
     },
 
     async _loadPeriodRecords() {
+        var client = this.initSupabase();
+        if (!client) return;
+
         var year = this._periodCalendarYear;
         var month = this._periodCalendarMonth;
         var startDate = year + '-' + String(month).padStart(2,'0') + '-01';
         var endDateObj = new Date(year, month, 0);
         var endDateStr = year + '-' + String(month).padStart(2,'0') + '-' + String(endDateObj.getDate()).padStart(2,'0');
 
-        var result = await supabase
+        var result = await client
             .from('period_daily_records')
             .select('*')
             .gte('record_date', startDate)
@@ -7580,9 +7583,9 @@ const mobile = {
 
         this._periodRecords = {};
         if (!result.error && result.data) {
-            result.data.forEach(function(r) {
-                this._periodRecords[r.record_date] = r;
-            }.bind(this));
+            for (var i = 0; i < result.data.length; i++) {
+                this._periodRecords[result.data[i].record_date] = result.data[i];
+            }
         }
 
         // Load last 3 months for prediction
@@ -7590,7 +7593,7 @@ const mobile = {
         threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
         var threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0];
 
-        var allResult = await supabase
+        var allResult = await client
             .from('period_daily_records')
             .select('*')
             .gte('record_date', threeMonthsAgoStr)
@@ -7932,7 +7935,9 @@ const mobile = {
             notes: notes
         };
 
-        var result = await supabase
+        var client = this.initSupabase();
+        if (!client) return;
+        var result = await client
             .from('period_daily_records')
             .upsert(record, { onConflict: 'user_name,record_date' });
 
