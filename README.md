@@ -18,6 +18,7 @@
 |------|------|:--:|:--:|
 | 首页情侣横幅 | 双人头像(可上传/跨设备同步)+恋爱天数倒计时 | — | ✅ |
 | 纪念日时间线 | 倒数日、纪念日里程碑、经期记录 | ✅ | ✅ |
+| 周期追踪 | 经期日历标记、流量强度、症状记录、周期预测 | — | ✅ |
 | 心情日记 | 记录每日心情，关联照片，支持删除 | ✅ | ✅ |
 | 每日叨叨 | 碎片化文字记录，支持删除 | ✅ | ✅ |
 | 亲密记录 | 密码锁保护，统计面板 | ✅ | ✅ |
@@ -38,8 +39,9 @@
 
 ### 其他
 
-- 桌面端侧边栏导航 + tooltip
-- 手机端暖粉风格首页 2×4 功能宫格
+- 桌面端侧边栏导航（18个功能分区）+ tooltip
+- 手机端暖粉风格首页 2×4 功能宫格 + 22个独立页面
+- 手机端 3 标签导航：首页 / 照片 / 我的
 - 手机端所有子页面 `←` 统一返回
 - 主题切换：蓝色经典 / 暖粉（设置页切换，夜间模式独立，跨设备同步）
 - 照片分享链接（`share.html`）
@@ -89,16 +91,16 @@
 
 | 文件 | 用途 |
 |------|------|
-| `index.html` | 桌面版入口，侧边栏导航 + 主内容区 |
-| `index-mobile.html` | 手机版入口，暖粉风格首页 + 底部导航 + 功能页 |
+| `index.html` | 桌面版入口，侧边栏导航 + 主内容区（18个功能分区） |
+| `index-mobile.html` | 手机版入口，暖粉风格首页 + 底部3标签导航 + 22个功能页 |
 | `share.html` | 相册分享独立页面，无需登录即可浏览 |
 
 ### 核心 JS
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `app.js` | ~6100 | 桌面版全部逻辑：照片流/分类/地图/情侣打卡/纪念日/心情日记/每日叨叨/亲密记录/拼贴墙/相册/足迹护照/回忆成就/情感时间轴/漂流瓶/秘密便签/轻轻碰 |
-| `mobile-app.js` | ~7000 | 手机版全部逻辑：同上 + 首页情侣横幅/RPG成就系统/头像上传/主题切换 |
+| `app.js` | ~6100 | 桌面版全部逻辑：照片流/分类/地图/情侣打卡/纪念日/心情日记/每日叨叨/亲密记录/拼贴墙/相册/足迹护照/回忆成就/情感时间轴/漂流瓶/秘密便签/轻轻碰/经期记录 |
+| `mobile-app.js` | ~7000 | 手机版全部逻辑：同上 + 首页情侣横幅/RPG成就系统/头像上传/主题切换/周期追踪 |
 | `share.js` | ~300 | 分享页面：加载相册照片、密码验证 |
 | `sw.js` | ~50 | Service Worker：离线缓存、PWA 安装 |
 
@@ -107,7 +109,7 @@
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | `style.css` | ~2400 | 桌面版全部样式：侧边栏/照片网格/模态框/表单/地图/成就 |
-| `mobile.css` | ~3200 | 手机版全部样式：暖粉主题/卡片布局/底部导航/RPG 系统/设置面板 |
+| `mobile.css` | ~3200 | 手机版全部样式：暖粉主题/卡片布局/底部导航/RPG 系统/设置面板/周期追踪日历 |
 
 ### 数据库迁移 (`migrations/`)
 
@@ -117,7 +119,7 @@
 |------|------|
 | `001_milestones_app_settings.sql` | 纪念日表、应用设置表 |
 | `002_albums_share_links.sql` | 相册表、分享链接表、照片-相册关联表 |
-| `003_couple_features.sql` | 心情日记/每日叨叨/亲密记录/情侣打卡表 |
+| `003_couple_features.sql` | 心情日记/每日叨叨/亲密记录/经期记录/情侣打卡表 |
 | `004_rpg_achievements.sql` | RPG 进度表（XP/等级/任务/称号/奖励） |
 | `005_drift_bottles.sql` | 漂流瓶表（扔瓶/捞瓶/回复） |
 | `006_secret_notes.sql` | 秘密便签表（地理围栏/过期/已读） |
@@ -125,6 +127,9 @@
 | `008_time_capsules.sql` | 时光胶囊表 |
 | `009_add_length_checks.sql` | 内容长度 CHECK 约束 |
 | `010_fix_rls.sql` | RLS 收紧 + profiles 表 + SECURITY DEFINER 函数 |
+| `011_app_settings_anon_select.sql` | app_settings anon SELECT 策略（登录前必需） |
+| `012_tighten_share_links.sql` | share_links 策略收紧：移除 anon 写入权限 |
+| `013_period_daily.sql` | 周期追踪每日记录表（经期状态/流量强度/症状/备注） |
 
 ### 配置 & 构建
 
@@ -166,12 +171,36 @@ window.__APP_CONFIG__ = {
   USER_EMAILS: { laoda: 'laoda@couple.local', xiaodi: 'xiaodi@couple.local' }
 }
 ```
-
 > `config.js` 已加入 `.gitignore`
 
 ## 数据库
 
 在 Supabase SQL Editor 中依次执行 `migrations/` 目录下的 SQL 文件。
+
+### 数据库表一览
+
+| 表名 | 用途 |
+|------|------|
+| `categories` | 照片分类（无限级联） |
+| `photos` | 照片记录（url/category/tags/location） |
+| `milestones` | 纪念日（倒数日/里程碑/经期记录） |
+| `app_settings` | 应用设置（主题/夜间模式等） |
+| `albums` | 相册 |
+| `album_photos` | 相册-照片关联 |
+| `share_links` | 分享链接 |
+| `mood_diary` | 心情日记 |
+| `daily_chatter` | 每日叨叨 |
+| `intimate_records` | 亲密记录（密码锁） |
+| `period_records` | 经期记录（纪念日内嵌） |
+| `period_daily_records` | 周期追踪每日记录（日历标记/流量/症状/预测） |
+| `couple_tasks` | 情侣打卡任务 |
+| `couple_checkins` | 情侣打卡记录 |
+| `rpg_progress` | RPG 成就进度 |
+| `drift_bottles` | 漂流瓶 |
+| `secret_notes` | 秘密便签 |
+| `nudges` | 轻轻碰 |
+| `time_capsules` | 时光胶囊 |
+| `profiles` | 用户档案 (user_id → username/role) |
 
 ### Storage Bucket
 
