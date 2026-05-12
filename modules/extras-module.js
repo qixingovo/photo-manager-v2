@@ -2040,6 +2040,52 @@
         else if (count >= 1) this.unlockTitle('好宝宝');
     },
 
+    _renderDietaryCard() {
+        var card = document.getElementById('dietaryCheckinCard');
+        if (!card) return;
+
+        if (!this._isInDietaryWindow()) { card.style.display = 'none'; return; }
+
+        var w = this._getDietaryWindow();
+        if (!w) { card.style.display = 'none'; return; }
+
+        var today = new Date().toISOString().split('T')[0];
+        var todayRec = this._dietaryCheckins[today];
+        var isDone = todayRec && todayRec.completed;
+
+        var todayIdx = w.dates.indexOf(today);
+        var totalDays = w.dates.length;
+
+        var restrictions = CommonUtils.DIETARY_RESTRICTIONS;
+        var tagsHTML = restrictions.map(function(item) {
+            return '<span class="dietary-tag">🚫 ' + item + '</span>';
+        }).join('');
+
+        if (isDone) {
+            card.innerHTML = '<div class="dietary-card dietary-card-done">' +
+                '<div class="dietary-card-header">' +
+                    '<span class="dietary-card-icon">✅</span>' +
+                    '<span class="dietary-card-title">忌口完成</span>' +
+                '</div>' +
+                '<div class="dietary-card-date">' + today + ' · 今天表现超棒</div>' +
+                (todayRec.note ? '<div class="dietary-card-note">"' + todayRec.note + '"</div>' : '') +
+                '<div class="dietary-tags-grid" style="margin-top:8px;">' + tagsHTML + '</div>' +
+            '</div>';
+        } else {
+            card.innerHTML = '<div class="dietary-card dietary-card-pending">' +
+                '<div class="dietary-card-header">' +
+                    '<span class="dietary-card-icon">🩸</span>' +
+                    '<span class="dietary-card-title">经期忌口 · 第 ' + (todayIdx + 1) + ' 天</span>' +
+                '</div>' +
+                '<div class="dietary-card-date">还剩 ' + (totalDays - todayIdx) + ' 天 · 月经期注意饮食</div>' +
+                '<div class="dietary-tags-grid" style="margin:8px 0;">' + tagsHTML + '</div>' +
+                '<button class="dietary-card-btn" onclick="mobile._openDietaryCheckinModal()">今日打卡</button>' +
+            '</div>';
+        }
+
+        card.style.display = 'block';
+    },
+
     _openDietaryCheckinModal() {
         var self = this;
         var today = new Date();

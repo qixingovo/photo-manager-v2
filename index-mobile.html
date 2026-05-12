@@ -23,7 +23,7 @@
                 <h1>老大和小弟的回忆</h1>
                 <p>回忆我们的从前</p>
             </div>
-            <form id="loginForm" onsubmit="mobile.handleLogin(event)">
+            <form id="loginForm" onsubmit="if(window.mobile){mobile.handleLogin(event)};return false;">
                 <div class="input-group">
                     <input type="text" id="loginUsername" placeholder="账号" required>
                 </div>
@@ -67,14 +67,18 @@
             <span class="bottle-text">一个漂流瓶漂到了...</span>
         </div>
 
-        <!-- 戳一戳按钮 -->
-        <div class="nudge-section" style="padding:0 12px;margin-bottom:8px;">
-            <button id="mobileNudgeBtn" class="btn-nudge-mobile" onclick="mobile.sendNudge()">
+        <!-- 快捷入口：戳一戳 + 游戏中心 -->
+        <div class="home-quick-actions" style="display:flex;gap:8px;padding:0 12px;margin-bottom:8px;">
+            <button id="mobileNudgeBtn" class="btn-nudge-mobile" onclick="mobile.nudgeOrLoad()" style="flex:1;">
                 <span class="nudge-heart-mobile">💗</span>
-                <span>戳一戳 Ta</span>
+                <span>戳一戳</span>
             </button>
-            <p id="mobileNudgeCooldown" style="font-size:11px;color:#999;text-align:center;margin-top:4px;display:none;"></p>
+            <button class="btn-game-mobile" onclick="mobile.switchTab('gameCenter')" style="flex:1;">
+                <span style="font-size:20px;">🎮</span>
+                <span>游戏中心</span>
+            </button>
         </div>
+        <p id="mobileNudgeCooldown" style="font-size:11px;color:#999;text-align:center;margin-top:4px;display:none;"></p>
 
         <!-- 功能入口卡片 3x2（可编辑排序） -->
         <div id="featureCardEditBar" class="feature-card-edit-bar" style="display:none;">
@@ -195,7 +199,7 @@
                 <div class="form-item" style="display:flex;gap:8px;">
                     <input type="number" id="mobilePhotoLatitude" placeholder="纬度" step="any" style="flex:1;">
                     <input type="number" id="mobilePhotoLongitude" placeholder="经度" step="any" style="flex:1;">
-                    <button type="button" class="btn-secondary" onclick="mobile.pickLocationOnMap()" style="white-space:nowrap;">📍 选点</button>
+                    <button type="button" class="btn-secondary" onclick="mobile.pickLocationOrLoad()" style="white-space:nowrap;">📍 选点</button>
                 </div>
 
                 <!-- 上传进度 -->
@@ -402,6 +406,29 @@
         </div>
     </div>
 
+    <!-- ========== 游戏中心 ========== -->
+    <div id="gameCenterPage" class="page">
+        <header class="top-bar">
+            <div class="logo">
+                <span>🎮</span>
+                <span>游戏中心</span>
+            </div>
+        </header>
+        <div id="mobileGameHubView" style="flex:1;overflow-y:auto;padding:12px;">
+            <div class="game-center-grid" id="mobileGameCards"></div>
+            <div style="margin-top:16px;">
+                <h3 style="font-size:16px;margin-bottom:8px;">🏆 排行榜</h3>
+                <div id="mobileGameLeaderboard" style="color:var(--text-muted);"></div>
+            </div>
+        </div>
+        <div id="mobileGamePlayArea" style="display:none;flex:1;flex-direction:column;">
+            <div style="padding:8px 12px;display:flex;gap:8px;">
+                <button class="btn-secondary" onclick="mobile.closeGame()">← 返回</button>
+            </div>
+            <div id="mobileGameContainer" style="flex:1;overflow-y:auto;"></div>
+        </div>
+    </div>
+
     <!-- ========== 相册列表页 ========== -->
     <div id="albumsPage" class="page">
         <header class="top-bar">
@@ -461,6 +488,8 @@
                     <span><i class="period-dot ovulation"></i> 排卵期</span>
                 </div>
             </div>
+            <!-- 忌口打卡卡片（仅窗口期显示） -->
+            <div id="dietaryCheckinCard" class="dietary-checkin-card" style="display:none;margin:0 12px 12px;"></div>
             <!-- 记录按钮 -->
             <div style="padding:0 12px 12px;">
                 <button class="period-record-btn" id="periodRecordTodayBtn">📝 记录今天</button>
@@ -792,6 +821,11 @@
     <div id="toast" class="toast"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="games/games.css?v=1">
+    <script src="games/game-engine.js"></script>
+    <script src="games/memory-card.js?v=1"></script>
+    <script src="games/chinese-chess.js?v=1"></script>
+    <script src="games/reversi.js?v=1"></script>
     <script type="module" src="mobile-app.js?v=76"></script>
     <script>
         if ('serviceWorker' in navigator) {
