@@ -2053,13 +2053,22 @@
                 .filter(function(r) { return r.is_period; })
                 .map(function(r) { return r.record_date; })
                 .sort();
-            if (sortedPeriodDays.length > 0) {
-                for (var i = 0; i < sortedPeriodDays.length; i++) {
-                    if (sortedPeriodDays[i] === todayStr) {
-                        periodDayText = '经期第 ' + (i + 1) + ' 天';
+            if (sortedPeriodDays.length > 0 && sortedPeriodDays.indexOf(todayStr) >= 0) {
+                // Find the current period segment (consecutive days containing todayStr)
+                var allDates = sortedPeriodDays.slice();
+                var todayIdx = allDates.indexOf(todayStr);
+                // Walk backward to find segment start
+                var segStart = todayIdx;
+                while (segStart > 0) {
+                    var prevDate = new Date(allDates[segStart - 1] + 'T00:00:00');
+                    var currDate = new Date(allDates[segStart] + 'T00:00:00');
+                    if ((currDate - prevDate) / (1000 * 60 * 60 * 24) <= 1) {
+                        segStart--;
+                    } else {
                         break;
                     }
                 }
+                periodDayText = '经期第 ' + (todayIdx - segStart + 1) + ' 天';
             }
             if (!periodDayText) {
                 var startDate = new Date(w.start + 'T00:00:00');
