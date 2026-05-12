@@ -598,6 +598,31 @@
                 }).join('') + '</div>';
         }
 
+        var dietaryTitlesEl = document.getElementById('rpgDietaryTitles');
+        if (dietaryTitlesEl) {
+            var dietaryCount = this.rpgData.dietary_month_count || 0;
+            var dietaryTiers = [
+                { count: 1, name: '好宝宝' },
+                { count: 3, name: '乖宝宝' },
+                { count: 6, name: '好乖宝宝' }
+            ];
+            var titles = this.rpgData.unlocked_titles || [];
+            dietaryTitlesEl.innerHTML = '<h3>🩸 忌口成就</h3>' +
+                '<div class="dietary-title-track">' +
+                    '<div class="dietary-title-count">已完成 <strong>' + dietaryCount + '</strong> 次月度忌口挑战</div>' +
+                    '<div class="rpg-track-badges">' +
+                        dietaryTiers.map(function(t) {
+                            var unlocked = titles.indexOf(t.name) >= 0;
+                            return '<div class="rpg-track-badge' + (unlocked ? '' : ' locked') + '">' +
+                                '<span class="rpg-track-badge-icon">' + (unlocked ? '🏅' : '🔒') + '</span>' +
+                                '<span class="rpg-track-badge-name">' + (unlocked ? t.name : '???') + '</span>' +
+                                '<span class="rpg-track-badge-desc">' + t.count + ' 次</span>' +
+                            '</div>';
+                        }).join('') +
+                    '</div>' +
+                '</div>';
+        }
+
         // 里程碑成就（成就路线）
         const grid = document.getElementById('mobileAchievementsGrid');
         if (grid) {
