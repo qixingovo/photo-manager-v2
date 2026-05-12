@@ -506,6 +506,7 @@ const mobile = {
                 this.currentUser = this.getUserFromSession({ username: profile.username, role: profile.role });
                 this.showPage('home');
                 this.renderFeatureCards();
+                this._renderFloatingBall();
                 this._loadFeatureCardOrderFromServer().then(() => this.renderFeatureCards());
                 this.loadData().catch(err => {
                     console.error('加载数据失败:', err);
@@ -583,6 +584,7 @@ const mobile = {
         // 先跳转页面
         this.showPage('home');
         this.renderFeatureCards();
+        this._renderFloatingBall();
         this._loadFeatureCardOrderFromServer().then(() => this.renderFeatureCards());
 
         // 再加载数据（不阻塞页面显示）
@@ -1040,10 +1042,32 @@ const mobile = {
         bar.classList.remove('active');
     },
 
+    _renderFloatingBall() {
+        var ball = document.getElementById('dietaryFloatingBall');
+        if (!ball) return;
+
+        var self = this;
+        this._ensureModule('extras').then(function() {
+            if (self._isInDietaryWindow && self._isInDietaryWindow()) {
+                if (self._checkDietaryWindowCompletion) self._checkDietaryWindowCompletion();
+                ball.style.display = 'flex';
+                var todayRec = self._getTodayDietaryCheckin ? self._getTodayDietaryCheckin() : null;
+                var dot = document.getElementById('dietaryBallDot');
+                if (dot) dot.style.display = (todayRec && todayRec.completed) ? 'none' : 'block';
+                ball.style.opacity = (todayRec && todayRec.completed) ? '0.6' : '1';
+            } else {
+                ball.style.display = 'none';
+            }
+        }).catch(function() {
+            ball.style.display = 'none';
+        });
+    },
+
     switchTab(tab) {
         if (tab === 'home') {
             this.showPage('home');
             this.renderFeatureCards();
+            this._renderFloatingBall();
             this.renderCoupleBanner();
             this._ensureModule('extras').then(() => {
                 this.checkIncomingBottles();

@@ -80,6 +80,13 @@
         </div>
         <p id="mobileNudgeCooldown" style="font-size:11px;color:#999;text-align:center;margin-top:4px;display:none;"></p>
 
+        <!-- 忌口打卡浮球（仅窗口期显示） -->
+        <div id="dietaryFloatingBall" class="dietary-floating-ball" style="display:none;" onclick="mobile._openDietaryCheckinModal()">
+            <span class="dietary-ball-icon">🍽️</span>
+            <span class="dietary-ball-label">忌口</span>
+            <span id="dietaryBallDot" class="dietary-ball-dot"></span>
+        </div>
+
         <!-- 功能入口卡片 3x2（可编辑排序） -->
         <div id="featureCardEditBar" class="feature-card-edit-bar" style="display:none;">
             <button id="featureCardEditToggle" class="feature-edit-toggle" onclick="mobile.toggleFeatureCardEdit()">✏️ 编辑排序</button>
