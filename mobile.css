@@ -2286,6 +2286,26 @@ mark { background: #ffe066; color: #333; padding: 1px 3px; border-radius: 3px; }
 .btn-nudge-mobile.nudged { animation: nudge-bounce 0.3s ease; }
 .nudge-heart-mobile { font-size: 22px; }
 
+/* Game center quick action */
+.btn-game-mobile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #66a;
+    background: linear-gradient(135deg, #F0F0FF, #E0E8FF);
+    border: 1.5px solid #c8d6ff;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 2px 12px rgba(100,100,255,0.10);
+    -webkit-tap-highlight-color: transparent;
+}
+.btn-game-mobile:active { transform: scale(0.96); }
+
 @keyframes nudge-bounce {
     0% { transform: scale(1); }
     30% { transform: scale(1.15); }
@@ -2852,4 +2872,124 @@ body.dark .period-info-card {
 }
 .period-panel-notes::placeholder {
     color: var(--text-muted, #999);
+
+/* ========================================
+   模块懒加载进度条（轻量 loading 动画）
+   ======================================== */
+.module-loading-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #ff9a9e, #fbc2eb, #ff9a9e);
+    background-size: 200% 100%;
+    z-index: 10000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    animation: moduleLoadingSlide 1.2s ease-in-out infinite;
+    box-shadow: 0 0 6px rgba(255, 154, 158, 0.4);
 }
+.module-loading-bar.active {
+    opacity: 1;
+}
+@keyframes moduleLoadingSlide {
+    0%   { width: 0; left: 0; }
+    30%  { width: 30%; left: 0; }
+    50%  { width: 40%; left: 30%; }
+    70%  { width: 30%; left: 70%; }
+    100% { width: 0; left: 100%; }
+}
+}
+
+/* ========================================
+   忌口打卡系统样式
+   ======================================== */
+
+.dietary-floating-ball {
+    position: fixed;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #FF8099, #E84A6B);
+    box-shadow: 0 3px 12px rgba(232, 74, 107, 0.35);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 100;
+    transition: opacity 0.3s, transform 0.3s;
+    -webkit-tap-highlight-color: transparent;
+}
+.dietary-floating-ball:active {
+    transform: translateY(-50%) scale(0.92);
+}
+.dietary-ball-icon { font-size: 20px; line-height: 1; }
+.dietary-ball-label { font-size: 9px; font-weight: 700; color: #fff; line-height: 1; margin-top: 1px; }
+.dietary-ball-dot {
+    position: absolute; top: 4px; right: 4px;
+    width: 10px; height: 10px;
+    background: #fff; border: 2px solid #E84A6B; border-radius: 50%;
+    animation: dietary-dot-pulse 2s infinite;
+}
+@keyframes dietary-dot-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+}
+
+.dietary-checkin-card { border-radius: 12px; overflow: hidden; }
+.dietary-card { padding: 16px; border-radius: 12px; }
+.dietary-card-pending { background: #FFF5F5; border: 1px solid #FFD4DD; }
+.dietary-card-done { background: #F0FFF4; border: 1px solid #C6F6D5; }
+.dietary-card-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.dietary-card-icon { font-size: 18px; }
+.dietary-card-title { font-weight: 700; font-size: 15px; color: #E84A6B; }
+.dietary-card-done .dietary-card-title { color: #38A169; }
+.dietary-card-date { font-size: 12px; color: #999; margin-top: 2px; }
+.dietary-card-note { margin-top: 6px; font-size: 12px; color: #666; font-style: italic; }
+.dietary-card-btn {
+    display: block; width: 100%; background: #E84A6B; color: #fff;
+    border: none; padding: 8px 16px; border-radius: 20px;
+    font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px;
+}
+.dietary-card-btn:active { opacity: 0.85; }
+
+.dietary-tags-grid { display: flex; gap: 6px; flex-wrap: wrap; }
+.dietary-tag { background: #FFE0E6; color: #E84A6B; padding: 4px 10px; border-radius: 12px; font-size: 12px; white-space: nowrap; }
+
+.dietary-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; animation: dietary-fade-in 0.2s ease;
+}
+@keyframes dietary-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.dietary-checkin-panel {
+    background: #fff; border-radius: 20px; padding: 28px 24px 20px;
+    width: calc(100vw - 48px); max-width: 360px; text-align: center;
+    animation: dietary-scale-in 0.25s ease;
+}
+@keyframes dietary-scale-in { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.dietary-panel-icon { font-size: 40px; margin-bottom: 8px; }
+.dietary-panel-title { font-weight: 700; font-size: 18px; color: #333; }
+.dietary-panel-date { font-size: 13px; color: #999; margin-top: 4px; }
+.dietary-restrictions-box { background: #FFF5F5; border-radius: 10px; padding: 12px; margin-top: 16px; text-align: left; }
+.dietary-restrictions-label { font-size: 12px; color: #999; margin-bottom: 8px; }
+.dietary-note-input {
+    width: 100%; border: 1px solid #e0e0e0; border-radius: 10px;
+    padding: 10px 12px; font-size: 14px; margin-top: 12px;
+    resize: none; height: 60px; box-sizing: border-box; font-family: inherit;
+}
+.dietary-note-input:focus { outline: none; border-color: #E84A6B; }
+.dietary-panel-actions { display: flex; gap: 10px; margin-top: 16px; }
+.dietary-btn-cancel { flex: 1; background: #f0f0f0; color: #666; border: none; padding: 12px; border-radius: 25px; font-size: 14px; cursor: pointer; }
+.dietary-btn-cancel:active { background: #e0e0e0; }
+.dietary-btn-done { flex: 2; background: #E84A6B; color: #fff; border: none; padding: 12px; border-radius: 25px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.dietary-btn-done:active { opacity: 0.85; }
+
+.dietary-title-track { padding: 12px 0; }
+.dietary-title-count { font-size: 14px; color: #666; margin-bottom: 12px; text-align: center; }
+.dietary-title-count strong { color: #E84A6B; font-size: 20px; }
