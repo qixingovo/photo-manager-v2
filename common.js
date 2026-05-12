@@ -107,6 +107,36 @@
     return path;
   };
 
+  // 情感类型（共享常量）
+  U.EMOTION_TYPES = [
+    { key: 'photo', icon: '📷', label: '照片' },
+    { key: 'mood', icon: '📝', label: '心情日记' },
+    { key: 'chatter', icon: '💬', label: '每日叨叨' },
+    { key: 'milestone', icon: '🎉', label: '纪念日' },
+    { key: 'checkin', icon: '✅', label: '情侣打卡' },
+    { key: 'bottle', icon: '🍾', label: '漂流瓶' },
+    { key: 'time_capsule', icon: '⏳', label: '时光胶囊' }
+  ];
+
+  // 心情表情（共享常量）
+  U.MOOD_EMOJIS = ['😊', '😢', '😡', '😴', '🥰', '😰', '🤩', '😤'];
+
+  // 伴侣喜好档案默认模板（共享常量）
+  U.DEFAULT_PROFILE = {
+    updated_by: '', updated_at: '',
+    categories: {
+      food:    { label: '食物', icon: '🍔', likes: [], dislikes: [] },
+      drinks:  { label: '饮品', icon: '🧋', likes: [], dislikes: [] },
+      colors:  { label: '颜色', icon: '🎨', likes: [], dislikes: [] },
+      movies:  { label: '电影/剧', icon: '🎬', likes: [], dislikes: [] },
+      music:   { label: '音乐', icon: '🎵', likes: [], dislikes: [] },
+      brands:  { label: '品牌', icon: '🛍', likes: [], dislikes: [] },
+      restaurants: { label: '餐厅', icon: '🍽', likes: [], dislikes: [] },
+      gifts:   { label: '想要的礼物', icon: '🎁', likes: [], dislikes: [] },
+      other:   { label: '其他备忘', icon: '📌', notes: '' }
+    }
+  };
+
   U.getDefaultMilestones = function () {
     return [
       { id: '1', date: '2020-06-15', title: '我们在一起的第一天', description: '故事从这里开始', photoId: null },
@@ -115,6 +145,9 @@
       { id: '4', date: '2021-12-25', title: '第一个圣诞节', description: '', photoId: null }
     ];
   };
+
+  // 经期忌口清单（共享常量）
+  U.DIETARY_RESTRICTIONS = ['冰的', '辣的', '咖啡', '酒', '生冷', '油炸', '奶茶'];
 
   window.CommonUtils = U;
 })();
