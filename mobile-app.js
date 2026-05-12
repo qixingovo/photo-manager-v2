@@ -1048,8 +1048,8 @@ const mobile = {
 
         var self = this;
         this._ensureModule('extras').then(function() {
+            if (self._checkDietaryWindowCompletion) self._checkDietaryWindowCompletion();
             if (self._isInDietaryWindow && self._isInDietaryWindow()) {
-                if (self._checkDietaryWindowCompletion) self._checkDietaryWindowCompletion();
                 ball.style.display = 'flex';
                 var todayRec = self._getTodayDietaryCheckin ? self._getTodayDietaryCheckin() : null;
                 var dot = document.getElementById('dietaryBallDot');

@@ -2872,6 +2872,7 @@ body.dark .period-info-card {
 }
 .period-panel-notes::placeholder {
     color: var(--text-muted, #999);
+}
 
 /* ========================================
    模块懒加载进度条（轻量 loading 动画）

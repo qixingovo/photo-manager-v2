@@ -2081,9 +2081,10 @@
         var todayIdx = w.dates.indexOf(today);
         var totalDays = w.dates.length;
 
+        var self = this;
         var restrictions = CommonUtils.DIETARY_RESTRICTIONS;
         var tagsHTML = restrictions.map(function(item) {
-            return '<span class="dietary-tag">🚫 ' + item + '</span>';
+            return '<span class="dietary-tag">🚫 ' + self.escapeHtml(item) + '</span>';
         }).join('');
 
         if (isDone) {
@@ -2093,7 +2094,7 @@
                     '<span class="dietary-card-title">忌口完成</span>' +
                 '</div>' +
                 '<div class="dietary-card-date">' + today + ' · 今天表现超棒</div>' +
-                (todayRec.note ? '<div class="dietary-card-note">"' + todayRec.note + '"</div>' : '') +
+                (todayRec.note ? '<div class="dietary-card-note">"' + this.escapeHtml(todayRec.note) + '"</div>' : '') +
                 '<div class="dietary-tags-grid" style="margin-top:8px;">' + tagsHTML + '</div>' +
             '</div>';
         } else {
