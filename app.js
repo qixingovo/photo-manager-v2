@@ -1,3 +1,5 @@
+// 生产环境禁用 debug 日志（设置 DEBUG=true 可开启）
+if (!window.__APP_CONFIG__?.DEBUG) { console.log = () => {}; }
 // ========== 状态变量 ==========
 let categories = []
 let photos = []
@@ -11,6 +13,19 @@ let selectedPhotos = new Set()
 let markedCategories = new Set((JSON.parse(localStorage.getItem('markedCategories') || '[]')).map(String))
 let expandedCategories = new Set()
 let expandedInManager = new Set() // 分类管理区域的展开状态
+
+// ========== 桌面主题切换 ==========
+(function initTheme() {
+    var savedTheme = localStorage.getItem('desktop_theme') || 'purple';
+    document.body.className = 'theme-' + savedTheme;
+})();
+
+window.toggleDesktopTheme = function() {
+    var isPurple = document.body.classList.contains('theme-purple');
+    var newTheme = isPurple ? 'warm' : 'purple';
+    document.body.className = 'theme-' + newTheme;
+    localStorage.setItem('desktop_theme', newTheme);
+};
 
 // 分页状态
 const PHOTOS_PER_PAGE = 20
@@ -76,8 +91,20 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: true, storage: window.localStorage, autoRefreshToken: true, detectSessionInUrl: true }
 });
-const USER_EMAIL_MAP = { laoda: 'laoda@couple.local', xiaodi: 'xiaodi@couple.local' };
+const USER_EMAIL_MAP = APP_CONFIG.USER_EMAILS || { laoda: 'laoda@couple.local', xiaodi: 'xiaodi@couple.local' };
 let currentUser = null;
+
+const escapeHtml = CommonUtils.escapeHtml;
+const sha256 = CommonUtils.sha256;
+const safeBigint = CommonUtils.safeBigint;
+const highlightKeywords = CommonUtils.highlightKeywords;
+const formatRelativeTime = CommonUtils.formatRelativeTime;
+const getRelativeTime = CommonUtils.getRelativeTime;
+const formatFileSize = CommonUtils.formatFileSize;
+const generateShareToken = CommonUtils.generateShareToken;
+const getCategoryAndChildrenIds = function (id) { return CommonUtils.getCategoryAndChildrenIds(id, categories); };
+const getCategoryPath = function (id) { return CommonUtils.getCategoryPath(id, categories); };
+const getDefaultMilestones = CommonUtils.getDefaultMilestones;
 
 function getUserFromSession(session) {
     const username = session?.username || '用户';
@@ -465,6 +492,7 @@ window.toggleSection = function(section) {
     const passportSection = document.getElementById('passportSection')
     const partnerProfileSection = document.getElementById('partnerProfileSection')
     const timeCapsuleSection = document.getElementById('timeCapsuleSection')
+    const gameCenterSection = document.getElementById('gameCenterSection')
 
     // 辅助：隐藏所有分区
     const hideAll = () => {
@@ -483,6 +511,7 @@ window.toggleSection = function(section) {
         if (document.getElementById('coupleTasksSection')) document.getElementById('coupleTasksSection').style.display = 'none'
         if (partnerProfileSection) partnerProfileSection.style.display = 'none'
         if (timeCapsuleSection) timeCapsuleSection.style.display = 'none'
+        if (gameCenterSection) gameCenterSection.style.display = 'none'
     }
 
     if (section === 'upload') {
@@ -640,6 +669,16 @@ window.toggleSection = function(section) {
             hideAll()
             sec.style.display = 'block'
             window.loadTimeCapsules()
+        } else {
+            sec.style.display = 'none'
+        }
+    } else if (section === 'gameCenter') {
+        const sec = document.getElementById('gameCenterSection')
+        if (!sec) return
+        if (sec.style.display === 'none' || !sec.style.display) {
+            hideAll()
+            sec.style.display = 'block'
+            window.loadGameCenter()
         } else {
             sec.style.display = 'none'
         }
@@ -1021,18 +1060,6 @@ window._calcDistance = function(lat1, lng1, lat2, lng2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-function formatRelativeTime(dateStr) {
-    if (!dateStr) return '';
-    var d = new Date(dateStr);
-    var now = new Date();
-    var diff = now - d;
-    if (diff < 60000) return '刚刚';
-    if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
-    if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
-    if (diff < 2592000000) return Math.floor(diff / 86400000) + '天前';
-    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
-}
-
 window.toggleMarkCategory = function(catId) {
     if (markedCategories.has(catId)) {
         markedCategories.delete(catId)
@@ -1212,16 +1239,6 @@ async function loadPhotos() {
     } catch (err) {
         console.error('加载照片失败:', err)
     }
-}
-
-function getCategoryAndChildrenIds(categoryId) {
-    const strId = String(categoryId)
-    const ids = [strId]
-    const children = categories.filter(c => String(c.parent_id) === String(categoryId))
-    children.forEach(child => {
-        ids.push(...getCategoryAndChildrenIds(String(child.id)))
-    })
-    return ids
 }
 
 function getCategoryPhotoCount(catId) {
@@ -1991,16 +2008,6 @@ function rebuildFilterCascade(categoryId) {
     })
 }
 
-function getCategoryPath(categoryId) {
-    const path = []
-    let current = categories.find(c => c.id === categoryId)
-    while (current) {
-        path.unshift(current.id)
-        current = current.parent_id ? categories.find(c => c.id === current.parent_id) : null
-    }
-    return path
-}
-
 function onFilterCatLevelChange(level) {
     const container = document.getElementById('filterCategoryCascade')
     if (!container) return
@@ -2077,10 +2084,10 @@ function renderCategoryItem(cat, level) {
     return `
         <div class="category-item" style="padding-left:${indent}px;">
             <div class="category-tag ${isActive}" onclick="${mainOnclick}">
-                <span class="cat-name">${cat.name}</span>
+                <span class="cat-name">${escapeHtml(cat.name)}</span>
                 ${hasChildren ? `<span class="cat-arrow" onclick="${arrowOnclick}">${arrow}</span>` : ''}
                 <span class="count">${count}</span>
-                <button onclick="event.stopPropagation(); window.openEditCategoryModal('${cat.id}', '${cat.name}')" title="编辑" style="background:none;border:none;cursor:pointer;padding:0 2px;">✏️</button>
+                <button onclick="event.stopPropagation(); window.openEditCategoryModal('${cat.id}', '${escapeHtml(cat.name).replace(/'/g, "\\'")}')" title="编辑" style="background:none;border:none;cursor:pointer;padding:0 2px;">✏️</button>
                 <button class="btn-danger" onclick="event.stopPropagation(); window.deleteCategory('${cat.id}')" title="删除">×</button>
             </div>
             ${childrenHtml}
@@ -2725,15 +2732,6 @@ window.confirmMapPick = function() {
 
 // ========== 纪念日时间线 ==========
 
-function getDefaultMilestones() {
-    return [
-        { id: '1', date: '2020-06-15', title: '我们在一起的第一天', description: '故事从这里开始', photoId: null },
-        { id: '2', date: '2021-02-14', title: '第一个情人节', description: '', photoId: null },
-        { id: '3', date: '2021-01-01', title: '第一个新年', description: '', photoId: null },
-        { id: '4', date: '2021-12-25', title: '第一个圣诞节', description: '', photoId: null },
-    ];
-}
-
 // 检测是否有 localStorage 数据（用于判断是否应从 localStorage 加载）
 
 
@@ -2821,12 +2819,6 @@ async function loadStartDate() {
         }
         // 有任何 error 就保持 localStorage 值
     } catch (e) { /* 静默 */ }
-}
-
-function safeBigint(val, fallback) {
-    if (val === null || val === undefined) return fallback;
-    const n = parseInt(val, 10);
-    return Number.isFinite(n) ? n : fallback;
 }
 
 async function migrateMilestonesToSupabase() {
@@ -3748,12 +3740,6 @@ function getPhotoUrl(storagePath) {
     return data.publicUrl
 }
 
-function formatFileSize(bytes) {
-    if (bytes < 1024) return bytes + ' B'
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
-
 function formatTime(timestamp) {
     const date = new Date(timestamp)
     return date.toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
@@ -3807,12 +3793,6 @@ function renderComments() {
     `).join('')
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div')
-    div.textContent = text
-    return div.innerHTML
-}
-
 window.addComment = async function(e) {
     e.preventDefault()
     
@@ -3835,15 +3815,6 @@ window.addComment = async function(e) {
     } catch (err) {
         alert('留言失败: ' + err.message)
     }
-}
-
-function highlightKeywords(text, searchValue) {
-    if (!searchValue || !text) return text;
-    const keywords = searchValue.trim().split(/\s+/).filter(k => k.length > 0);
-    if (keywords.length === 0) return text;
-    const escaped = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
-    return text.replace(regex, '<mark>$1</mark>');
 }
 
 function renderPhotos() {
@@ -4661,19 +4632,6 @@ window.deleteAlbum = async function() {
 //   分享链接
 // ========================================
 
-function generateShareToken() {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID()
-    }
-    const arr = new Uint8Array(16)
-    if (typeof crypto !== 'undefined') {
-        crypto.getRandomValues(arr)
-    } else {
-        for (let i = 0; i < 16; i++) arr[i] = Math.floor(Math.random() * 256)
-    }
-    return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('')
-}
-
 window.openShareCurrentAlbum = function() {
     if (!currentAlbum) { alert('请先打开一个相册'); return }
     window.openCreateShareModal(currentAlbum.id)
@@ -4886,7 +4844,7 @@ window.closePassportLocation = function() {
 // 心情日记
 // ========================================
 
-const MOOD_EMOJIS = ['😊', '😢', '😡', '😴', '🥰', '😰', '🤩', '😤']
+const MOOD_EMOJIS = CommonUtils.MOOD_EMOJIS;
 
 async function loadMoodDiary() {
     try {
@@ -5032,25 +4990,6 @@ window.saveMoodDiary = async function(editId) {
 // ========================================
 // 每日叨叨
 // ========================================
-
-function getRelativeTime(dateStr) {
-    const now = new Date()
-    const date = new Date(dateStr)
-    const diff = now - date
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return '刚刚'
-    if (mins < 60) return `${mins}分钟前`
-    const hours = Math.floor(mins / 60)
-    if (hours < 24) return `${hours}小时前`
-    const days = Math.floor(hours / 24)
-    if (days < 7) return `${days}天前`
-    const weeks = Math.floor(days / 7)
-    if (weeks < 4) return `${weeks}周前`
-    const months = Math.floor(days / 30)
-    if (months < 12) return `${months}个月前`
-    const years = Math.floor(days / 365)
-    return `${years}年前`
-}
 
 async function loadDailyChatter() {
     try {
@@ -5393,12 +5332,6 @@ window.saveCheckin = async function(taskId) {
 // ========================================
 // 亲密记录
 // ========================================
-
-async function sha256(message) {
-    const msgBuffer = new TextEncoder().encode(message);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
 
 async function getIntimatePassword() {
     try {
@@ -5860,20 +5793,7 @@ window.closeIncomingBottle = async function() {
 window.partnerProfileData = null;
 window._partnerProfileEditing = false;
 
-const DEFAULT_PROFILE = {
-    updated_by: '', updated_at: '',
-    categories: {
-        food:    { label: '食物', icon: '🍔', likes: [], dislikes: [] },
-        drinks:  { label: '饮品', icon: '🧋', likes: [], dislikes: [] },
-        colors:  { label: '颜色', icon: '🎨', likes: [], dislikes: [] },
-        movies:  { label: '电影/剧', icon: '🎬', likes: [], dislikes: [] },
-        music:   { label: '音乐', icon: '🎵', likes: [], dislikes: [] },
-        brands:  { label: '品牌', icon: '🛍', likes: [], dislikes: [] },
-        restaurants: { label: '餐厅', icon: '🍽', likes: [], dislikes: [] },
-        gifts:   { label: '想要的礼物', icon: '🎁', likes: [], dislikes: [] },
-        other:   { label: '其他备忘', icon: '📌', notes: '' }
-    }
-};
+const DEFAULT_PROFILE = CommonUtils.DEFAULT_PROFILE;
 
 async function loadPartnerProfile() {
     const profileKey = 'partner_profile_' + (currentUser?.username || 'default');
@@ -6352,15 +6272,7 @@ window.saveTimelineHiddenPhotos = async function() {
     try { await supabase.from('app_settings').upsert({ key: 'timeline_hidden_photos', value: JSON.stringify(arr) }); } catch(e) {}
 };
 
-var EMOTION_TYPES = [
-    { key: 'photo', icon: '📷', label: '照片' },
-    { key: 'mood', icon: '📝', label: '心情日记' },
-    { key: 'chatter', icon: '💬', label: '每日叨叨' },
-    { key: 'milestone', icon: '🎉', label: '纪念日' },
-    { key: 'checkin', icon: '✅', label: '情侣打卡' },
-    { key: 'bottle', icon: '🍾', label: '漂流瓶' },
-    { key: 'time_capsule', icon: '⏳', label: '时光胶囊' }
-];
+var EMOTION_TYPES = CommonUtils.EMOTION_TYPES;
 
 window.loadEmotionTimeline = async function() {
     var container = document.getElementById('emotionTimelineContainer');
@@ -6633,3 +6545,148 @@ document.addEventListener('click', (e) => {
         }
     }
 })
+
+// ========================================
+// 游戏中心
+// ========================================
+
+window._activeGame = null;
+
+window.loadGameCenter = function () {
+    document.getElementById('gameHubView').style.display = 'block'
+    document.getElementById('gamePlayArea').style.display = 'none'
+    if (window._activeGame) {
+        window._activeGame.destroy()
+        window._activeGame = null
+    }
+    window.renderGameCards()
+    window.loadGameLeaderboard()
+};
+
+window.renderGameCards = function () {
+    var container = document.getElementById('gameCardsGrid')
+    if (!container) return
+    var games = [
+        { id: 'memoryCard', icon: '🃏', title: '记忆翻牌', desc: '找出相同的照片配对', available: true },
+        { id: 'chineseChess', icon: '♟️', title: '中国象棋', desc: '双人本地对弈，轮流走子', available: true },
+        { id: 'reversi', icon: '⚫', title: '黑白棋', desc: '夹住翻转，棋子最多的获胜', available: true },
+        { id: 'coupleQuiz', icon: '💑', title: '默契大考验', desc: '测测你们有多了解对方', available: false },
+        { id: 'photoPuzzle', icon: '🧩', title: '照片拼图', desc: '拖动碎片还原照片', available: false }
+    ]
+    container.innerHTML = games.map(function (g) {
+        return '<div class="game-card' + (g.available ? '' : ' disabled') + '"' +
+            (g.available ? ' onclick="window.launchGame(\'' + g.id + '\')"' : '') + '>' +
+            '<span class="game-card-icon">' + g.icon + '</span>' +
+            '<div class="game-card-info">' +
+                '<div class="game-card-title">' + g.title + '</div>' +
+                '<div class="game-card-desc">' + g.desc + '</div>' +
+            '</div>' +
+            (g.available ? '' : '<span class="game-card-badge">即将推出</span>') +
+        '</div>'
+    }).join('')
+};
+
+window.launchGame = async function (gameName) {
+    document.getElementById('gameHubView').style.display = 'none'
+    document.getElementById('gamePlayArea').style.display = 'block'
+    var container = document.getElementById('gameContainer')
+    container.innerHTML = '<p style="text-align:center;padding:40px;color:var(--text-muted);">加载游戏中...</p>'
+
+    if (!window.GameEngine.xpBridge) {
+        window.GameEngine.xpBridge = function (amount, reason) {
+            console.log('[Game] XP awarded:', amount, reason)
+        }
+    }
+    if (!window.GameEngine.supabaseClient) {
+        window.GameEngine.supabaseClient = supabase
+    }
+
+    await window.GameEngine.ensureGame(gameName)
+
+    var photoUrls = []
+    if (gameName === 'memoryCard') {
+        try {
+            var result = await supabase.from('photos').select('storage_path').limit(50)
+            var data = (result.data || [])
+            for (var i = data.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1))
+                var tmp = data[i]; data[i] = data[j]; data[j] = tmp
+            }
+            photoUrls = data.slice(0, 12).map(function (p) {
+                return getPhotoUrl(p.storage_path)
+            })
+        } catch (e) {
+            console.warn('[Game] Failed to fetch photos:', e)
+        }
+    }
+
+    var game = window.GameEngine.games[gameName]
+    if (!game) {
+        container.innerHTML = '<p style="text-align:center;padding:40px;color:#e05565;">游戏加载失败，请刷新页面重试</p>'
+        return
+    }
+
+    game.init(container, {
+        currentUser: currentUser,
+        photoUrls: photoUrls,
+        difficulty: 'normal',
+        supabase: supabase,
+        onScoreSubmit: function (scoreData) {
+            window.submitGameScore(gameName, scoreData)
+        }
+    })
+    game.start()
+    window._activeGame = game
+};
+
+window.closeGame = function () {
+    if (window._activeGame) {
+        window._activeGame.destroy()
+        window._activeGame = null
+    }
+    window.loadGameCenter()
+};
+
+window.submitGameScore = async function (gameName, scoreData) {
+    try {
+        // Normalize game name to snake_case for DB
+        var dbGameName = gameName.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')
+        await window.GameEngine.submitScore(dbGameName, scoreData)
+    } catch (e) {
+        console.warn('[Game] Score submit failed:', e)
+    }
+};
+
+window.loadGameLeaderboard = async function () {
+    var el = document.getElementById('gameLeaderboardContent')
+    if (!el) return
+    try {
+        var scores = await window.GameEngine.getLeaderboard('memory_card', 10)
+        if (!scores || scores.length === 0) {
+            el.innerHTML = '<p style="text-align:center;padding:20px;">还没有游戏记录，快来玩一局吧！</p>'
+            return
+        }
+        el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:14px;">' +
+            '<thead><tr style="border-bottom:1px solid var(--border);">' +
+            '<th style="padding:8px;text-align:left;">排名</th>' +
+            '<th style="text-align:left;">玩家</th>' +
+            '<th style="text-align:right;">得分</th>' +
+            '<th style="text-align:right;">步数</th>' +
+            '<th style="text-align:right;">用时</th>' +
+            '</tr></thead><tbody>' +
+            scores.map(function (s, i) {
+                var name = s.user_name === 'laoda' ? '老大' : (s.user_name === 'xiaodi' ? '小弟' : s.user_name)
+                var moves = (s.extra_data && s.extra_data.moves) ? s.extra_data.moves : '-'
+                var timeStr = (s.extra_data && s.extra_data.time_seconds) ? window.GameEngine.formatTime(s.extra_data.time_seconds) : '-'
+                return '<tr style="border-bottom:1px solid var(--border-light);">' +
+                    '<td style="padding:8px;">' + (i + 1) + '</td>' +
+                    '<td>' + name + '</td>' +
+                    '<td style="text-align:right;">' + s.score + '</td>' +
+                    '<td style="text-align:right;">' + moves + '</td>' +
+                    '<td style="text-align:right;">' + timeStr + '</td>' +
+                    '</tr>'
+            }).join('') + '</tbody></table>'
+    } catch (e) {
+        el.innerHTML = '<p style="text-align:center;padding:20px;color:var(--text-muted);">排行榜加载失败</p>'
+    }
+};

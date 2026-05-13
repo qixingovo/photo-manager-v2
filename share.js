@@ -21,12 +21,6 @@ function getPhotoUrl(storagePath) {
     return STORAGE_URL + storagePath;
 }
 
-function escapeHtml(str) {
-    var div = document.createElement('div');
-    div.textContent = str || '';
-    return div.innerHTML;
-}
-
 function showError(icon, title, message) {
     document.getElementById('shareContent').style.display = 'none';
     document.getElementById('shareError').style.display = 'block';
@@ -47,13 +41,17 @@ function showShareContent(album, photos) {
     container.innerHTML = '<div class="photo-grid">' +
         photos.map(function(p) {
             var imgSrc = getPhotoUrl(p.storage_path);
-            return '<div class="photo-card" onclick="window.open(\'' + escapeHtml(imgSrc) + '\', \'_blank\')">' +
-                '<img src="' + escapeHtml(imgSrc) + '" alt="' + escapeHtml(p.name || '') + '" loading="lazy">' +
+            var escSrc = CommonUtils.escapeHtml(imgSrc);
+            var escName = CommonUtils.escapeHtml(p.name || '未命名');
+            var escDesc = CommonUtils.escapeHtml(p.description || '');
+            var escLoc = p.location_name ? CommonUtils.escapeHtml(p.location_name) : '';
+            return '<div class="photo-card" onclick="window.open(\'' + escSrc + '\', \'_blank\')">' +
+                '<img src="' + escSrc + '" alt="' + CommonUtils.escapeHtml(p.name || '') + '" loading="lazy">' +
                 '<div class="photo-info">' +
-                '<h3>' + escapeHtml(p.name || '未命名') + '</h3>' +
-                '<p>' + escapeHtml(p.description || '') + '</p>' +
+                '<h3>' + escName + '</h3>' +
+                '<p>' + escDesc + '</p>' +
                 '<div class="photo-meta">' +
-                (p.location_name ? '<span class="photo-category">📍 ' + escapeHtml(p.location_name) + '</span>' : '') +
+                (escLoc ? '<span class="photo-category">📍 ' + escLoc + '</span>' : '') +
                 '</div></div></div>';
         }).join('') + '</div>';
 }

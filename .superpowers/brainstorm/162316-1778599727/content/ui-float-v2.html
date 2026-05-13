@@ -1,0 +1,72 @@
+<h2>忌口打卡 — 右侧小圆球浮窗</h2>
+<p class="subtitle">忌口窗口期内，首页右侧出现小圆球，平时不显示</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">平时 — 无圆球</div>
+    <div class="mockup-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div style="background:#F0F4FF;border-radius:10px;padding:14px;text-align:center;font-size:12px;">📸<br>照片</div>
+        <div style="background:#FFF5F0;border-radius:10px;padding:14px;text-align:center;font-size:12px;">🎮<br>游戏</div>
+        <div style="background:#F0FFF4;border-radius:10px;padding:14px;text-align:center;font-size:12px;">💬<br>碎碎念</div>
+        <div style="background:#FFF0F5;border-radius:10px;padding:14px;text-align:center;font-size:12px;">📅<br>纪念日</div>
+        <div style="background:#F5F0FF;border-radius:10px;padding:14px;text-align:center;font-size:12px;">🗺️<br>地图</div>
+        <div style="background:#FFF9F0;border-radius:10px;padding:14px;text-align:center;font-size:12px;">🩸<br>周期</div>
+      </div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">忌口窗口 — 右侧圆球浮窗</div>
+    <div class="mockup-body" style="position:relative;min-height:280px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div style="background:#F0F4FF;border-radius:10px;padding:14px;text-align:center;font-size:12px;">📸<br>照片</div>
+        <div style="background:#FFF5F0;border-radius:10px;padding:14px;text-align:center;font-size:12px;">🎮<br>游戏</div>
+        <div style="background:#F0FFF4;border-radius:10px;padding:14px;text-align:center;font-size:12px;">💬<br>碎碎念</div>
+        <div style="background:#FFF0F5;border-radius:10px;padding:14px;text-align:center;font-size:12px;">📅<br>纪念日</div>
+        <div style="background:#F5F0FF;border-radius:10px;padding:14px;text-align:center;font-size:12px;">🗺️<br>地图</div>
+        <div style="background:#FFF9F0;border-radius:10px;padding:14px;text-align:center;font-size:12px;">🩸<br>周期</div>
+      </div>
+      <!-- 右侧浮球 -->
+      <div style="position:absolute;top:50%;right:-4px;transform:translateY(-50%);width:52px;height:52px;background:linear-gradient(135deg,#FF8099,#E84A6B);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(232,74,107,0.35);cursor:pointer;z-index:10;">
+        <div style="text-align:center;line-height:1;">
+          <div style="font-size:20px;">🍽️</div>
+          <div style="font-size:9px;font-weight:700;color:#fff;">忌口</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:16px;">
+  <h3>打卡弹窗（点击圆球弹出）</h3>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">忌口打卡弹窗</div>
+  <div class="mockup-body" style="max-width:340px;margin:0 auto;">
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:40px;">🍽️</div>
+      <div style="font-weight:700;font-size:16px;color:#333;margin-top:4px;">今日忌口打卡</div>
+      <div style="font-size:12px;color:#999;">3 月 10 日 · 经期第 2 天</div>
+    </div>
+    <div style="background:#FFF5F5;border-radius:10px;padding:12px;margin-bottom:12px;">
+      <div style="font-size:12px;color:#999;margin-bottom:6px;">今日忌口清单</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <span style="background:#FFE0E6;color:#E84A6B;padding:4px 10px;border-radius:12px;font-size:12px;">🚫 冰的</span>
+        <span style="background:#FFE0E6;color:#E84A6B;padding:4px 10px;border-radius:12px;font-size:12px;">🚫 辣的</span>
+        <span style="background:#FFE0E6;color:#E84A6B;padding:4px 10px;border-radius:12px;font-size:12px;">🚫 咖啡</span>
+        <span style="background:#FFE0E6;color:#E84A6B;padding:4px 10px;border-radius:12px;font-size:12px;">🚫 酒</span>
+        <span style="background:#FFE0E6;color:#E84A6B;padding:4px 10px;border-radius:12px;font-size:12px;">🚫 生冷</span>
+        <span style="background:#FFE0E6;color:#E84A6B;padding:4px 10px;border-radius:12px;font-size:12px;">🚫 油炸</span>
+        <span style="background:#FFE0E6;color:#E84A6B;padding:4px 10px;border-radius:12px;font-size:12px;">🚫 奶茶</span>
+      </div>
+    </div>
+    <div style="margin-bottom:12px;">
+      <input class="mock-input" placeholder="说点什么...（可选）" style="width:100%;box-sizing:border-box;">
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="mock-button" style="flex:1;background:#f0f0f0;color:#666;">算了</button>
+      <button class="mock-button" style="flex:2;background:#E84A6B;color:#fff;">✅ 完成打卡 +30 XP</button>
+    </div>
+  </div>
+</div>

@@ -3,13 +3,15 @@
    缓存静态资源，支持离线访问
    ======================================== */
 
-const CACHE_NAME = 'photo-manager-v3';
+const CACHE_NAME = 'photo-manager-v4';
 
-// 需要预缓存的静态资源
+// 需要预缓存的静态资源（不包含版本化 JS，运行时缓存会自动覆盖）
 const STATIC_ASSETS = [
+    './index.html',
     './index-mobile.html',
+    './share.html',
+    './style.css',
     './mobile.css',
-    './mobile-app.js',
     './manifest.json',
     './icons/icon-192.png',
     './icons/icon-512.png',

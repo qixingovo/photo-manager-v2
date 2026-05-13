@@ -1,0 +1,85 @@
+<h2>日历页面设计</h2>
+<p class="subtitle">周期追踪主页：顶部状态条 + 月历 + 记录入口 + 历史列表</p>
+
+<div class="mockup">
+  <div class="mockup-header">移动端日历页面布局</div>
+  <div class="mockup-body">
+    <div style="max-width:375px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.1);">
+
+      <!-- 顶部周期信息卡 -->
+      <div style="background:linear-gradient(135deg,#e896a8,#f5a0b0);padding:16px;color:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:12px;opacity:0.9;">当前周期 · 第 8 天</div>
+            <div style="font-size:20px;font-weight:bold;">卵泡期</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:12px;opacity:0.9;">预计下次经期</div>
+            <div style="font-size:16px;font-weight:bold;">6月3日</div>
+            <div style="font-size:11px;opacity:0.8;">还有 23 天</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 月历 -->
+      <div style="padding:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <button style="background:#f0f0f0;border:none;border-radius:50%;width:28px;height:28px;">◀</button>
+          <span style="font-weight:bold;">2026年5月</span>
+          <button style="background:#f0f0f0;border:none;border-radius:50%;width:28px;height:28px;">▶</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:10px;color:#999;margin-bottom:4px;">
+          <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;font-size:12px;">
+          <span style="padding:6px 0;"></span><span style="padding:6px 0;"></span><span style="padding:6px 0;"></span>
+          <span style="padding:6px 0;"></span><span style="padding:6px 0;"></span>
+          <span style="padding:6px 0;color:#999;">1</span><span style="padding:6px 0;color:#999;">2</span>
+          <span style="padding:6px 0;">3</span><span style="padding:6px 0;">4</span><span style="padding:6px 0;">5</span>
+          <span style="background:#e896a8;color:#fff;border-radius:50%;width:28px;height:28px;line-height:28px;margin:0 auto;">6</span>
+          <span style="background:#d98092;color:#fff;border-radius:50%;width:28px;height:28px;line-height:28px;margin:0 auto;">7</span>
+          <span style="background:#e896a8;color:#fff;border-radius:50%;width:28px;height:28px;line-height:28px;margin:0 auto;">8</span>
+          <span style="padding:6px 0;">9</span><span style="padding:6px 0;">10</span>
+          <span style="border:2px dashed #e896a8;border-radius:50%;width:28px;height:28px;line-height:28px;margin:0 auto;color:#e896a8;">11</span>
+          <span style="padding:6px 0;">12</span><span style="padding:6px 0;">13</span><span style="padding:6px 0;">14</span><span style="padding:6px 0;">15</span>
+          <span style="padding:6px 0;">16</span><span style="padding:6px 0;">17</span><span style="padding:6px 0;">18</span><span style="padding:6px 0;">19</span>
+          <span style="padding:6px 0;">20</span><span style="padding:6px 0;">21</span><span style="padding:6px 0;">22</span>
+          <span style="padding:6px 0;">23</span><span style="padding:6px 0;">24</span><span style="padding:6px 0;">25</span><span style="padding:6px 0;">26</span>
+          <span style="padding:6px 0;">27</span><span style="padding:6px 0;">28</span><span style="padding:6px 0;">29</span>
+          <span style="padding:6px 0;">30</span><span style="padding:6px 0;">31</span>
+        </div>
+        <div style="display:flex;gap:16px;padding:8px 0;font-size:10px;color:#666;">
+          <span>🟣 经期</span><span>⭕ 预测经期</span><span>💧 排卵期</span>
+        </div>
+      </div>
+
+      <!-- 记录今日按钮 -->
+      <div style="padding:0 12px 12px;">
+        <button style="width:100%;padding:12px;background:linear-gradient(135deg,#e896a8,#f5a0b0);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:bold;">
+          📝 记录今天
+        </button>
+      </div>
+
+      <!-- 近期记录列表 -->
+      <div style="border-top:1px solid #f0e0e0;padding:12px;">
+        <div style="font-size:13px;font-weight:bold;color:#666;margin-bottom:8px;">📋 近期记录</div>
+        <div style="border-left:2px solid #e896a8;padding-left:12px;margin-bottom:12px;">
+          <div style="font-size:11px;color:#999;">5月8日</div>
+          <div style="font-size:13px;">经期第3天 · 流量中</div>
+          <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;">
+            <span style="background:#fff0f0;color:#e896a8;padding:2px 8px;border-radius:10px;font-size:10px;">😣 痛经</span>
+            <span style="background:#fff0f0;color:#e896a8;padding:2px 8px;border-radius:10px;font-size:10px;">😴 疲劳</span>
+          </div>
+          <div style="font-size:11px;color:#999;margin-top:2px;">备注：喝了红糖姜茶</div>
+        </div>
+        <div style="border-left:2px solid #e896a8;padding-left:12px;">
+          <div style="font-size:11px;color:#999;">5月6日</div>
+          <div style="font-size:13px;">经期开始 · 流量少</div>
+          <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;">
+            <span style="background:#fff0f0;color:#e896a8;padding:2px 8px;border-radius:10px;font-size:10px;">😣 痛经</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

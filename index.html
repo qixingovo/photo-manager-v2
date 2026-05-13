@@ -11,11 +11,12 @@
         window.location.href = 'index-mobile.html';
     }
     </script>
-    <link rel="stylesheet" href="style.css?v=39">
+    <link rel="stylesheet" href="style.css?v=45">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="config.js"></script>
+    <script src="common.js?v=1"></script>
 </head>
 <body>
     <!-- 登录页面 -->
@@ -129,6 +130,11 @@
             <div class="nav-section" onclick="window.toggleSection('timeCapsule')" title="时光胶囊">
                 <span class="nav-icon">⏳</span>
                 <span class="nav-text">时光胶囊</span>
+            </div>
+            <div class="nav-divider"></div>
+            <div class="nav-section" onclick="window.toggleSection('gameCenter')" title="游戏中心">
+                <span class="nav-icon">🎮</span>
+                <span class="nav-text">游戏中心</span>
             </div>
             <div class="nav-divider"></div>
             <div class="nav-section" onclick="window.refreshData()" title="刷新">
@@ -357,6 +363,7 @@
         </section>
 
         <button onclick="window.handleLogout()" class="btn btn-secondary" style="position:fixed;top:20px;right:20px;z-index:100;">退出登录</button>
+<button class="theme-toggle-btn" onclick="window.toggleDesktopTheme()" title="切换主题">🎨</button>
 
         <!-- 对方喜好档案 -->
         <section id="partnerProfileSection" style="display:none;" class="feature-section">
@@ -424,6 +431,22 @@
             </div>
             <div id="timeCapsuleList" class="time-capsule-list">
                 <p style="text-align:center;color:#999;padding:40px;">加载中...</p>
+            </div>
+        </section>
+
+        <!-- 游戏中心 -->
+        <section class="feature-section" id="gameCenterSection" style="display:none;">
+            <h2>🎮 游戏中心</h2>
+            <div id="gameHubView">
+                <div id="gameCardsGrid" class="game-center-grid"></div>
+                <div style="margin-top:24px;">
+                    <h3>🏆 排行榜</h3>
+                    <div id="gameLeaderboardContent" style="margin-top:8px;color:var(--text-muted);"></div>
+                </div>
+            </div>
+            <div id="gamePlayArea" style="display:none;">
+                <button class="btn btn-secondary" onclick="window.closeGame()" style="margin-bottom:12px;">← 返回游戏中心</button>
+                <div id="gameContainer"></div>
             </div>
         </section>
 
@@ -622,6 +645,11 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="app.js?v=55"></script>
+    <link rel="stylesheet" href="games/games.css?v=1">
+    <script src="games/game-engine.js"></script>
+    <script src="games/memory-card.js?v=1"></script>
+    <script src="games/chinese-chess.js?v=1"></script>
+    <script src="games/reversi.js?v=1"></script>
+    <script type="module" src="app.js?v=59"></script>
 </body>
 </html>

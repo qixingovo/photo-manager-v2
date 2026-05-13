@@ -1,0 +1,273 @@
+/* ========================================
+   Mini-Games Styles
+   ======================================== */
+
+/* -------- Game Center Hub -------- */
+.game-center-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.game-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--card-bg-alt);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: box-shadow var(--transition), transform var(--transition);
+}
+.game-card:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
+}
+.game-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+.game-card.disabled:hover {
+  box-shadow: none;
+}
+.game-card-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+.game-card-info {
+  flex: 1;
+  min-width: 0;
+}
+.game-card-title {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.game-card-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.game-card-badge {
+  font-size: 10px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* -------- Game HUD -------- */
+.game-hud {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-light);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.game-hud-item {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* -------- Memory Card Grid -------- */
+.memory-grid {
+  display: grid;
+  gap: 10px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* -------- Memory Card -------- */
+.memory-card {
+  aspect-ratio: 1 / 1;
+  perspective: 600px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.memory-card.matched {
+  cursor: default;
+}
+
+.memory-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.4s ease;
+  transform-style: preserve-3d;
+}
+.memory-card.flipped .memory-card-inner {
+  transform: rotateY(180deg);
+}
+
+.memory-card-front,
+.memory-card-back {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-sm);
+  backface-visibility: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.memory-card-back {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: white;
+  font-size: 28px;
+  border: 2px solid var(--primary-dark);
+}
+
+.memory-card-front {
+  background: var(--card-bg);
+  border: 2px solid var(--border);
+  transform: rotateY(180deg);
+}
+
+.memory-card.matched .memory-card-front {
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3);
+}
+
+.memory-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.memory-card-emoji {
+  font-size: 36px;
+}
+
+.memory-card.no-photo .memory-card-front {
+  background: var(--card-bg-alt);
+}
+
+/* -------- Memory Difficulty Selector -------- */
+.memory-difficulty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+/* -------- Game Complete Overlay -------- */
+.game-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: gameFadeIn 0.3s ease;
+}
+@keyframes gameFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.game-complete {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  padding: 32px 40px;
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: var(--shadow-lg);
+}
+
+.game-complete-stats {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin: 12px 0;
+}
+.game-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.game-stat-val {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.game-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* -------- Mobile overrides -------- */
+@media (max-width: 480px) {
+  .game-center-grid {
+    grid-template-columns: 1fr;
+  }
+  .memory-grid {
+    gap: 6px;
+  }
+  .game-hud {
+    gap: 10px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  .game-hud-item {
+    font-size: 13px;
+  }
+  .memory-card-back {
+    font-size: 20px;
+  }
+  .memory-card-emoji {
+    font-size: 24px;
+  }
+  .game-complete {
+    padding: 24px 20px;
+  }
+  .game-complete-stats {
+    gap: 12px;
+  }
+  .game-stat-val {
+    font-size: 20px;
+  }
+}
+
+/* -------- Chinese Chess -------- */
+.cc-canvas {
+  display: block;
+  margin: 0 auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.cc-captured-area {
+  min-width: 60px;
+  max-width: 100px;
+}
+.cc-captured-pieces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 4px;
+  line-height: 1.2;
+}
+@media (max-width: 480px) {
+  .cc-captured-area {
+    min-width: 40px;
+    max-width: 60px;
+  }
+  .cc-captured-pieces {
+    font-size: 14px;
+    gap: 1px;
+  }
+}
