@@ -2994,3 +2994,33 @@ body.dark .period-info-card {
 .dietary-title-track { padding: 12px 0; }
 .dietary-title-count { font-size: 14px; color: #666; margin-bottom: 12px; text-align: center; }
 .dietary-title-count strong { color: #E84A6B; font-size: 20px; }
+
+/* ========================================
+   页面切换加载动画
+   ======================================== */
+.page-loading-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255,255,255,0.6);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+.page-loading-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+.page-loading-spinner {
+    width: 36px; height: 36px;
+    border: 3px solid #f0f0f0;
+    border-top-color: #E84A6B;
+    border-radius: 50%;
+    animation: pageLoadingSpin 0.7s linear infinite;
+}
+@keyframes pageLoadingSpin {
+    to { transform: rotate(360deg); }
+}

@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=74">
+    <link rel="stylesheet" href="mobile.css?v=75">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -15,6 +15,11 @@
     <script src="common.js?v=1"></script>
 </head>
 <body>
+    <!-- 页面切换加载遮罩 -->
+    <div id="pageLoadingOverlay" class="page-loading-overlay">
+        <div class="page-loading-spinner"></div>
+    </div>
+
     <!-- ========== 登录页面 ========== -->
     <div id="loginPage" class="page active">
         <div class="login-card">

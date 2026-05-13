@@ -1041,6 +1041,25 @@ const mobile = {
         bar.classList.remove('active');
     },
 
+    _showPageLoading() {
+        var self = this;
+        if (this._pageLoadingTimer) return;
+        this._pageLoadingTimer = setTimeout(function() {
+            self._pageLoadingTimer = null;
+            var overlay = document.getElementById('pageLoadingOverlay');
+            if (overlay) overlay.classList.add('active');
+        }, 200);
+    },
+
+    _hidePageLoading() {
+        if (this._pageLoadingTimer) {
+            clearTimeout(this._pageLoadingTimer);
+            this._pageLoadingTimer = null;
+        }
+        var overlay = document.getElementById('pageLoadingOverlay');
+        if (overlay) overlay.classList.remove('active');
+    },
+
     _renderFloatingBall() {
         var ball = document.getElementById('dietaryFloatingBall');
         if (!ball) return;
@@ -1076,74 +1095,93 @@ const mobile = {
             });
         } else if (tab === 'photos') {
             this.showPage('photos');
+            this._showPageLoading();
             this._ensureModule('photos').then(() => {
                 this.updateCategorySelects();
                 if (this.updateCategoryPathDisplay) this.updateCategoryPathDisplay();
                 this.renderPhotos();
-            });
+            }).finally(() => this._hidePageLoading());
         } else if (tab === 'upload') {
             this.showPage('upload');
-            this._ensureModule('photos').then(() => this.renderUploadCategoryCascade());
+            this._showPageLoading();
+            this._ensureModule('photos').then(() => this.renderUploadCategoryCascade()).finally(() => this._hidePageLoading());
         } else if (tab === 'category') {
             this.showPage('category');
-            this._ensureModule('categories').then(() => this.renderCategories());
+            this._showPageLoading();
+            this._ensureModule('categories').then(() => this.renderCategories()).finally(() => this._hidePageLoading());
         } else if (tab === 'map') {
             this.showPage('map');
-            this._ensureModule('map').then(() => this.initMapView());
+            this._showPageLoading();
+            this._ensureModule('map').then(() => this.initMapView()).finally(() => this._hidePageLoading());
         } else if (tab === 'timeline') {
             this.showPage('timeline');
-            this._ensureModule('timeline').then(() => this.initTimeline());
+            this._showPageLoading();
+            this._ensureModule('timeline').then(() => this.initTimeline()).finally(() => this._hidePageLoading());
         } else if (tab === 'collage') {
             this.showPage('collage');
+            this._showPageLoading();
             this._ensureModule('extras').then(() => {
                 this.loadAllPhotoCategories().then(() => this.renderMobileCollageCategorySelect());
-            });
+            }).finally(() => this._hidePageLoading());
         } else if (tab === 'achievements') {
             this.showPage('achievements');
-            this._ensureModule('extras').then(() => this.loadAchievements());
+            this._showPageLoading();
+            this._ensureModule('extras').then(() => this.loadAchievements()).finally(() => this._hidePageLoading());
         } else if (tab === 'albums') {
             this.showPage('albums');
-            this._ensureModule('albums').then(() => this.loadAlbums());
+            this._showPageLoading();
+            this._ensureModule('albums').then(() => this.loadAlbums()).finally(() => this._hidePageLoading());
         } else if (tab === 'periodTracker') {
             this.showPage('periodTracker');
+            this._showPageLoading();
             var self = this;
             var now = new Date();
             this._periodCalendarYear = now.getFullYear();
             this._periodCalendarMonth = now.getMonth() + 1;
-            this._ensureModule('extras').then(() => self.loadPeriodTracker());
+            this._ensureModule('extras').then(() => self.loadPeriodTracker()).finally(() => this._hidePageLoading());
         } else if (tab === 'gameCenter') {
             this.showPage('gameCenter');
-            this._ensureModule('extras').then(() => this.loadGameCenter());
+            this._showPageLoading();
+            this._ensureModule('extras').then(() => this.loadGameCenter()).finally(() => this._hidePageLoading());
         } else if (tab === 'passport') {
             this.showPage('passport');
-            this._ensureModule('map').then(() => this.loadPassport());
+            this._showPageLoading();
+            this._ensureModule('map').then(() => this.loadPassport()).finally(() => this._hidePageLoading());
         } else if (tab === 'moodDiary') {
             this.showPage('moodDiary');
-            this._ensureModule('diary').then(() => this.loadMoodDiary());
+            this._showPageLoading();
+            this._ensureModule('diary').then(() => this.loadMoodDiary()).finally(() => this._hidePageLoading());
         } else if (tab === 'dailyChatter') {
             this.showPage('dailyChatter');
-            this._ensureModule('diary').then(() => this.loadDailyChatter());
+            this._showPageLoading();
+            this._ensureModule('diary').then(() => this.loadDailyChatter()).finally(() => this._hidePageLoading());
         } else if (tab === 'intimateRecords') {
             this.showPage('intimateRecords');
-            this._ensureModule('records').then(() => this.checkIntimateLock());
+            this._showPageLoading();
+            this._ensureModule('records').then(() => this.checkIntimateLock()).finally(() => this._hidePageLoading());
         } else if (tab === 'coupleTasks') {
             this.showPage('coupleTasks');
-            this._ensureModule('records').then(() => this.loadCoupleTasks());
+            this._showPageLoading();
+            this._ensureModule('records').then(() => this.loadCoupleTasks()).finally(() => this._hidePageLoading());
         } else if (tab === 'profile') {
             this.showPage('profile');
             this.updateProfile();
         } else if (tab === 'partnerProfile') {
             this.showPage('partnerProfile');
-            this._ensureModule('records').then(() => this.loadPartnerProfile());
+            this._showPageLoading();
+            this._ensureModule('records').then(() => this.loadPartnerProfile()).finally(() => this._hidePageLoading());
         } else if (tab === 'secretNote') {
             this.showPage('secretNote');
-            this._ensureModule('extras').then(() => this.loadSecretNoteInbox());
+            this._showPageLoading();
+            this._ensureModule('extras').then(() => this.loadSecretNoteInbox()).finally(() => this._hidePageLoading());
         } else if (tab === 'emotionTimeline') {
             this.showPage('emotionTimeline');
-            this._ensureModule('timeline').then(() => this.loadEmotionTimeline());
+            this._showPageLoading();
+            this._ensureModule('timeline').then(() => this.loadEmotionTimeline()).finally(() => this._hidePageLoading());
         } else if (tab === 'timeCapsule') {
             this.showPage('timeCapsule');
-            this._ensureModule('extras').then(() => this.loadTimeCapsules());
+            this._showPageLoading();
+            this._ensureModule('extras').then(() => this.loadTimeCapsules()).finally(() => this._hidePageLoading());
         }
     },
 
