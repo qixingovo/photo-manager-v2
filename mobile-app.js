@@ -16,11 +16,10 @@ const FEATURE_CARD_CONFIG = {
     coupleTasks:     { id:'coupleTasks', icon:'✅', title:'情侣打卡',   sub:'一起完成100件事',  gradient:'linear-gradient(135deg,#FFF3E0,#FFE8CC)' },
     map:             { id:'map', icon:'🗺️', title:'我们的地图',  sub:'走过的地方',        gradient:'linear-gradient(135deg,#E8F5E9,#C8E6C9)' },
     emotionTimeline: { id:'emotionTimeline', icon:'📜', title:'情感时间轴', sub:'纪念日·时光胶囊',  gradient:'linear-gradient(135deg,#FFF8E1,#FFECB3)' },
-    periodTracker:   { id:'periodTracker', icon:'🩸', title:'周期追踪', sub:'经期记录与预测',   gradient:'linear-gradient(135deg,#FFE0E6,#FFD4DD)' },
-    gameCenter:      { id:'gameCenter', icon:'🎮', title:'游戏中心', sub:'记忆翻牌',           gradient:'linear-gradient(135deg,#E8F5E9,#C8E6C9)' }
+    periodTracker:   { id:'periodTracker', icon:'🩸', title:'周期追踪', sub:'经期记录与预测',   gradient:'linear-gradient(135deg,#FFE0E6,#FFD4DD)' }
 };
 
-const DEFAULT_FEATURE_CARD_ORDER = ['moodDiary','dailyChatter','coupleTasks','map','emotionTimeline','periodTracker','gameCenter'];
+const DEFAULT_FEATURE_CARD_ORDER = ['moodDiary','dailyChatter','coupleTasks','map','emotionTimeline','periodTracker'];
 
 const mobile = {
     // 状态
