@@ -1121,7 +1121,7 @@ const mobile = {
             this.showPage('collage');
             this._showPageLoading();
             this._ensureModule('extras').then(() => {
-                this.loadAllPhotoCategories().then(() => this.renderMobileCollageCategorySelect());
+                return this.loadAllPhotoCategories().then(() => this.renderMobileCollageCategorySelect());
             }).finally(() => this._hidePageLoading());
         } else if (tab === 'achievements') {
             this.showPage('achievements');
