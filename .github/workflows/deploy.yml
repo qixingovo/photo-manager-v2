@@ -15,5 +15,6 @@ jobs:
           key: ${{ secrets.ECS_KEY }}
           source: "."
           target: "/var/www/photo-manager/"
-          rm: true
+          rm: false
+          overwrite: true
           strip_components: 0
