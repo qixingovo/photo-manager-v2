@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="favicon-192.png">
     <title>📷 照片分类管理</title>
     <meta name="theme-color" content="#A8D8EA">
     <link rel="manifest" href="manifest.json">
@@ -11,12 +13,12 @@
         window.location.href = 'index-mobile.html';
     }
     </script>
-    <link rel="stylesheet" href="style.css?v=45">
+    <link rel="stylesheet" href="style.css?v=46">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="config.js"></script>
-    <script src="common.js?v=1"></script>
+    <script src="config.js?v=2"></script>
+    <script src="common.js?v=mp8lpeav"></script>
 </head>
 <body>
     <!-- 登录页面 -->
@@ -31,7 +33,7 @@
                 </div>
                 <div class="form-group">
                     <label for="loginPassword">密码</label>
-                    <input type="password" id="loginPassword" required placeholder="请输入密码">
+                    <input type="password" id="loginPassword" required placeholder="请输入密码" autocomplete="current-password">
                 </div>
                 <button type="submit" class="btn btn-primary btn-block">登录</button>
                 <p id="loginError" class="login-error"></p>
@@ -334,7 +336,7 @@
                     <div class="lock-icon">🔐</div>
                     <h3 id="intimateLockTitle">设置密码</h3>
                     <p class="lock-hint" id="intimateLockHint">首次使用，请设置一个密码</p>
-                    <input type="password" id="intimatePasswordInput" class="lock-input" placeholder="输入密码">
+                    <input type="password" id="intimatePasswordInput" class="lock-input" placeholder="输入密码" autocomplete="current-password">
                     <button class="btn btn-primary lock-btn" onclick="window.handleIntimatePassword()">确认</button>
                     <p id="intimateLockError" class="lock-error"></p>
                 </div>
@@ -364,6 +366,7 @@
 
         <button onclick="window.handleLogout()" class="btn btn-secondary" style="position:fixed;top:20px;right:20px;z-index:100;">退出登录</button>
 <button class="theme-toggle-btn" onclick="window.toggleDesktopTheme()" title="切换主题">🎨</button>
+<button onclick="window.openChangePasswordModal()" class="btn btn-secondary" style="position:fixed;top:20px;right:120px;z-index:100;">🔑 修改密码</button>
 
         <!-- 对方喜好档案 -->
         <section id="partnerProfileSection" style="display:none;" class="feature-section">
@@ -644,12 +647,37 @@
         </div>
     </div>
 
+    <!-- 修改密码弹窗 -->
+    <div id="changePasswordModal" class="modal" style="display:none;">
+        <div class="modal-content modal-small">
+            <span class="modal-close" onclick="window.closeChangePasswordModal()">&times;</span>
+            <h3>修改密码</h3>
+            <form id="changePasswordForm" onsubmit="window.handleChangePassword(event)">
+                <div class="form-group">
+                    <label for="oldPassword">当前密码</label>
+                    <input type="password" id="oldPassword" required autocomplete="current-password">
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">新密码</label>
+                    <input type="password" id="newPassword" required minlength="4" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">确认新密码</label>
+                    <input type="password" id="confirmPassword" required minlength="4" autocomplete="new-password">
+                </div>
+                <p id="changePasswordError" style="color:#dc2626;font-size:13px;display:none;"></p>
+                <p id="changePasswordSuccess" style="color:#059669;font-size:13px;display:none;">密码修改成功</p>
+                <button type="submit" class="btn btn-primary">确认修改</button>
+            </form>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="games/games.css?v=1">
     <script src="games/game-engine.js"></script>
     <script src="games/memory-card.js?v=1"></script>
     <script src="games/chinese-chess.js?v=1"></script>
     <script src="games/reversi.js?v=1"></script>
-    <script type="module" src="app.js?v=59"></script>
+    <script type="module" src="app.js?v=mp8lpeav"></script>
 </body>
 </html>

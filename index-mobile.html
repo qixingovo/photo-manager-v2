@@ -6,13 +6,15 @@
     <title>📷 回忆</title>
     <meta name="theme-color" content="#A8D8EA">
     <meta name="mobile-web-app-capable" content="yes">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="favicon-192.png">
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="mobile.css?v=75">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="config.js"></script>
-    <script src="common.js?v=1"></script>
+    <script src="config.js?v=2"></script>
+    <script src="common.js?v=mp8lpeav"></script>
 </head>
 <body>
     <!-- 页面切换加载遮罩 -->
@@ -33,7 +35,7 @@
                     <input type="text" id="loginUsername" placeholder="账号" required>
                 </div>
                 <div class="input-group">
-                    <input type="password" id="loginPassword" placeholder="密码" required>
+                    <input type="password" id="loginPassword" placeholder="密码" required autocomplete="current-password">
                 </div>
                 <p id="loginError" class="error-msg"></p>
                 <button type="submit" class="btn-primary">登录</button>
@@ -619,7 +621,7 @@
                 <div class="lock-icon">🔐</div>
                 <h3 id="mobileIntimateLockTitle">设置密码</h3>
                 <p class="lock-hint" id="mobileIntimateLockHint">首次使用，请设置一个密码</p>
-                <input type="password" id="mobileIntimatePasswordInput" class="lock-input" placeholder="输入密码">
+                <input type="password" id="mobileIntimatePasswordInput" class="lock-input" placeholder="输入密码" autocomplete="current-password">
                 <button class="btn-primary lock-btn" onclick="mobile.handleIntimatePassword()">确认</button>
                 <p id="mobileIntimateLockError" class="lock-error"></p>
             </div>
@@ -696,6 +698,11 @@
             <div class="menu-item" onclick="mobile.switchTab('intimateRecords')">
                 <span class="menu-icon">🔒</span>
                 <span class="menu-text">亲密记录</span>
+                <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item" onclick="mobile.openChangePasswordModal()">
+                <span class="menu-icon">🔑</span>
+                <span class="menu-text">修改密码</span>
                 <span class="menu-arrow">›</span>
             </div>
             <div class="menu-item" onclick="mobile.showSettings()">
@@ -840,7 +847,7 @@
     <script src="games/memory-card.js?v=1"></script>
     <script src="games/chinese-chess.js?v=1"></script>
     <script src="games/reversi.js?v=1"></script>
-    <script type="module" src="mobile-app.js?v=76"></script>
+    <script type="module" src="mobile-app.js?v=mp8lpeav"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;
@@ -855,5 +862,33 @@
             });
         }
     </script>
+
+    <!-- 修改密码弹窗 -->
+    <div id="changePasswordMobileModal" class="modal" style="display:none;">
+        <div class="modal-content" style="margin:20px;padding:24px;background:#fff;border-radius:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h3 style="margin:0;font-size:18px;">修改密码</h3>
+                <button onclick="mobile.closeChangePasswordModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;">&times;</button>
+            </div>
+            <form onsubmit="mobile.handleChangePassword(event)">
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">当前密码</label>
+                    <input type="password" id="oldPasswordMobile" required autocomplete="current-password" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:16px;">
+                </div>
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">新密码</label>
+                    <input type="password" id="newPasswordMobile" required minlength="4" autocomplete="new-password" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:16px;">
+                </div>
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">确认新密码</label>
+                    <input type="password" id="confirmPasswordMobile" required minlength="4" autocomplete="new-password" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:16px;">
+                </div>
+                <p id="changePasswordMobileError" style="color:#dc2626;font-size:13px;display:none;"></p>
+                <p id="changePasswordMobileSuccess" style="color:#059669;font-size:13px;display:none;">密码修改成功</p>
+                <button type="submit" style="width:100%;padding:12px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:600;">确认修改</button>
+            </form>
+        </div>
+    </div>
+
 </body>
 </html>

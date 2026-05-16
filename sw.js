@@ -1,11 +1,11 @@
 /* ========================================
-   Service Worker - 照片管理系统
+   Service Worker - 照片管理系统 v5
    缓存静态资源，支持离线访问
    ======================================== */
 
-const CACHE_NAME = 'photo-manager-v4';
+const CACHE_NAME = 'photo-manager-v5';
 
-// 需要预缓存的静态资源（不包含版本化 JS，运行时缓存会自动覆盖）
+// 需要预缓存的静态资源
 const STATIC_ASSETS = [
     './index.html',
     './index-mobile.html',
@@ -24,7 +24,6 @@ self.addEventListener('install', (event) => {
             return cache.addAll(STATIC_ASSETS);
         })
     );
-    // 立即激活，不等待旧 SW 失效
     self.skipWaiting();
 });
 
@@ -40,18 +39,23 @@ self.addEventListener('activate', (event) => {
         )
     );
     self.clients.claim();
-    // 通知所有页面刷新以使用新缓存
     self.clients.matchAll().then(clients => {
         clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
     });
 });
 
-// 请求拦截：区分静态资源与动态请求
+// 请求拦截
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
-    // Supabase API / 存储请求 / CDN：直接走网络，不缓存
-    if (url.hostname.includes('supabase') || url.hostname.includes('jsdelivr')) {
+    // API 请求（/rest/, /auth/, /storage/）：直接走网络，不缓存
+    if (url.pathname.startsWith('/rest/') || url.pathname.startsWith('/auth/') || url.pathname.startsWith('/storage/')) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
+    // CDN：直接走网络，不缓存
+    if (url.hostname.includes('jsdelivr') || url.hostname.includes('unpkg')) {
         event.respondWith(fetch(event.request));
         return;
     }
@@ -62,32 +66,33 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // GET 请求：优先从缓存读取，缓存未命中时请求网络并写入缓存
-    event.respondWith(
-        caches.match(event.request).then((cached) => {
-            if (cached) return cached;
-
-            return fetch(event.request)
+    // HTML 文件：网络优先（确保总是拿到最新版本）
+    if (event.request.destination === 'document') {
+        event.respondWith(
+            fetch(event.request)
                 .then((response) => {
-                    // 只缓存成功的响应
                     if (response.ok) {
                         const clone = response.clone();
                         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
                     }
                     return response;
                 })
-                .catch(() => {
-                    // 离线且缓存未命中时，尝试返回移动端主页作为兜底
-                    if (event.request.destination === 'document') {
-                        return caches.match('./index-mobile.html').then((fallback) => {
-                            return fallback || new Response('暂无网络，请检查网络连接后重试', {
-                                status: 503,
-                                headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-                            });
-                        });
-                    }
-                    return new Response('', { status: 503 });
-                });
+                .catch(() => caches.match(event.request))
+        );
+        return;
+    }
+
+    // 其他静态资源：缓存优先，网络更新
+    event.respondWith(
+        caches.match(event.request).then((cached) => {
+            const fetchPromise = fetch(event.request).then((response) => {
+                if (response.ok) {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                }
+                return response;
+            });
+            return cached || fetchPromise;
         })
     );
 });

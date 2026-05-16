@@ -1,6 +1,7 @@
 // app.js — 桌面版入口：导入 main.js（状态 + 初始化）+ 各视图模块
 import './src/desktop/main.js';
 import { supabase } from './src/core/supabase.js';
+import './games/games.css';
 
 // 视图模块（side-effect 导入，自动注册 window.* 函数）
 import './src/desktop/views/auth.js';
@@ -101,28 +102,7 @@ let coupleCheckins = []
 let currentTaskTab = 'tasks'
 const INTIMATE_STORAGE_KEY = 'intimate_unlocked'
 
-// Supabase 配置（从外部配置文件读取）
-const APP_CONFIG = window.__APP_CONFIG__ || {}
-const SUPABASE_URL = APP_CONFIG.SUPABASE_URL || ''
-const SUPABASE_ANON_KEY = APP_CONFIG.SUPABASE_ANON_KEY || ''
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    document.body.innerHTML = `
-        <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:#f5f6f8;">
-            <div style="max-width:540px;width:100%;background:#fff;border:1px solid #eee;border-radius:12px;padding:20px;color:#333;line-height:1.6;">
-                <h2 style="margin:0 0 8px 0;">配置缺失</h2>
-                <p style="margin:0;">请先创建 <code>config.js</code> 并设置 <code>SUPABASE_URL</code> 与 <code>SUPABASE_ANON_KEY</code>，可参考 <code>config.example.js</code>。</p>
-            </div>
-        </div>
-    `
-    throw new Error('缺少 Supabase 配置，请在 config.js 中设置 SUPABASE_URL 和 SUPABASE_ANON_KEY')
-}
-
-// 直接初始化 Supabase（CDN 脚本是同步加载的）
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { persistSession: true, storage: window.localStorage, autoRefreshToken: true, detectSessionInUrl: true }
-});
-const USER_EMAIL_MAP = APP_CONFIG.USER_EMAILS || { laoda: 'laoda@couple.local', xiaodi: 'xiaodi@couple.local' };
+const APP_CONFIG = window.__APP_CONFIG__ || {};
 let currentUser = null;
 
 const escapeHtml = CommonUtils.escapeHtml;

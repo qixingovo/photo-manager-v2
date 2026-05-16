@@ -1,4 +1,37 @@
 import { defineConfig } from 'vite'
+import fs from 'fs'
+import path from 'path'
+
+// Custom plugin to copy static non-module files to dist/
+function copyStaticFiles() {
+  const filesToCopy = [
+    'common.js',
+    'config.js',
+    'games/game-engine.js',
+    'games/memory-card.js',
+    'games/chinese-chess.js',
+    'games/reversi.js'
+  ]
+
+  return {
+    name: 'copy-static-files',
+    closeBundle() {
+      const distDir = path.resolve(__dirname, 'dist')
+      filesToCopy.forEach(file => {
+        const src = path.resolve(__dirname, file)
+        const dest = path.resolve(distDir, file)
+        if (fs.existsSync(src)) {
+          const destDir = path.dirname(dest)
+          if (!fs.existsSync(destDir)) {
+            fs.mkdirSync(destDir, { recursive: true })
+          }
+          fs.copyFileSync(src, dest)
+          console.log(`  复制: ${file}`)
+        }
+      })
+    }
+  }
+}
 
 export default defineConfig({
   base: './',
@@ -29,5 +62,6 @@ export default defineConfig({
         secure: false
       }
     }
-  }
+  },
+  plugins: [copyStaticFiles()]
 })

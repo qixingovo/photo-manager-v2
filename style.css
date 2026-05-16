@@ -323,7 +323,14 @@ select { cursor: pointer; }
     align-items: center;
 }
 
-#searchInput { width: 220px; }
+.photos-controls select,
+.photos-controls button {
+    margin: 0;
+    height: 38px;
+    line-height: 1.2;
+}
+
+#searchInput { width: 220px; height: 38px; }
 
 .photo-grid {
     display: grid;
