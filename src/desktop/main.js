@@ -80,12 +80,12 @@ window.toggleDesktopTheme = function() {
 };
 
 // ========== 辅助函数 ==========
-function isLaodaFromSession(session) {
+export function isLaodaFromSession(session) {
     var role = session?.role;
     return role === 'laoda';
 }
 
-async function loadBirthdayConfig() {
+export async function loadBirthdayConfig() {
     try {
         var _a = await supabase.from('app_settings').select('value').eq('key', 'birthday_config').single();
         var data = _a.data;
@@ -103,21 +103,21 @@ async function loadBirthdayConfig() {
     }
 }
 
-function isBirthdayToday() {
+export function isBirthdayToday() {
     if (!birthdayConfig) return false;
     var today = new Date();
     return today.getMonth() + 1 === birthdayConfig.month && today.getDate() === birthdayConfig.day;
 }
 
 // ========== 页面显示控制 ==========
-function showLoginPage() {
+export function showLoginPage() {
     var loginEl = document.getElementById('loginPage');
     var mainEl = document.getElementById('mainContainer');
     if (loginEl) loginEl.style.display = '';
     if (mainEl) mainEl.style.display = 'none';
 }
 
-function showMainApp() {
+export function showMainApp() {
     var loginEl = document.getElementById('loginPage');
     var mainEl = document.getElementById('mainContainer');
     if (loginEl) loginEl.style.display = 'none';
