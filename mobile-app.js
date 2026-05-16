@@ -3,11 +3,14 @@
    Typeform 风格移动端应用
    ======================================== */
 
+import { supabase, USER_EMAIL_MAP, getUserFromSession as _getUserFromSession } from './src/core/supabase.js';
+import { escapeHtml, sha256, getRelativeTime, formatFileSize, formatRelativeTime, highlightKeywords, safeBigint, generateShareToken, getCategoryAndChildrenIds as _getCatChildrenIds, getCategoryPath as _getCatPath, getDefaultMilestones, EMOTION_TYPES, MOOD_EMOJIS, DIETARY_RESTRICTIONS } from './src/core/utils.js';
+import { loadPhotos as _loadPhotos, toggleFavorite as _toggleFavorite, deletePhoto as _deletePhoto, updatePhoto as _updatePhoto, loadAllPhotoCategories as _loadAllPhotoCategories, batchDeletePhotos as _batchDeletePhotos } from './src/core/photo-service.js';
+import { loadCategories as _loadCategories, createCategory as _createCategory, deleteCategory as _deleteCategory } from './src/core/category-service.js';
+
 const APP_CONFIG = window.__APP_CONFIG__ || {};
 // 生产环境禁用 debug 日志（设置 DEBUG=true 可开启）
 if (!APP_CONFIG.DEBUG) { console.log = () => {}; }
-
-var EMOTION_TYPES = CommonUtils.EMOTION_TYPES;
 
 // 首页功能卡片配置（6 张，3×2 网格，可编辑排序）
 const FEATURE_CARD_CONFIG = {
@@ -110,24 +113,20 @@ const mobile = {
     _partnerProfileEditing: false,
 
     // Supabase 配置（从外部配置文件读取）
-    SUPABASE_URL: APP_CONFIG.SUPABASE_URL || '',
-    SUPABASE_KEY: APP_CONFIG.SUPABASE_ANON_KEY || '',
     STORAGE_URL: APP_CONFIG.SUPABASE_STORAGE_URL || (APP_CONFIG.SUPABASE_URL ? `${APP_CONFIG.SUPABASE_URL}/storage/v1/object/public/photo/` : ''),
-    USER_EMAIL_MAP: APP_CONFIG.USER_EMAILS || { laoda: 'laoda@couple.local', xiaodi: 'xiaodi@couple.local' },
 
-    escapeHtml: CommonUtils.escapeHtml,
-    sha256: CommonUtils.sha256,
-    safeBigint: CommonUtils.safeBigint,
-    highlightKeywords: CommonUtils.highlightKeywords,
-    formatRelativeTime: CommonUtils.formatRelativeTime,
-    getRelativeTime: CommonUtils.getRelativeTime,
-    formatFileSize: CommonUtils.formatFileSize,
-    generateShareToken: CommonUtils.generateShareToken,
-    getDefaultMilestones: CommonUtils.getDefaultMilestones,
-    getCategoryAndChildrenIds: function (id) { return CommonUtils.getCategoryAndChildrenIds(id, this.categories); },
-    getCategoryPath: function (id) { return CommonUtils.getCategoryPath(id, this.categories, 'name'); },
-
-    supabase: null,
+    escapeHtml,
+    sha256,
+    safeBigint,
+    highlightKeywords,
+    formatRelativeTime,
+    getRelativeTime,
+    formatFileSize,
+    generateShareToken,
+    getDefaultMilestones,
+    getUserFromSession: _getUserFromSession,
+    getCategoryAndChildrenIds: function (id) { return _getCatChildrenIds(id, this.categories); },
+    getCategoryPath: function (id) { return _getCatPath(id, this.categories, 'name'); },
 
     // 周期追踪状态
     _periodCalendarYear: null,
@@ -146,24 +145,9 @@ const mobile = {
     _loadedModules: {},
     _MODULE_VERSION: '2',
 
-    // 初始化 Supabase 客户端
+    // 初始化 Supabase 客户端（委托给 src/core/supabase.js）
     initSupabase() {
-        if (!this.SUPABASE_URL || !this.SUPABASE_KEY) {
-            console.error('缺少 Supabase 配置，请在 config.js 中设置 SUPABASE_URL 和 SUPABASE_ANON_KEY');
-            return null;
-        }
-
-        if (!this.supabase) {
-            // 等待 window.supabase 可用
-            if (typeof window.supabase === 'undefined') {
-                console.error('Supabase CDN 未加载');
-                return null;
-            }
-            this.supabase = window.supabase.createClient(this.SUPABASE_URL, this.SUPABASE_KEY, {
-                auth: { persistSession: true, storage: window.localStorage, autoRefreshToken: true, detectSessionInUrl: true }
-            });
-        }
-        return this.supabase;
+        return supabase;
     },
 
     getUserFromSession(session) {
@@ -254,8 +238,8 @@ const mobile = {
 
     async _syncThemeToDB() {
         try {
-            if (!window.supabase || !this.currentUser) return;
-            await window.supabase.from('app_settings').upsert({
+            if (!this.currentUser) return;
+            await supabase.from('app_settings').upsert({
                 key: 'mobile_color_theme',
                 value: JSON.stringify({
                     color_theme: this.currentColorTheme,
@@ -324,7 +308,18 @@ const mobile = {
     // ========================================
     // 生日彩蛋
     // ========================================
-    loadBirthdayConfig() {
+    async loadBirthdayConfig() {
+        try {
+            const client = this.initSupabase();
+            if (client) {
+                const { data } = await client.from('app_settings').select('value').eq('key', 'birthday_config').single();
+                if (data && data.value) {
+                    this.birthdayConfig = JSON.parse(data.value);
+                    localStorage.setItem('birthday_config', JSON.stringify(this.birthdayConfig));
+                    return;
+                }
+            }
+        } catch (e) { /* DB fail, fallback */ }
         try {
             this.birthdayConfig = JSON.parse(localStorage.getItem('birthday_config') || 'null');
             if (!this.birthdayConfig) {
@@ -336,19 +331,24 @@ const mobile = {
     },
 
     isBirthdayToday() {
-        this.loadBirthdayConfig();
         if (!this.birthdayConfig) return false;
         const today = new Date();
         return today.getMonth() + 1 === this.birthdayConfig.month && today.getDate() === this.birthdayConfig.day;
     },
 
-    saveBirthdayConfig(config) {
+    async saveBirthdayConfig(config) {
         this.birthdayConfig = config;
         localStorage.setItem('birthday_config', JSON.stringify(config));
+        try {
+            const client = this.initSupabase();
+            if (client) {
+                await client.from('app_settings').upsert({ key: 'birthday_config', value: JSON.stringify(config) }, { onConflict: 'key' });
+            }
+        } catch (e) { /* DB fail, localStorage still has it */ }
     },
 
-    showBirthdayWelcomeOverlay() {
-        this.loadBirthdayConfig();
+    async showBirthdayWelcomeOverlay() {
+        await this.loadBirthdayConfig();
         const cfg = this.birthdayConfig || { month: 6, day: 22, name: '老大' };
         const monthOptions = [1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}" ${m === cfg.month ? 'selected' : ''}>${m}月</option>`).join('');
         const dayOptions = Array.from({length: 31}, (_, i) => i + 1).map(d => `<option value="${d}" ${d === cfg.day ? 'selected' : ''}>${d}日</option>`).join('');
@@ -389,11 +389,11 @@ const mobile = {
         this.loadData().catch(err => console.error('加载数据失败:', err));
     },
 
-    updateBirthdayConfigMobile() {
+    async updateBirthdayConfigMobile() {
         const monthEl = document.getElementById('mobileBirthdayMonth');
         const dayEl = document.getElementById('mobileBirthdayDay');
         if (!monthEl || !dayEl) return;
-        this.saveBirthdayConfig({ month: parseInt(monthEl.value), day: parseInt(dayEl.value), name: '老大' });
+        await this.saveBirthdayConfig({ month: parseInt(monthEl.value), day: parseInt(dayEl.value), name: '老大' });
     },
 
     toggleBirthdayMusicMobile(e) {
@@ -502,7 +502,7 @@ const mobile = {
             const { data: profile } = await client.from('profiles')
                 .select('username, role').eq('user_id', session.user.id).single();
             if (profile) {
-                this.currentUser = this.getUserFromSession({ username: profile.username, role: profile.role });
+                this.currentUser = _getUserFromSession({ username: profile.username, role: profile.role });
                 this.showPage('home');
                 this.renderFeatureCards();
                 this._renderFloatingBall();
@@ -538,7 +538,7 @@ const mobile = {
             return;
         }
 
-        const email = this.USER_EMAIL_MAP[account];
+        const email = USER_EMAIL_MAP[account];
         if (!email) {
             errorEl.textContent = '账号不存在';
             return;
@@ -571,10 +571,11 @@ const mobile = {
             return;
         }
 
-        this.currentUser = this.getUserFromSession({ username: profile.username, role: profile.role });
+        this.currentUser = _getUserFromSession({ username: profile.username, role: profile.role });
         errorEl.textContent = '';
 
         // 老大生日彩蛋
+        await this.loadBirthdayConfig();
         if (this.currentUser.isLaoda && this.isBirthdayToday()) {
             this.showBirthdayWelcomeOverlay();
             return;
@@ -599,6 +600,52 @@ const mobile = {
         if (client) await client.auth.signOut();
         this.showPage('login');
         this.showToast('已退出登录');
+    },
+
+    openChangePasswordModal() {
+        document.getElementById('oldPasswordMobile').value = '';
+        document.getElementById('newPasswordMobile').value = '';
+        document.getElementById('confirmPasswordMobile').value = '';
+        document.getElementById('changePasswordMobileError').style.display = 'none';
+        document.getElementById('changePasswordMobileSuccess').style.display = 'none';
+        document.getElementById('changePasswordMobileModal').style.display = 'flex';
+    },
+
+    closeChangePasswordModal() {
+        document.getElementById('changePasswordMobileModal').style.display = 'none';
+    },
+
+    async handleChangePassword(e) {
+        e.preventDefault();
+        const oldPwd = document.getElementById('oldPasswordMobile').value;
+        const newPwd = document.getElementById('newPasswordMobile').value;
+        const confirmPwd = document.getElementById('confirmPasswordMobile').value;
+        const errorEl = document.getElementById('changePasswordMobileError');
+        const successEl = document.getElementById('changePasswordMobileSuccess');
+        errorEl.style.display = 'none';
+        successEl.style.display = 'none';
+
+        if (newPwd !== confirmPwd) { errorEl.textContent = '两次输入的新密码不一致'; errorEl.style.display = 'block'; return; }
+        if (newPwd.length < 4) { errorEl.textContent = '新密码至少4个字符'; errorEl.style.display = 'block'; return; }
+
+        const saved = JSON.parse(localStorage.getItem('pm2_session') || '{}');
+        const token = saved?.access_token;
+        if (!token) { errorEl.textContent = '未登录，请刷新后重试'; errorEl.style.display = 'block'; return; }
+
+        try {
+            const supabaseUrl = window.__APP_CONFIG__?.SUPABASE_URL || '';
+            const res = await fetch(supabaseUrl + '/auth/v1/user/password', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ oldPassword: oldPwd, newPassword: newPwd })
+            });
+            const data = await res.json();
+            if (!res.ok) { errorEl.textContent = data.error || '修改失败'; errorEl.style.display = 'block'; return; }
+            successEl.style.display = 'block';
+            setTimeout(() => this.closeChangePasswordModal(), 1500);
+        } catch (err) {
+            errorEl.textContent = '网络错误，请重试'; errorEl.style.display = 'block';
+        }
     },
 
     // ========================================
@@ -841,8 +888,8 @@ const mobile = {
         this._featureCardOrder = [...order];
         localStorage.setItem('featureCardOrder', JSON.stringify(order));
         try {
-            if (window.supabase && this.currentUser) {
-                await window.supabase.from('app_settings').upsert({
+            if (this.currentUser) {
+                await supabase.from('app_settings').upsert({
                     key: 'feature_card_order',
                     value: JSON.stringify(order)
                 }, { onConflict: 'key' });
@@ -853,8 +900,8 @@ const mobile = {
     // 从 Supabase 加载卡片顺序（登录后调用）
     async _loadFeatureCardOrderFromServer() {
         try {
-            if (!window.supabase || !this.currentUser) return;
-            const { data } = await window.supabase.from('app_settings')
+            if (!this.currentUser) return;
+            const { data } = await supabase.from('app_settings')
                 .select('value').eq('key', 'feature_card_order').maybeSingle();
             if (data?.value) {
                 const order = JSON.parse(data.value);
@@ -1209,15 +1256,7 @@ const mobile = {
 
     async loadCategories() {
         try {
-            const response = await fetch(`${this.SUPABASE_URL}/rest/v1/categories?select=*&order=id.asc`, {
-                headers: {
-                    'apikey': this.SUPABASE_KEY,
-                    'Authorization': `Bearer ${this.SUPABASE_KEY}`
-                }
-            });
-            if (response.ok) {
-                this.categories = await response.json();
-            }
+            this.categories = await _loadCategories();
         } catch (error) {
             console.warn('加载分类失败，使用空列表:', error);
             this.categories = [];
