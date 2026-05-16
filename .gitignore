@@ -3,4 +3,5 @@ dist/
 .env
 .DS_Store
 config.js
+src/core/config.js
 .vercel

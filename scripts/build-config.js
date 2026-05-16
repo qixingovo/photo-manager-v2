@@ -1,7 +1,25 @@
-// This script generates config.js from environment variables during deployment.
-// Set these in your Vercel project settings → Environment Variables
+// 从 .env 或系统环境变量读取配置，生成 src/core/config.js
 const fs = require('fs')
 const path = require('path')
+
+// 尝试从 .env 文件加载（本地开发用）
+function loadEnvFile() {
+    const envPath = path.join(__dirname, '..', '.env')
+    if (fs.existsSync(envPath)) {
+        const content = fs.readFileSync(envPath, 'utf8')
+        content.split('\n').forEach(line => {
+            const trimmed = line.trim()
+            if (!trimmed || trimmed.startsWith('#')) return
+            const eqIdx = trimmed.indexOf('=')
+            if (eqIdx > 0) {
+                const key = trimmed.substring(0, eqIdx).trim()
+                const value = trimmed.substring(eqIdx + 1).trim()
+                if (!process.env[key]) process.env[key] = value
+            }
+        })
+    }
+}
+loadEnvFile()
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
@@ -9,9 +27,11 @@ const SUPABASE_STORAGE_URL = process.env.SUPABASE_STORAGE_URL || ''
 const PEPPER = process.env.PEPPER || ''
 const USER_EMAILS_LAODA = process.env.USER_EMAILS_LAODA || ''
 const USER_EMAILS_XIAODI = process.env.USER_EMAILS_XIAODI || ''
+const DEBUG = process.env.DEBUG || 'false'
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.error('错误：请在 Vercel 项目设置中配置环境变量 SUPABASE_URL 和 SUPABASE_ANON_KEY')
+    console.error('错误：缺少环境变量 SUPABASE_URL 和 SUPABASE_ANON_KEY')
+    console.error('请复制 .env.example 为 .env 并填入实际值')
     process.exit(1)
 }
 
@@ -36,38 +56,29 @@ if (USER_EMAILS_LAODA && USER_EMAILS_XIAODI) {
     lines.push(`    }`)
 }
 
+if (DEBUG === 'true') {
+    lines.push(`    DEBUG: true`)
+}
+
 lines.push(`}`)
 
 const content = lines.join('\n') + '\n'
-const outputPath = path.join(__dirname, '..', 'config.js')
+const outputDir = path.join(__dirname, '..', 'src', 'core')
+if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true })
+const outputPath = path.join(outputDir, 'config.js')
 fs.writeFileSync(outputPath, content, 'utf8')
-console.log('config.js 已生成')
+console.log('src/core/config.js 已生成')
 
-// Auto-bump JS version numbers in HTML for cache busting
+// Auto-bump version numbers in HTML for cache busting
 const BUILD_VERSION = Date.now().toString(36)
 const htmlFiles = ['index.html', 'index-mobile.html']
 htmlFiles.forEach(file => {
     const htmlPath = path.join(__dirname, '..', file)
+    if (!fs.existsSync(htmlPath)) return
     let html = fs.readFileSync(htmlPath, 'utf8')
     html = html.replace(/(app\.js\?v=)\w+/g, '$1' + BUILD_VERSION)
     html = html.replace(/(mobile-app\.js\?v=)\w+/g, '$1' + BUILD_VERSION)
+    html = html.replace(/(common\.js\?v=)\w+/g, '$1' + BUILD_VERSION)
     fs.writeFileSync(htmlPath, html, 'utf8')
     console.log(`${file} 版本号已更新 → ${BUILD_VERSION}`)
-})
-
-// Auto-bump module version constant in mobile-app.js for lazy-loaded module cache busting
-const mobileAppPath = path.join(__dirname, '..', 'mobile-app.js')
-let mobileApp = fs.readFileSync(mobileAppPath, 'utf8')
-mobileApp = mobileApp.replace(/_MODULE_VERSION: '[^']*'/, "_MODULE_VERSION: '" + BUILD_VERSION + "'")
-fs.writeFileSync(mobileAppPath, mobileApp, 'utf8')
-console.log(`mobile-app.js module version → ${BUILD_VERSION}`)
-
-// Auto-bump common.js version in HTML
-const commonVersion = BUILD_VERSION
-htmlFiles.forEach(file => {
-    const htmlPath = path.join(__dirname, '..', file)
-    let html = fs.readFileSync(htmlPath, 'utf8')
-    html = html.replace(/(common\.js\?v=)\w+/g, '$1' + commonVersion)
-    fs.writeFileSync(htmlPath, html, 'utf8')
-    console.log(`${file} common.js 版本号已更新 → ${commonVersion}`)
 })
