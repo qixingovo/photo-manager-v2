@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Architecture review — photo-manager-v2</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+  </script>
+  <style>
+    .seam { stroke-dasharray: 4 4; }
+    .leak { stroke: #dc2626; }
+    .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+    .shallow-marker { border-left: 3px solid #f59e0b; }
+  </style>
+</head>
+<body class="bg-stone-50 text-slate-900 font-sans">
+  <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+    <!-- HEADER -->
+    <header class="space-y-2">
+      <h1 class="text-3xl font-bold font-serif">photo-manager-v2</h1>
+      <p class="text-sm text-slate-500">Architecture review — 2026-05-26</p>
+      <div class="flex gap-6 text-xs text-slate-400 pt-2">
+        <span><span class="inline-block w-3 h-3 border-2 border-slate-800 bg-slate-800 rounded-sm mr-1"></span> module</span>
+        <span><span class="inline-block w-3 h-3 border-2 border-dashed border-slate-400 rounded-sm mr-1"></span> seam</span>
+        <span><span class="inline-block w-3 h-3 border-2 border-red-500 rounded-sm mr-1"></span> leakage</span>
+        <span><span class="inline-block w-3 h-3 bg-slate-900 rounded-sm mr-1 deep"></span> deep module</span>
+        <span><span class="inline-block w-3 h-3 border-l-2 border-amber-400 rounded-sm mr-1"></span> shallow</span>
+      </div>
+    </header>
+
+    <!-- CANDIDATE 1: Bifurcated Architecture -->
+    <section id="candidates" class="space-y-10">
+      <article class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+        <div class="flex items-center gap-3">
+          <h2 class="text-xl font-bold font-serif">1. Eliminate the bifurcated service layer</h2>
+          <span class="px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 rounded-full">Strong</span>
+          <span class="px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-full">in-process</span>
+        </div>
+        <div class="text-xs font-mono text-slate-400">src/core/photo-service.js  ·  src/core/category-service.js  ·  mobile-app.js  ·  modules/*.js</div>
+
+        <!-- Diagram -->
+        <div class="rounded-lg border border-slate-200 bg-white p-4">
+          <pre class="mermaid">
+            flowchart LR
+              subgraph B["BEFORE: Bifurcated"]
+                direction TB
+                CORE["src/core/&lt;br/&gt;photo-service.js&lt;br/&gt;category-service.js&lt;br/&gt;storage-service.js"]
+                MOBILE["mobile-app.js&lt;br/&gt;(2058 lines)&lt;br/&gt;reimplements all queries inline"]
+                MODS["modules/&lt;br/&gt;(6656 lines)&lt;br/&gt;bypass src/core/ entirely"]
+                CORE -.->|"dead imports&lt;br/&gt;(never called)"| MOBILE
+                MOBILE -->|"Object.assign"| MODS
+              end
+
+              subgraph A["AFTER: Single service layer"]
+                direction TB
+                SRV["src/core/&lt;br/&gt;photo-service  ·  category-service&lt;br/&gt;storage-service"]
+                MBL["mobile-app.js + modules/&lt;br/&gt;delegate to src/core/"]
+                SRV -->|"single call path"| MBL
+              end
+
+              classDef dead stroke:#dc2626,stroke-dasharray:4 4;
+              class CORE dead;
+          </pre>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 text-sm">
+          <div class="shallow-marker pl-3">
+            <p class="font-medium">Problem</p>
+            <p class="text-slate-500 text-xs">Two parallel code paths for the same database operations. mobile-app.js imports photo-service.js but reimplements loadPhotos, toggleFavorite, loadAllPhotoCategories inline — imports are dead code.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Solution</p>
+            <p class="text-slate-500 text-xs">Make mobile-app.js delegate all data access through src/core/ services. Delete the inline reimplementations.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Wins</p>
+            <ul class="text-xs text-slate-500 list-disc pl-4 space-y-0.5">
+              <li>locality: one place to fix data bugs</li>
+              <li>~200 lines deleted from mobile-app.js</li>
+              <li>single seam for Supabase calls</li>
+              <li>dead imports eliminated</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <!-- CANDIDATE 2: God Object -->
+      <article class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+        <div class="flex items-center gap-3">
+          <h2 class="text-xl font-bold font-serif">2. Extract auth & theme from the god object</h2>
+          <span class="px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 rounded-full">Strong</span>
+          <span class="px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-full">in-process</span>
+        </div>
+        <div class="text-xs font-mono text-slate-400">mobile-app.js:27–2057  ·  modules/  ·  src/core/supabase.js</div>
+
+        <!-- Cross-section diagram -->
+        <div class="rounded-lg border border-slate-200 bg-white p-4">
+          <div class="flex gap-6">
+            <!-- BEFORE -->
+            <div class="flex-1">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before: God object (2058 lines, 96 methods, 80 state fields)</p>
+              <div class="space-y-0.5 text-[10px]">
+                <div class="h-3 bg-amber-100 border-l-2 border-amber-400" title="auth"></div>
+                <div class="h-3 bg-amber-100 border-l-2 border-amber-400" title="auth"></div>
+                <div class="h-3 bg-blue-100 border-l-2 border-blue-400" title="photo CRUD"></div>
+                <div class="h-3 bg-blue-100 border-l-2 border-blue-400" title="photo CRUD"></div>
+                <div class="h-3 bg-green-100 border-l-2 border-green-400" title="category"></div>
+                <div class="h-3 bg-green-100 border-l-2 border-green-400" title="category"></div>
+                <div class="h-3 bg-purple-100 border-l-2 border-purple-400" title="theme"></div>
+                <div class="h-3 bg-purple-100 border-l-2 border-purple-400" title="theme"></div>
+                <div class="h-3 bg-purple-100 border-l-2 border-purple-400" title="theme"></div>
+                <div class="h-3 bg-pink-100 border-l-2 border-pink-400" title="birthday"></div>
+                <div class="h-3 bg-pink-100 border-l-2 border-pink-400" title="birthday"></div>
+                <div class="h-3 bg-pink-100 border-l-2 border-pink-400" title="birthday"></div>
+                <div class="h-3 bg-pink-100 border-l-2 border-pink-400" title="birthday"></div>
+                <div class="h-3 bg-orange-100 border-l-2 border-orange-400" title="avatar"></div>
+                <div class="h-3 bg-orange-100 border-l-2 border-orange-400" title="avatar"></div>
+                <div class="h-3 bg-orange-100 border-l-2 border-orange-400" title="avatar"></div>
+                <div class="h-3 bg-teal-100 border-l-2 border-teal-400" title="feature-cards"></div>
+                <div class="h-3 bg-teal-100 border-l-2 border-teal-400" title="feature-cards"></div>
+                <div class="h-3 bg-gray-100 border-l-2 border-gray-400" title="navigation"></div>
+                <div class="h-3 bg-gray-100 border-l-2 border-gray-400" title="navigation"></div>
+                <div class="h-3 bg-gray-100 border-l-2 border-gray-400" title="navigation"></div>
+                <div class="h-3 bg-red-100 border-l-2 border-red-400" title="pagination"></div>
+                <div class="h-3 bg-red-100 border-l-2 border-red-400" title="pagination"></div>
+                <div class="h-3 bg-red-100 border-l-2 border-red-400" title="pagination"></div>
+                <div class="h-3 bg-indigo-100 border-l-2 border-indigo-400" title="detail-viewer"></div>
+                <div class="h-3 bg-indigo-100 border-l-2 border-indigo-400" title="detail-viewer"></div>
+                <div class="h-3 bg-indigo-100 border-l-2 border-indigo-400" title="detail-viewer"></div>
+                <div class="h-3 bg-amber-100 border-l-2 border-amber-400" title="lazy-loader"></div>
+                <div class="h-3 bg-amber-100 border-l-2 border-amber-400" title="lazy-loader"></div>
+                <div class="h-3 bg-amber-100 border-l-2 border-amber-400" title="lazy-loader"></div>
+              </div>
+              <p class="text-[9px] text-slate-400 mt-1">17 responsibilities, one object</p>
+            </div>
+            <!-- AFTER -->
+            <div class="flex-1">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">After: Extracted modules</p>
+              <div class="space-y-2 text-[10px]">
+                <div class="h-14 deep text-white rounded flex items-center justify-center font-medium text-xs" title="auth-module">auth module</div>
+                <div class="h-8 bg-blue-900 text-white rounded flex items-center justify-center font-medium text-xs" title="photo-crud">photo CRUD</div>
+                <div class="h-8 bg-green-900 text-white rounded flex items-center justify-center font-medium text-xs" title="category">category</div>
+                <div class="h-6 bg-purple-900 text-white rounded flex items-center justify-center font-medium text-xs" title="theme">theme</div>
+                <div class="h-6 bg-pink-900 text-white rounded flex items-center justify-center font-medium text-xs" title="birthday">birthday</div>
+                <div class="h-5 bg-gray-800 text-white rounded flex items-center justify-center font-medium text-xs" title="nav">navigation</div>
+              </div>
+              <p class="text-[9px] text-slate-400 mt-1">6 focused modules, clear seams</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 text-sm">
+          <div class="shallow-marker pl-3">
+            <p class="font-medium">Problem</p>
+            <p class="text-slate-500 text-xs">Auth (login/logout/password change, ~150 lines), theme (dark/warm/blue, ~100 lines), and birthday easter egg (~120 lines) are tangled into the 2058-line god object. These are self-contained concerns with no cross-dependencies.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Solution</p>
+            <p class="text-slate-500 text-xs">Extract auth-module.js, theme-module.js, birthday-module.js. Each takes a reference to mobile (not the full object). Loadable via the existing _ensureModule mechanism.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Wins</p>
+            <ul class="text-xs text-slate-500 list-disc pl-4 space-y-0.5">
+              <li>mobile-app.js drops ~370 lines</li>
+              <li>locality: auth bugs isolated to auth-module</li>
+              <li>each module testable independently</li>
+              <li>consistent with existing lazy-load pattern</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <!-- CANDIDATE 3: Shallow Services -->
+      <article class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+        <div class="flex items-center gap-3">
+          <h2 class="text-xl font-bold font-serif">3. Deepen photo-service and storage-service</h2>
+          <span class="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">Worth exploring</span>
+          <span class="px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-full">in-process</span>
+        </div>
+        <div class="text-xs font-mono text-slate-400">src/core/photo-service.js (84 lines, 9 exports)  ·  src/core/storage-service.js (17 lines, 2 exports)</div>
+
+        <!-- Mass diagram -->
+        <div class="rounded-lg border border-slate-200 bg-white p-4">
+          <div class="flex gap-8">
+            <div class="flex-1 text-center">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">photo-service.js: interface = implementation</p>
+              <div class="inline-flex gap-1">
+                <div class="w-12 bg-amber-100 border border-amber-300 rounded" style="height:140px" title="9 exports">
+                  <div class="text-[9px] text-center mt-1 text-amber-700">interface</div>
+                  <div class="text-[9px] text-center text-amber-600">9 exports</div>
+                </div>
+                <div class="w-12 bg-amber-50 border border-amber-200 rounded" style="height:140px" title="mostly pass-through">
+                  <div class="text-[9px] text-center mt-1 text-amber-600">impl</div>
+                  <div class="text-[9px] text-center text-amber-500">~10% logic</div>
+                </div>
+              </div>
+              <p class="text-[9px] text-slate-400 mt-1">shallow: interface nearly as tall as implementation</p>
+            </div>
+            <div class="flex-1 text-center">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">storage-service.js: pass-through</p>
+              <div class="inline-flex gap-1">
+                <div class="w-12 bg-amber-100 border border-amber-300 rounded" style="height:56px" title="2 exports">
+                  <div class="text-[9px] text-center mt-1 text-amber-700">interface</div>
+                  <div class="text-[9px] text-center text-amber-600">2 exports</div>
+                </div>
+                <div class="w-12 bg-amber-50 border border-amber-200 rounded" style="height:56px" title="string concat only">
+                  <div class="text-[9px] text-center mt-1 text-amber-600">impl</div>
+                  <div class="text-[9px] text-center text-amber-500">0% logic</div>
+                </div>
+              </div>
+              <p class="text-[9px] text-slate-400 mt-1">shallow: delegates entirely to supabase SDK</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 text-sm">
+          <div class="shallow-marker pl-3">
+            <p class="font-medium">Problem</p>
+            <p class="text-slate-500 text-xs">photo-service exports 9 functions but only 1 (loadPhotos) has meaningful logic; the rest are single-line supabase delegation. storage-service's uploadFile is a pass-through wrapper. Both fail the deletion test: if removed, callers just call supabase directly with no complexity increase.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Solution</p>
+            <p class="text-slate-500 text-xs">Merge photo-service into a single deep module with a narrower interface. Inline storage-service — its 2 exports provide zero leverage. Add error normalization, retry logic, and cache invalidation behind the seam.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Wins</p>
+            <ul class="text-xs text-slate-500 list-disc pl-4 space-y-0.5">
+              <li>interface shrinks 9→4 entry points</li>
+              <li>leverage: error handling, retry, cache at the seam</li>
+              <li>storage-service: deletion test passed — remove it</li>
+              <li>locality: all Supabase photo calls behind one seam</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <!-- CANDIDATE 4: Duplicated Category Tree -->
+      <article class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+        <div class="flex items-center gap-3">
+          <h2 class="text-xl font-bold font-serif">4. Deduplicate category tree traversal</h2>
+          <span class="px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 rounded-full">Strong</span>
+          <span class="px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-full">in-process</span>
+        </div>
+        <div class="text-xs font-mono text-slate-400">src/core/category-service.js:15-38  ·  src/core/utils.js  ·  mobile-app.js:128</div>
+
+        <!-- Before: two modules, same tree logic -->
+        <div class="rounded-lg border border-slate-200 bg-white p-4">
+          <pre class="mermaid">
+            flowchart LR
+              subgraph B["BEFORE: Duplicated tree algorithms"]
+                direction TB
+                CS["category-service.js&lt;br/&gt;getCategoryAndChildrenIds&lt;br/&gt;getCategoryPath"]
+                UT["utils.js&lt;br/&gt;getCategoryAndChildrenIds&lt;br/&gt;getCategoryPath"]
+                MBL["mobile-app.js&lt;br/&gt;wraps both as convenience methods"]
+                CS -.->|identical logic| UT
+                UT --> MBL
+                CS --> MBL
+              end
+
+              subgraph A["AFTER: Single source of truth"]
+                direction TB
+                CAT["category-service.js&lt;br/&gt;getCategoryAndChildrenIds&lt;br/&gt;getCategoryPath&lt;br/&gt;getCategories"]
+                UTL["utils.js&lt;br/&gt;(pure utility functions only)"]
+                MB["mobile-app.js&lt;br/&gt;(delegates to category-service)"]
+                CAT --> UTL
+                CAT --> MB
+              end
+
+              classDef duplicate stroke:#dc2626,stroke-dasharray:4 4;
+              class CS,UT duplicate;
+          </pre>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 text-sm">
+          <div class="shallow-marker pl-3">
+            <p class="font-medium">Problem</p>
+            <p class="text-slate-500 text-xs">getCategoryAndChildrenIds and getCategoryPath exist identically in both category-service.js and utils.js. Two implementations of the same recursive tree algorithm. Fix a bug — have to fix it twice.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Solution</p>
+            <p class="text-slate-500 text-xs">Remove the duplicates from utils.js. category-service.js is the single source of truth for category tree operations. utils.js retains pure stateless functions only.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Wins</p>
+            <ul class="text-xs text-slate-500 list-disc pl-4 space-y-0.5">
+              <li>locality: one place to fix tree bugs</li>
+              <li>~30 lines deleted from utils.js</li>
+              <li>deletion test: remove duplicates, nothing breaks</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <!-- CANDIDATE 5: Modal Factory -->
+      <article class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+        <div class="flex items-center gap-3">
+          <h2 class="text-xl font-bold font-serif">5. Shared modal factory</h2>
+          <span class="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">Worth exploring</span>
+          <span class="px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-full">in-process</span>
+        </div>
+        <div class="text-xs font-mono text-slate-400">modules/photos-module.js  ·  modules/diary-module.js  ·  modules/records-module.js  ·  modules/albums-module.js  ·  modules/extras-module.js</div>
+
+        <div class="rounded-lg border border-slate-200 bg-white p-4">
+          <div class="flex gap-4">
+            <!-- Before: 7+ copies of identical modal code -->
+            <div class="flex-1">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before: 7+ modules each create modals by hand</p>
+              <div class="space-y-1 text-[9px] font-mono">
+                <div class="p-1 bg-slate-100 rounded">createElement('div')</div>
+                <div class="p-1 bg-slate-100 rounded">className = 'modal-overlay'</div>
+                <div class="p-1 bg-slate-100 rounded">innerHTML = `&lt;div class="modal-card"&gt;...`</div>
+                <div class="p-1 bg-slate-100 rounded">appendChild(modal)</div>
+                <div class="p-1 bg-slate-100 rounded">zIndex = '1000'</div>
+                <p class="text-slate-400 mt-2">↑ repeated verbatim in every module</p>
+              </div>
+            </div>
+            <!-- After: one factory -->
+            <div class="flex-1">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">After: one modal factory at the seam</p>
+              <div class="space-y-1 text-[9px] font-mono">
+                <div class="p-2 deep text-white rounded text-center">modalFactory.show({<br/>  title, body, actions<br/>})</div>
+                <p class="text-slate-400 mt-2">↑ single interface, ~40 lines saved per modal</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 text-sm">
+          <div class="shallow-marker pl-3">
+            <p class="font-medium">Problem</p>
+            <p class="text-slate-500 text-xs">Every module reimplements modal creation: createElement, set className, build innerHTML template, append to body, manage z-index. ~15 duplicate modal implementations across 7 modules.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Solution</p>
+            <p class="text-slate-500 text-xs">Add modalFactory to mobile-app.js with a single interface: show({title, body, actions}), close(). Modules call mobile.showModal(...) instead of building DOM manually.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Wins</p>
+            <ul class="text-xs text-slate-500 list-disc pl-4 space-y-0.5">
+              <li>leverage: one interface, 15+ call sites</li>
+              <li>locality: modal z-index/layout at one seam</li>
+              <li>fix modal bug once, every module benefits</li>
+              <li>~200 lines deleted across modules</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <!-- CANDIDATE 6: Desktop View Pass-through -->
+      <article class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+        <div class="flex items-center gap-3">
+          <h2 class="text-xl font-bold font-serif">6. Desktop views: collapse window.* + export duality</h2>
+          <span class="px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-full">Speculative</span>
+          <span class="px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-full">in-process</span>
+        </div>
+        <div class="text-xs font-mono text-slate-400">src/desktop/views/*.js (12 files)  ·  app.js (2734 lines)  ·  src/desktop/main.js (189 lines)</div>
+
+        <!-- Cross-section -->
+        <div class="rounded-lg border border-slate-200 bg-white p-4">
+          <div class="flex gap-6">
+            <div class="flex-1 text-center">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before: Dual registration per view</p>
+              <div class="inline-flex flex-col gap-1 items-center">
+                <div class="w-40 py-1 bg-amber-50 border border-amber-200 rounded text-[10px] text-center">window.getPhotoUrl = ...</div>
+                <div class="w-40 py-1 bg-amber-50 border border-amber-200 rounded text-[10px] text-center">window.openDetail = ...</div>
+                <div class="w-40 py-1 bg-amber-50 border border-amber-200 rounded text-[10px] text-center">window.toggleFavorite = ...</div>
+                <p class="text-[9px] text-slate-400">152× window.* assignments</p>
+                <div class="h-0.5 w-full bg-dashed border-t border-dashed border-slate-300 my-1"></div>
+                <div class="w-40 py-1 bg-blue-50 border border-blue-200 rounded text-[10px] text-center">export function getPhotoUrl</div>
+                <div class="w-40 py-1 bg-blue-50 border border-blue-200 rounded text-[10px] text-center">export function openDetail</div>
+                <div class="w-40 py-1 bg-blue-50 border border-blue-200 rounded text-[10px] text-center">export function toggleFavorite</div>
+                <p class="text-[9px] text-slate-400">40× export statements</p>
+              </div>
+            </div>
+            <div class="flex-1 text-center">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">After: Single registration pattern</p>
+              <div class="inline-flex flex-col gap-1 items-center">
+                <div class="w-40 py-2 deep text-white rounded text-[10px] text-center">export manager = {<br/>getPhotoUrl,<br/>openDetail,<br/>toggleFavorite<br/>}</div>
+                <p class="text-[9px] text-slate-400 mt-1">one export per view</p>
+                <p class="text-[9px] text-slate-400">window.* populated once by main.js</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 text-sm">
+          <div class="shallow-marker pl-3">
+            <p class="font-medium">Problem</p>
+            <p class="text-slate-500 text-xs">12 desktop views each maintain 15-26 window.* assignments AND matching export blocks — identical name lists maintained in parallel. Changing one function requires updating both lists. 152 window.* + 40 export = 192 registration points.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Solution</p>
+            <p class="text-slate-500 text-xs">Each view exports a single manager object. main.js iterates over the manager and auto-populates window.* from exports. No manual dual maintenance.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Wins</p>
+            <ul class="text-xs text-slate-500 list-disc pl-4 space-y-0.5">
+              <li>leverage: main.js registers all window.* centrally</li>
+              <li>add a function → add it once, auto-registered</li>
+              <li>deletion test: window.* block = export block = waste</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <!-- CANDIDATE 7: Duplicate config.js -->
+      <article class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+        <div class="flex items-center gap-3">
+          <h2 class="text-xl font-bold font-serif">7. Single config.js — delete the 2 copies</h2>
+          <span class="px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 rounded-full">Strong</span>
+          <span class="px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-full">in-process</span>
+        </div>
+        <div class="text-xs font-mono text-slate-400">config.js (root)  ·  src/core/config.js  ·  dist/config.js</div>
+
+        <div class="rounded-lg border border-slate-200 bg-white p-4">
+          <pre class="mermaid">
+            flowchart LR
+              ROOT["config.js (root)"] -->|identical| SRC["src/core/config.js"]
+              ROOT -->|identical| DIST["dist/config.js"]
+              subgraph WASTE["3 identical copies = 2 wasted"]
+                ROOT
+                SRC
+                DIST
+              end
+              classDef waste stroke:#dc2626,stroke-width:1px;
+              class SRC,DIST waste;
+          </pre>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 text-sm">
+          <div class="shallow-marker pl-3">
+            <p class="font-medium">Problem</p>
+            <p class="text-slate-500 text-xs">Three identical config.js files. Every configuration change requires updating all three. Already auto-generated by build-config.js — just generate it once.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Solution</p>
+            <p class="text-slate-500 text-xs">Generate config.js only at root. Update build-config.js output path. Update HTML <script> tags to load from root. Remove src/core/config.js and dist/config.js.</p>
+          </div>
+          <div class="pl-3">
+            <p class="font-medium">Wins</p>
+            <ul class="text-xs text-slate-500 list-disc pl-4 space-y-0.5">
+              <li>locality: one file for all config</li>
+              <li>deletion test: remove 2 copies, nothing breaks</li>
+              <li>no maintenance cost</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- TOP RECOMMENDATION -->
+    <section id="top-recommendation" class="deep rounded-xl p-6 text-white">
+      <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Top recommendation</p>
+      <h2 class="text-lg font-bold font-serif"><a href="#candidates" class="underline decoration-slate-500 underline-offset-4">#1: Eliminate the bifurcated service layer</a></h2>
+      <p class="text-sm text-slate-300 mt-2">This is the single highest-leverage change. mobile-app.js contains dead imports from src/core/ and reimplements the same queries inline. Fixing this one issue eliminates the class of bugs where a fix in one path doesn't propagate to the other — including the exact category association bug you hit today. The other six candidates build on this foundation.</p>
+      <div class="flex gap-4 mt-3 text-xs text-slate-400">
+        <span>~200 lines deleted</span>
+        <span>4 dead imports eliminated</span>
+        <span>1 seam for all Supabase photo calls</span>
+      </div>
+    </section>
+
+    <!-- SUMMARY TABLE -->
+    <section class="rounded-xl border border-slate-200 bg-white p-6">
+      <h2 class="text-lg font-bold font-serif mb-4">Summary</h2>
+      <table class="w-full text-sm">
+        <thead class="text-left text-xs uppercase tracking-wider text-slate-400">
+          <tr>
+            <th class="pb-2">#</th>
+            <th class="pb-2">Candidate</th>
+            <th class="pb-2">Severity</th>
+            <th class="pb-2">Category</th>
+            <th class="pb-2">Effort</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr>
+            <td class="py-2 font-mono text-xs">1</td>
+            <td class="py-2">Eliminate bifurcated service layer</td>
+            <td class="py-2"><span class="px-2 py-0.5 text-xs bg-emerald-100 text-emerald-700 rounded-full">Strong</span></td>
+            <td class="py-2 text-xs">in-process</td>
+            <td class="py-2 text-xs">Medium</td>
+          </tr>
+          <tr>
+            <td class="py-2 font-mono text-xs">2</td>
+            <td class="py-2">Extract auth &amp; theme from god object</td>
+            <td class="py-2"><span class="px-2 py-0.5 text-xs bg-emerald-100 text-emerald-700 rounded-full">Strong</span></td>
+            <td class="py-2 text-xs">in-process</td>
+            <td class="py-2 text-xs">Small</td>
+          </tr>
+          <tr>
+            <td class="py-2 font-mono text-xs">3</td>
+            <td class="py-2">Deepen photo-service and storage-service</td>
+            <td class="py-2"><span class="px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full">Worth exploring</span></td>
+            <td class="py-2 text-xs">in-process</td>
+            <td class="py-2 text-xs">Medium</td>
+          </tr>
+          <tr>
+            <td class="py-2 font-mono text-xs">4</td>
+            <td class="py-2">Deduplicate category tree traversal</td>
+            <td class="py-2"><span class="px-2 py-0.5 text-xs bg-emerald-100 text-emerald-700 rounded-full">Strong</span></td>
+            <td class="py-2 text-xs">in-process</td>
+            <td class="py-2 text-xs">Trivial</td>
+          </tr>
+          <tr>
+            <td class="py-2 font-mono text-xs">5</td>
+            <td class="py-2">Shared modal factory</td>
+            <td class="py-2"><span class="px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full">Worth exploring</span></td>
+            <td class="py-2 text-xs">in-process</td>
+            <td class="py-2 text-xs">Small</td>
+          </tr>
+          <tr>
+            <td class="py-2 font-mono text-xs">6</td>
+            <td class="py-2">Desktop views: collapse window.* + export duality</td>
+            <td class="py-2"><span class="px-2 py-0.5 text-xs bg-slate-100 text-slate-600 rounded-full">Speculative</span></td>
+            <td class="py-2 text-xs">in-process</td>
+            <td class="py-2 text-xs">Medium</td>
+          </tr>
+          <tr>
+            <td class="py-2 font-mono text-xs">7</td>
+            <td class="py-2">Single config.js — delete 2 copies</td>
+            <td class="py-2"><span class="px-2 py-0.5 text-xs bg-emerald-100 text-emerald-700 rounded-full">Strong</span></td>
+            <td class="py-2 text-xs">in-process</td>
+            <td class="py-2 text-xs">Trivial</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="mt-4 p-3 bg-slate-50 rounded-lg text-xs text-slate-500">
+        <span class="font-medium">Vocabulary</span> — module · interface · implementation · depth · seam · adapter · leverage · locality.
+        <span class="text-slate-400 ml-2">Report format per <code>mattpocock/skills</code> — HTML-REPORT.md.</span>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>
