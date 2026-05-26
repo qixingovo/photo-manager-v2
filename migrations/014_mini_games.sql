@@ -14,5 +14,5 @@ CREATE INDEX IF NOT EXISTS idx_game_scores_leaderboard
 ALTER TABLE game_scores ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "allow_all_game_scores" ON game_scores FOR ALL
-    TO anon, authenticated
+    TO authenticated
     USING (true) WITH CHECK (true);

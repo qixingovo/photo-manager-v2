@@ -6,7 +6,7 @@ var categories = [];
 export function getCategories() { return categories; }
 
 export async function loadCategories() {
-    var { data, error } = await supabase.from('categories').select('*').order('sort_order');
+    var { data, error } = await supabase.from('categories').select('*').order('created_at', { ascending: false });
     if (error) { console.error('loadCategories:', error.message); return []; }
     categories = data || [];
     return categories;

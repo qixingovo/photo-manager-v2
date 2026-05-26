@@ -44,7 +44,13 @@ router.get('/v1/user', async (req, res) => {
         if (r.rows.length === 0) return res.status(404).json({ error: 'user_not_found' });
         const u = r.rows[0];
         res.json({ id: String(u.id), email: u.email, user_metadata: { username: u.username, role: u.role } });
-    } catch (err) { res.status(401).json({ error: 'invalid_token' }); }
+    } catch (err) {
+        if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError' || err.name === 'NotBeforeError') {
+            return res.status(401).json({ error: 'invalid_token' });
+        }
+        console.error('Get user error:', err);
+        res.status(500).json({ error: '获取用户信息失败，请稍后重试' });
+    }
 });
 
 // PUT /auth/v1/user/password — 修改密码
@@ -64,7 +70,13 @@ router.put('/v1/user/password', async (req, res) => {
         const newHash = await bcrypt.hash(newPassword, 10);
         await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, user.id]);
         res.json({ success: true });
-    } catch (err) { res.status(401).json({ error: 'invalid_token' }); }
+    } catch (err) {
+        if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError' || err.name === 'NotBeforeError') {
+            return res.status(401).json({ error: 'invalid_token' });
+        }
+        console.error('Password change error:', err);
+        res.status(500).json({ error: '修改密码失败，请稍后重试' });
+    }
 });
 
 // POST /auth/v1/logout — 登出（JWT 无状态，仅返回成功）

@@ -14,7 +14,7 @@
 ## 📦 master (最新版)
 
 **状态**: ✅ 生产环境运行中  
-**部署**: Vercel (https://photo.qixingovo.cn)
+**部署**: Vercel
 
 ### 主要功能
 - ✅ 级联式分类选择器（桌面版）
@@ -94,7 +94,7 @@
 | 后端 | Supabase (PostgreSQL + Storage) |
 | 数据库 | categories, photos, photo_categories, comments |
 | 部署 | Vercel |
-| 登录 | 老大(lxyajwr06225) / 小弟(lxyajwr06225) |
+| 登录 | 双用户登录系统 |
 
 ---
 

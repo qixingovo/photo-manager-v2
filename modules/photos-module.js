@@ -393,16 +393,16 @@
                     .single();
 
                 if (insertError) throw insertError;
-                successCount++;
 
-                // 写入 photo_categories 关联表
+                // 写入 photo_categories 关联表（成功后才能计数）
                 if (categoryId) {
-                    const photoId = photoData.id;
-                    await supabase.from('photo_categories').insert([{
-                        photo_id: photoId,
+                    const { error: catError } = await supabase.from('photo_categories').insert([{
+                        photo_id: photoData.id,
                         category_id: categoryId
                     }]);
+                    if (catError) throw catError;
                 }
+                successCount++;
             } catch (err) {
                 console.error('上传失败:', err);
             }

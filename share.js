@@ -14,7 +14,8 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error('缺少 Supabase 配置');
 }
 
-var shareClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+var shareClient = window.__sb_share_client__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+window.__sb_share_client__ = shareClient;
 
 function getPhotoUrl(storagePath) {
     if (!storagePath) return '';

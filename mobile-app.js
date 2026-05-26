@@ -1865,6 +1865,9 @@ const mobile = {
         this.showFavoritesOnly = !this.showFavoritesOnly;
         this.currentPage = 1;
         if (this.showFavoritesOnly) {
+            this.currentCategory = 'all';
+            var filterCat = document.getElementById('mobileFilterCategory');
+            if (filterCat) filterCat.value = 'all';
             this.showPage('home');
         }
         this.loadPhotos();

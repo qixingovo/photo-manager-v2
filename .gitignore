@@ -5,3 +5,6 @@ dist/
 config.js
 src/core/config.js
 .vercel
+docs/
+.superpowers/
+*.bak
