@@ -393,16 +393,24 @@
                     .single();
 
                 if (insertError) throw insertError;
-
-                // 写入 photo_categories 关联表（成功后才能计数）
-                if (categoryId) {
-                    const { error: catError } = await supabase.from('photo_categories').insert([{
-                        photo_id: photoData.id,
-                        category_id: categoryId
-                    }]);
-                    if (catError) throw catError;
-                }
                 successCount++;
+
+                // 写入 photo_categories 关联表
+                if (categoryId) {
+                    try {
+                        const { error: catError } = await supabase.from('photo_categories').insert([{
+                            photo_id: photoData.id,
+                            category_id: categoryId
+                        }]);
+                        if (catError) {
+                            console.error('photo_categories 插入失败:', JSON.stringify(catError));
+                            this.showToast('分类关联失败: ' + (catError.message || catError.code || '未知错误'));
+                        }
+                    } catch (catErr) {
+                        console.error('photo_categories 插入异常:', catErr);
+                        this.showToast('分类关联异常');
+                    }
+                }
             } catch (err) {
                 console.error('上传失败:', err);
             }
