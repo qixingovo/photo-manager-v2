@@ -344,7 +344,7 @@
         if (this._rpgXpToday + earned > this.RPG_DAILY_XP_CAP) {
             earned = Math.max(0, this.RPG_DAILY_XP_CAP - this._rpgXpToday);
         }
-        if (earned <= 0) return;
+        if (earned <= 0) { this._checkQuestProgress(reason); await this._saveRPGData(); return; }
 
         this._rpgXpToday += earned;
         const oldLevel = this._rpgLevelFromXP(this.rpgData.xp);
@@ -360,8 +360,8 @@
             }
         }
 
-        await this._saveRPGData();
         this._checkQuestProgress(reason);
+        await this._saveRPGData();
         if (newLevel > oldLevel) {
             this.showToast('⬆️ 升级！Lv.' + newLevel + ' ' + title);
         }

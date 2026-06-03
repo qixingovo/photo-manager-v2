@@ -1,8 +1,6 @@
 // app.js — 桌面版入口：导入 main.js（状态 + 初始化）+ 各视图模块
 import './src/desktop/main.js';
 import { supabase } from './src/core/supabase.js';
-import './games/games.css';
-
 // 视图模块（side-effect 导入，自动注册 window.* 函数）
 import './src/desktop/views/auth.js';
 import './src/desktop/views/album.js';
@@ -659,8 +657,6 @@ window.toggleSection = function(section) {
         }
     }
 }
-
-
 function updateMarkedCount() {
     const el = document.getElementById('markedCount')
     if (el) el.textContent = markedCategories.size
@@ -721,14 +717,6 @@ async function initApp() {
     document.getElementById('editForm').addEventListener('submit', window.handleEdit);
 }
 
-
-
-
-
-
-
-
-
 async function loadAllPhotoCategories() {
     // 清空旧的关联
     photoCategories = {}
@@ -756,8 +744,6 @@ async function loadAllPhotoCategories() {
     }
 }
 window.loadAllPhotoCategories = loadAllPhotoCategories;
-
-
 async function loadPassport() {
     try {
         const { data, error } = await supabase

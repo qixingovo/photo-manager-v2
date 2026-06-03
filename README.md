@@ -4,6 +4,13 @@
 
 > **2026-05-17 优化完成** — 安全脱敏(JWT/DB密码→process.env)、架构拆分(app.js 6757→2734行)、抽取 src/core/ 共享层(6个服务模块)、desktop/views/ 12个视图文件。mobile-app.js 对接共享层。删除 385KB 备份。
 
+> **2026-06-02 代码审查修复**
+> - 修复 `uploadPhotos()` 重复 toast（成功/失败各弹一次）
+> - 修复上传图片压缩时 toast 刷屏（大图每张弹 2-3 次）
+> - 添加单文件上传失败计数和错误反馈
+> - 修复 `init()` 中 `_ensureModule` 未 await 的竞态条件
+> - `_MODULE_VERSION` 升级至 '4'
+
 ## 功能
 
 ### 核心

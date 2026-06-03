@@ -340,6 +340,7 @@
         const longitude = parseFloat(document.getElementById('mobilePhotoLongitude')?.value) || null;
         
         let successCount = 0;
+        let failCount = 0;
         
         for (let i = 0; i < total; i++) {
             let file = this.previewFiles[i];
@@ -355,9 +356,7 @@
 
             // 压缩超过1.5MB的图片
             if (file.size > 1.5 * 1024 * 1024) {
-                this.showToast(`压缩第 ${i + 1} 张图片...`);
                 file = await this.compressImage(file, 1.5);
-                this.showToast(`压缩完成: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
             }
             
             const fileName = namePrefix ? `${namePrefix}_${i + 1}` : file.name;
@@ -413,11 +412,19 @@
                 }
             } catch (err) {
                 console.error('上传失败:', err);
+                failCount++;
             }
             
             const percent = Math.round(((i + 1) / total) * 100);
             progressFill.style.width = percent + '%';
             progressText.textContent = percent + '%';
+        }
+
+        if (successCount > 0) {
+            this.showToast('成功上传 ' + successCount + ' 张照片');
+            this.renderPhotos();
+        } else {
+            this.showToast('上传失败: ' + failCount + ' 张失败，请重试');
         }
 
         // 重置
@@ -437,7 +444,6 @@
         if (latEl) latEl.value = '';
         if (lngEl) lngEl.value = '';
         this.renderUploadCategoryCascade();
-        this.showToast(`成功上传 ${successCount} 张照片`);
         for (let i = 0; i < successCount; i++) this.addXP(5, 'upload');
         if (latitude && longitude) this.addXP(20, 'location');
 

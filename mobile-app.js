@@ -143,7 +143,7 @@ const mobile = {
 
     // 懒加载模块管理
     _loadedModules: {},
-    _MODULE_VERSION: '2',
+    _MODULE_VERSION: '4',
 
     // 初始化 Supabase 客户端（委托给 src/core/supabase.js）
     initSupabase() {
@@ -186,9 +186,14 @@ const mobile = {
         this.initTheme();
         
         // 等待 Supabase CDN 加载完成后再初始化
-        this.waitForSupabase(() => {
-            this.checkLogin();
-            this.loadMarkedCategories();
+        Promise.all([
+            this._ensureModule("diary"),
+            this._ensureModule("extras")
+        ]).then(() => {
+            this.waitForSupabase(() => {
+                this.checkLogin();
+                this.loadMarkedCategories();
+            });
         });
     },
 
@@ -1642,7 +1647,7 @@ const mobile = {
             page.removeEventListener('touchstart', this._detailTouchStart);
             if (this._boundDetailTouchEnd) page.removeEventListener('touchend', this._boundDetailTouchEnd);
         }
-        this.showPage('home');
+        this.showPage('photos');
     },
 
     _detailTouchStart(e) {
@@ -1868,7 +1873,7 @@ const mobile = {
             this.currentCategory = 'all';
             var filterCat = document.getElementById('mobileFilterCategory');
             if (filterCat) filterCat.value = 'all';
-            this.showPage('home');
+            this.showPage('photos');
         }
         this.loadPhotos();
         this.showToast(this.showFavoritesOnly ? '显示收藏照片' : '显示全部照片');
