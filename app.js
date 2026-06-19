@@ -167,7 +167,8 @@ async function loadPhotosByCategory(categoryName) {
 }
 
 function getStorageUrl(photo) {
-    var base = (window.__APP_CONFIG__ && window.__APP_CONFIG__.SUPABASE_STORAGE_URL) || '';
+    var cfg = window.__APP_CONFIG__ || {};
+    var base = cfg.SUPABASE_STORAGE_URL || (cfg.SUPABASE_URL ? cfg.SUPABASE_URL + '/storage/v1/object/public/photo/' : '');
     if (photo.storage_path && photo.storage_path.startsWith('http')) return photo.storage_path;
     return base + (photo.storage_path || '');
 }
