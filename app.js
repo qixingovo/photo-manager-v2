@@ -385,14 +385,7 @@ async function showBirthdayWelcome() {
         '</div>' +
         // 音乐按钮和日期选择
         '<div style="position:fixed;bottom:30px;right:30px;z-index:10;display:flex;gap:10px;align-items:center;">' +
-          '<p style="color:rgba(255,255,255,0.4);font-size:0.75rem;margin-right:4px;">' +
-            '<select id="birthdayMonth" onchange="window.updateBirthdayConfig()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:2px 6px;font-size:11px;">' +
-              [1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){return '<option value="'+m+'"'+(m===cfg.month?' selected':'')+'>'+m+'月</option>';}).join('') +
-            '</select>' +
-            '<select id="birthdayDay" onchange="window.updateBirthdayConfig()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:2px 6px;font-size:11px;">' +
-              Array.from({length:31},function(_,i){return '<option value="'+(i+1)+'"'+(i+1===cfg.day?' selected':'')+'>'+(i+1)+'日</option>';}).join('') +
-            '</select>' +
-          '</p>' +
+          '' +
           '<button id="musicToggle" onclick="window.toggleBirthdayMusic(event)" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;width:36px;height:36px;border-radius:50%;font-size:14px;cursor:pointer;">🔇</button>' +
         '</div>' +
         '<style>' +

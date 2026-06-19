@@ -683,14 +683,7 @@ const mobile = {
               '</div>' +
             '</div>' +
             '<div style="position:fixed;bottom:20px;right:16px;z-index:10;display:flex;gap:8px;align-items:center;">' +
-              '<p style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-right:2px;">' +
-                '<select id="mobileBirthdayMonth" onchange="mobile.updateBirthdayConfigMobile()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:2px 4px;font-size:10px;">' +
-                  [1,2,3,4,5,6,7,8,9,10,11,12].map(m => '<option value="'+m+'"'+(m===cfg.month?' selected':'')+'>'+m+'月</option>').join('') +
-                '</select>' +
-                '<select id="mobileBirthdayDay" onchange="mobile.updateBirthdayConfigMobile()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:2px 4px;font-size:10px;">' +
-                  Array.from({length:31},(_,i) => '<option value="'+(i+1)+'"'+(i+1===cfg.day?' selected':'')+'>'+(i+1)+'日</option>').join('') +
-                '</select>' +
-              '</p>' +
+              '' +
               '<button id="mobileMusicToggle" onclick="mobile.toggleBirthdayMusicMobile(event)" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;width:32px;height:32px;border-radius:50%;font-size:13px;cursor:pointer;">🔇</button>' +
             '</div>' +
             '<style>' +
