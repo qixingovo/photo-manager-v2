@@ -429,7 +429,8 @@ async function showBirthdayWelcome() {
         // 阶段2→3：流星 → 回忆轮播 (流星动画1.5s + 停留1.5s)
         setTimeout(function() {
             switchPhase(phase2, phase3);
-            startCarousel();
+            // phase3 display 延迟 400ms 才变 block，等它可见再启动轮播
+            setTimeout(function() { startCarousel(); }, 500);
             // 阶段3→4：轮播结束 → 礼盒
             setTimeout(function() {
                 switchPhase(phase3, phase4);

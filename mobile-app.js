@@ -722,7 +722,8 @@ const mobile = {
             switchPhase(p1, p2);
             setTimeout(() => {
                 switchPhase(p2, p3);
-                self._startMobileCarousel(carouselPhotos);
+                // phase3 display 延迟 400ms 才变 block，等它可见再启动轮播
+                setTimeout(() => { self._startMobileCarousel(carouselPhotos); }, 500);
                 setTimeout(() => {
                     switchPhase(p3, p4);
                     overlay.style.background = 'linear-gradient(180deg, #0b1a3b 0%, #1a3a6b 40%, #2A5C8A 100%)';
@@ -759,7 +760,7 @@ const mobile = {
         let idx = 0;
         function showNext() {
             const p3 = document.getElementById('mbPhase3');
-            if (!p3 || p3.style.display === 'none') { clearInterval(self.__mobileCarouselTimer); return; }
+            if (!p3 || p3.style.display === 'none') return; // phase 未显示，等下一轮
             img.style.opacity = '0';
             setTimeout(() => { img.src = self.getStorageUrl(photos[idx]); img.style.opacity = '1'; counter.textContent = (idx+1)+' / '+photos.length; idx = (idx+1) % photos.length; }, 600);
         }
