@@ -4,6 +4,11 @@
   "outputDirectory": ".",
   "installCommand": null,
   "framework": null,
+  "rewrites": [
+    { "source": "/auth/v1/:path*", "destination": "http://47.114.121.178/auth/v1/:path*" },
+    { "source": "/rest/v1/:path*", "destination": "http://47.114.121.178/rest/v1/:path*" },
+    { "source": "/storage/v1/:path*", "destination": "http://47.114.121.178/storage/v1/:path*" }
+  ],
   "headers": [
     {
       "source": "/:path*{.js,.css}",
