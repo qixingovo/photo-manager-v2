@@ -710,6 +710,7 @@ const mobile = {
               '</div>' +
               '<p style="font-size:0.9rem;opacity:0.7;margin-top:12px;letter-spacing:1px;">' + t_crslLabel + '</p>' +
               '<p id="mbCarouselCounter" style="font-size:0.75rem;opacity:0.5;margin-top:2px;"></p>' +
+              '<a href="javascript:void(0)" onclick="mobile.skipMobileCarousel()" style="position:absolute;right:12px;bottom:12px;color:rgba(255,255,255,0.25);font-size:0.75rem;text-decoration:none;">跳过 ▸</a>' +
             '</div>' +
             '<div id="mbPhase4" class="mb-phase" style="display:none;position:relative;z-index:2;text-align:center;color:white;padding:20px;">' +
               '<div id="mbGiftBox" onclick="mobile.openMobileGift()" style="cursor:pointer;position:relative;margin-bottom:20px;">' +
@@ -823,6 +824,18 @@ const mobile = {
         }
         showNext();
         self.__mobileCarouselTimer = setInterval(showNext, 2500);
+    },
+
+    skipMobileCarousel() {
+        clearInterval(this.__mobileCarouselTimer);
+        const p3 = document.getElementById('mbPhase3');
+        const p4 = document.getElementById('mbPhase4');
+        const overlay = document.getElementById('mobileBirthdayOverlay');
+        if (p3) { p3.style.opacity = '0'; setTimeout(() => { p3.style.display = 'none'; }, 800); }
+        setTimeout(() => {
+            if (p4) { p4.style.display = 'block'; requestAnimationFrame(() => { p4.style.opacity = '1'; }); }
+        }, 400);
+        if (overlay) { overlay.style.background = 'linear-gradient(180deg, #0b1a3b 0%, #1a3a6b 40%, #2A5C8A 100%)'; overlay.style.transition = 'background 1.5s ease'; }
     },
 
     openMobileGift() {

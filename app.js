@@ -380,6 +380,7 @@ async function showBirthdayWelcome() {
           '</div>' +
           '<p style="font-size:1rem;opacity:0.7;margin-top:16px;letter-spacing:2px;">' + t_crslLabel + '</p>' +
           '<p id="carouselCounter" style="font-size:0.8rem;opacity:0.5;margin-top:4px;"></p>' +
+          '<a href="javascript:void(0)" onclick="window.skipToGift()" style="position:absolute;right:16px;bottom:16px;color:rgba(255,255,255,0.2);font-size:0.75rem;text-decoration:none;">跳过 ▸</a>' +
         '</div>' +
         // 阶段四：礼盒
         '<div id="phase4" class="bd-phase" style="display:none;position:relative;z-index:2;text-align:center;color:white;">' +
@@ -526,6 +527,18 @@ window.openBirthdayGift = function() {
 };
 
 // ---- 进入主应用 ----
+window.skipToGift = function() {
+    clearInterval(window.__carouselTimer);
+    var p3 = document.getElementById('phase3');
+    var p4 = document.getElementById('phase4');
+    var overlay = document.getElementById('birthdayOverlay');
+    if (p3) { p3.style.opacity = '0'; setTimeout(function(){ p3.style.display = 'none'; }, 800); }
+    setTimeout(function() {
+        if (p4) { p4.style.display = 'block'; requestAnimationFrame(function(){ p4.style.opacity = '1'; }); }
+    }, 400);
+    if (overlay) { overlay.style.background = 'linear-gradient(180deg, #0b1a3b 0%, #1a3a6b 40%, #2A5C8A 100%)'; overlay.style.transition = 'background 1.5s ease'; }
+};
+
 window.enterMainApp = function() {
     stopStarsCanvas();
     if (window.__burstAnimId) { cancelAnimationFrame(window.__burstAnimId); window.__burstAnimId = null; }
