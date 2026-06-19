@@ -800,12 +800,9 @@ const mobile = {
         const counter = document.getElementById('mbCarouselCounter');
         if (!img || photos.length === 0) return;
         let idx = 0;
-        console.log('[Carousel] Starting with', photos.length, 'photos');
         function showNext() {
             const p3 = document.getElementById('mbPhase3');
             if (!p3 || p3.style.display === 'none') return; // phase 未显示，等下一轮
-            const photo = photos[idx];
-            console.log('[Carousel] idx=' + idx + ' path=' + (photo ? photo.storage_path : 'NULL'));
             img.style.opacity = '0';
             setTimeout(() => { img.src = self.getStorageUrl(photos[idx]) + '?t=' + Date.now(); img.style.opacity = '1'; counter.textContent = (idx+1)+' / '+photos.length; idx = (idx+1) % photos.length; }, 600);
         }
