@@ -420,7 +420,9 @@ const mobile = {
     init() {
         // 初始化主题
         this.initTheme();
-        
+        // 离线检测
+        this._initOfflineDetection();
+
         // 等待 Supabase CDN 加载完成后再初始化
         Promise.all([
             this._ensureModule("diary"),
@@ -431,6 +433,28 @@ const mobile = {
                 this.loadMarkedCategories();
             });
         });
+    },
+
+    _initOfflineDetection() {
+        const banner = document.createElement('div');
+        banner.id = 'offlineBanner';
+        banner.style.cssText = 'display:none;position:fixed;top:0;left:0;right:0;z-index:10000;background:#f59e0b;color:#fff;text-align:center;padding:6px 12px;font-size:13px;font-weight:600;';
+        banner.textContent = '📡 离线模式 — 部分功能不可用';
+        document.body.appendChild(banner);
+
+        const showBanner = () => {
+            banner.style.display = 'block';
+            // 给页面内容加 top padding 避免遮挡
+            document.body.style.paddingTop = (banner.offsetHeight + 4) + 'px';
+        };
+        const hideBanner = () => {
+            banner.style.display = 'none';
+            document.body.style.paddingTop = '';
+        };
+
+        if (!navigator.onLine) showBanner();
+        window.addEventListener('online', hideBanner);
+        window.addEventListener('offline', showBanner);
     },
 
     // ========================================
