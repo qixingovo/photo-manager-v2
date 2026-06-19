@@ -474,12 +474,22 @@ async function showBirthdayWelcome() {
         function showNext() {
             if (!document.getElementById('phase3') || document.getElementById('phase3').style.display === 'none') return;
             img.style.opacity = '0';
-            setTimeout(function() {
-                img.src = getStorageUrl(carouselPhotos[carouselIndex]) + '?t=' + Date.now();
+            // 用 new Image() 预加载避开浏览器图片缓存
+            var preloader = new Image();
+            var url = getStorageUrl(carouselPhotos[carouselIndex]);
+            preloader.onload = function() {
+                img.src = url;
                 img.style.opacity = '1';
                 counter.textContent = (carouselIndex + 1) + ' / ' + carouselPhotos.length;
                 carouselIndex = (carouselIndex + 1) % carouselPhotos.length;
-            }, 600);
+            };
+            preloader.onerror = function() {
+                img.src = url;
+                img.style.opacity = '1';
+                counter.textContent = (carouselIndex + 1) + ' / ' + carouselPhotos.length;
+                carouselIndex = (carouselIndex + 1) % carouselPhotos.length;
+            };
+            preloader.src = url;
         }
         showNext();
         window.__carouselTimer = setInterval(showNext, 2500);
