@@ -475,7 +475,7 @@ async function showBirthdayWelcome() {
             if (!document.getElementById('phase3') || document.getElementById('phase3').style.display === 'none') return;
             img.style.opacity = '0';
             setTimeout(function() {
-                img.src = getStorageUrl(carouselPhotos[carouselIndex]);
+                img.src = getStorageUrl(carouselPhotos[carouselIndex]) + '?t=' + Date.now();
                 img.style.opacity = '1';
                 counter.textContent = (carouselIndex + 1) + ' / ' + carouselPhotos.length;
                 carouselIndex = (carouselIndex + 1) % carouselPhotos.length;

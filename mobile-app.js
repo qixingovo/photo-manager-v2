@@ -804,7 +804,7 @@ const mobile = {
             const p3 = document.getElementById('mbPhase3');
             if (!p3 || p3.style.display === 'none') return; // phase 未显示，等下一轮
             img.style.opacity = '0';
-            setTimeout(() => { img.src = self.getStorageUrl(photos[idx]); img.style.opacity = '1'; counter.textContent = (idx+1)+' / '+photos.length; idx = (idx+1) % photos.length; }, 600);
+            setTimeout(() => { img.src = self.getStorageUrl(photos[idx]) + '?t=' + Date.now(); img.style.opacity = '1'; counter.textContent = (idx+1)+' / '+photos.length; idx = (idx+1) % photos.length; }, 600);
         }
         showNext();
         self.__mobileCarouselTimer = setInterval(showNext, 2500);
