@@ -353,10 +353,13 @@ const mobile = {
         this.pendingDeleteType = null;
     },
 
-    // 自动检测更新
+    // 自动检测更新（仅 APK 环境）
     async checkUpdate() {
+        var isCap = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+        if (!isCap) return; // 网页版自动同步，无需检查更新
+
         try {
-            var curVer = (window.__APP_CONFIG__ || {}).APP_VERSION || '1.0.0';
+            var curVer = '1.0.1'; // 当前 APK 内置版本（构建时手动同步）
             var resp = await fetch('https://api.github.com/repos/qixingovo/photo-manager-v2/releases/latest');
             if (!resp.ok) return;
             var release = await resp.json();
@@ -373,16 +376,10 @@ const mobile = {
             }
             if (!newer) return;
 
-            // 有新版本
-            var isCap = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+            // 有新版本 APK
             var msg = '发现新版本 v' + latestVer + '（当前 v' + curVer + '）\n\n' + (release.body || '').substring(0, 200);
             if (confirm(msg + '\n\n是否前往下载？')) {
-                if (isCap) {
-                    // APK：直接打开 GitHub Release 页面
-                    window.open(release.html_url, '_blank');
-                } else {
-                    window.open(release.html_url, '_blank');
-                }
+                window.open(release.html_url, '_blank');
             }
         } catch(e) {
             console.log('Update check skipped:', e.message);
