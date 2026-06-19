@@ -150,6 +150,245 @@ const mobile = {
         return supabase;
     },
 
+    // 照片选择入口（使用 Capacitor Camera 原生插件）
+    async pickPhotos() {
+        var cap = window.Capacitor;
+        if (cap && cap.isNativePlatform && cap.isNativePlatform()) {
+            try {
+                var cam = cap.Plugins && cap.Plugins.Camera;
+                if (cam && cam.pickImages) {
+                    var result = await cam.pickImages({ quality: 90, limit: 0 });
+                    if (!result || !result.photos || result.photos.length === 0) return;
+
+                    var files = [];
+                    for (var i = 0; i < result.photos.length; i++) {
+                        var photo = result.photos[i];
+                        var resp = await fetch(photo.webPath);
+                        var blob = await resp.blob();
+                        var fname = (photo.path || 'photo').split('/').pop() || ('photo_' + Date.now() + '_' + i + '.jpg');
+                        files.push(new File([blob], fname, { type: 'image/jpeg' }));
+                    }
+                    this.previewFiles = files;
+                    this._showUploadPreviews(files);
+                    this.showToast('已选择 ' + files.length + ' 张照片');
+                    return;
+                }
+            } catch(e) {
+                console.error('Camera error:', e);
+            }
+        }
+        // 浏览器回退
+        var input = document.getElementById('photoInput');
+        if (input) input.click();
+    },
+
+    _showUploadPreviews(files) {
+        var area = document.getElementById('previewArea');
+        var grid = document.getElementById('previewGrid');
+        if (!area || !grid) return;
+        area.style.display = 'block';
+        grid.innerHTML = '';
+        var self = this;
+        for (var i = 0; i < files.length; i++) {
+            (function(idx) {
+                var file = files[idx];
+                var item = document.createElement('div');
+                item.className = 'preview-item';
+                var img = document.createElement('img');
+                img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+                // FileReader 兼容 Android WebView（URL.createObjectURL 不可靠）
+                var reader = new FileReader();
+                reader.onload = function(e) { img.src = e.target.result; };
+                reader.onerror = function() { img.src = ''; item.innerHTML = '<div style=\"color:red;font-size:11px;\">预览失败</div>'; };
+                reader.readAsDataURL(file);
+                var btn = document.createElement('button');
+                btn.className = 'remove-btn';
+                btn.textContent = 'x';
+                btn.onclick = function() { self._removePreview(idx); };
+                item.appendChild(img);
+                item.appendChild(btn);
+                grid.appendChild(item);
+            })(i);
+        }
+    },
+
+    _removePreview(index) {
+        this.previewFiles.splice(index, 1);
+        if (this.previewFiles.length === 0) {
+            document.getElementById('previewArea').style.display = 'none';
+        } else {
+            this._showUploadPreviews(this.previewFiles);
+        }
+    },
+
+    // 上传照片（直接放这里，不依赖懒加载模块）
+    async uploadPhotos() {
+        var self = this;
+        if (!this.previewFiles || this.previewFiles.length === 0) {
+            this.showToast('请先选择照片');
+            return;
+        }
+        var supabase = this.initSupabase();
+        if (!supabase) { this.showToast('数据库未连接'); return; }
+
+        var progressSection = document.getElementById('uploadProgress');
+        var progressFill = document.getElementById('progressFill');
+        var progressText = document.getElementById('progressText');
+        var uploadBtn = document.getElementById('uploadBtn');
+        if (progressSection) progressSection.style.display = 'block';
+        if (uploadBtn) { uploadBtn.disabled = true; uploadBtn.textContent = '上传中...'; }
+
+        var total = this.previewFiles.length;
+        var namePrefix = (document.getElementById('mobilePhotoName')?.value || '').trim();
+        var description = (document.getElementById('mobilePhotoDesc')?.value || '').trim();
+        var categoryId = this.getSelectedUploadCategoryId ? this.getSelectedUploadCategoryId() : null;
+        var locationName = (document.getElementById('mobilePhotoLocationName')?.value || '').trim() || null;
+        var latitude = parseFloat(document.getElementById('mobilePhotoLatitude')?.value) || null;
+        var longitude = parseFloat(document.getElementById('mobilePhotoLongitude')?.value) || null;
+
+        var successCount = 0, failCount = 0;
+        for (var i = 0; i < total; i++) {
+            var file = this.previewFiles[i];
+            var ext = '.' + file.name.split('.').pop().toLowerCase();
+            var allowedExts = ['.jpg','.jpeg','.png','.gif','.webp','.heic','.heif'];
+            if (!allowedExts.includes(ext)) { failCount++; continue; }
+
+            var fileName = namePrefix ? (namePrefix + '_' + (i + 1)) : file.name;
+            var uniqueName = Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '.' + file.name.split('.').pop();
+
+            try {
+                var uploadResult = await supabase.storage.from('photo').upload(uniqueName, file, { cacheControl: '3600', upsert: false });
+                if (uploadResult.error) throw uploadResult.error;
+
+                var insertResult = await supabase.from('photos').insert([{
+                    name: fileName, description: description, storage_path: uniqueName,
+                    original_name: file.name, size: file.size, is_favorite: false,
+                    latitude: latitude, longitude: longitude, location_name: locationName
+                }]).select().single();
+                if (insertResult.error) throw insertResult.error;
+                successCount++;
+
+                if (categoryId && insertResult.data) {
+                    try {
+                        await supabase.from('photo_categories').insert([{ photo_id: insertResult.data.id, category_id: categoryId }]);
+                    } catch(e) {}
+                }
+            } catch(e) {
+                console.error('Upload error:', e);
+                failCount++;
+            }
+            if (progressFill) progressFill.style.width = Math.round((i+1)/total*100) + '%';
+            if (progressText) progressText.textContent = Math.round((i+1)/total*100) + '%';
+        }
+
+        this.showToast(successCount > 0 ? '成功上传 ' + successCount + ' 张' : '上传失败，请重试');
+        if (progressSection) progressSection.style.display = 'none';
+        if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = '上传照片'; }
+
+        // 清预览
+        this.previewFiles = [];
+        document.getElementById('previewArea').style.display = 'none';
+        document.getElementById('mobilePhotoName').value = '';
+        document.getElementById('mobilePhotoDesc').value = '';
+        var ln = document.getElementById('mobilePhotoLocationName'); if (ln) ln.value = '';
+        var la = document.getElementById('mobilePhotoLatitude'); if (la) la.value = '';
+        var lo = document.getElementById('mobilePhotoLongitude'); if (lo) lo.value = '';
+
+        // 记住分类
+        if (categoryId) { try { localStorage.setItem('lastUploadCategoryId', categoryId); } catch(e) {} }
+    },
+
+    // 删除照片（弹出确认框）
+    deletePhoto() {
+        this.pendingDeleteId = this.currentPhotoId;
+        this.pendingDeleteType = 'photo';
+        var titleEl = document.getElementById('confirmTitle');
+        var msgEl = document.getElementById('confirmMessage');
+        if (titleEl) titleEl.textContent = '删除照片';
+        if (msgEl) msgEl.textContent = '确定要删除这张照片吗？';
+        var modal = document.getElementById('confirmModal');
+        if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
+    },
+
+    // 确认删除
+    async confirmDelete() {
+        var supabase = this.initSupabase();
+        if (!supabase) { this.showToast('数据库未连接'); return; }
+        var type = this.pendingDeleteType;
+        var id = this.pendingDeleteId;
+
+        if (type === 'photo' && id) {
+            try {
+                await supabase.from('photo_categories').delete().eq('photo_id', id);
+                await supabase.from('comments').delete().eq('photo_id', id);
+                var _r = await supabase.from('photos').delete().eq('id', id);
+                if (_r.error) throw _r.error;
+                this.photos = this.photos.filter(function(p) { return p.id !== id; });
+                this.renderPhotos();
+                this.showToast('照片已删除');
+            } catch(e) {
+                console.error(e);
+                this.showToast('删除失败');
+            }
+        } else if (type === 'batch-photo' && this.selectedPhotos && this.selectedPhotos.size > 0) {
+            var ids = Array.from(this.selectedPhotos);
+            var count = 0;
+            for (var i = 0; i < ids.length; i++) {
+                try {
+                    await supabase.from('photo_categories').delete().eq('photo_id', ids[i]);
+                    await supabase.from('comments').delete().eq('photo_id', ids[i]);
+                    await supabase.from('photos').delete().eq('id', ids[i]);
+                    count++;
+                } catch(e) { console.error(e); }
+            }
+            this.photos = this.photos.filter(function(p) { return !ids.includes(p.id); });
+            this.selectedPhotos.clear();
+            this.renderPhotos();
+            this.showToast('已删除 ' + count + ' 张照片');
+        }
+
+        var modal = document.getElementById('confirmModal');
+        if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
+        this.pendingDeleteId = null;
+        this.pendingDeleteType = null;
+    },
+
+    // 自动检测更新
+    async checkUpdate() {
+        try {
+            var curVer = (window.__APP_CONFIG__ || {}).APP_VERSION || '1.0.0';
+            var resp = await fetch('https://api.github.com/repos/qixingovo/photo-manager-v2/releases/latest');
+            if (!resp.ok) return;
+            var release = await resp.json();
+            var latestVer = (release.tag_name || '').replace('v', '').replace('-android', '');
+            if (!latestVer) return;
+
+            // 比较版本号
+            var cur = curVer.split('.').map(Number);
+            var lat = latestVer.split('.').map(Number);
+            var newer = false;
+            for (var i = 0; i < Math.max(cur.length, lat.length); i++) {
+                if ((lat[i] || 0) > (cur[i] || 0)) { newer = true; break; }
+                if ((lat[i] || 0) < (cur[i] || 0)) break;
+            }
+            if (!newer) return;
+
+            // 有新版本
+            var isCap = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+            var msg = '发现新版本 v' + latestVer + '（当前 v' + curVer + '）\n\n' + (release.body || '').substring(0, 200);
+            if (confirm(msg + '\n\n是否前往下载？')) {
+                if (isCap) {
+                    // APK：直接打开 GitHub Release 页面
+                    window.open(release.html_url, '_blank');
+                } else {
+                    window.open(release.html_url, '_blank');
+                }
+            }
+        } catch(e) {
+            console.log('Update check skipped:', e.message);
+        }
+    },
+
     getUserFromSession(session) {
         const username = session?.username || '用户';
         const metadataRole = session?.role || 'user';
@@ -352,42 +591,233 @@ const mobile = {
         } catch (e) { /* DB fail, localStorage still has it */ }
     },
 
+    // ========== 生日惊喜：蓝色星愿礼盒（移动版）==========
+
+    async loadPhotosByCategory(categoryName) {
+        try {
+            const client = this.initSupabase();
+            if (!client) return [];
+            const _c = await client.from('categories').select('id').eq('name', categoryName).single();
+            if (!_c.data) return [];
+            const _p = await client.from('photo_categories').select('photo_id').eq('category_id', _c.data.id);
+            if (!_p.data || _p.data.length === 0) return [];
+            const ids = _p.data.map(r => r.photo_id);
+            const _photos = await client.from('photos').select('*').in('id', ids);
+            return _photos.data || [];
+        } catch(e) { return []; }
+    },
+
+    getStorageUrl(photo) {
+        const base = (window.__APP_CONFIG__ && window.__APP_CONFIG__.SUPABASE_STORAGE_URL) || '';
+        if (photo.storage_path && photo.storage_path.startsWith('http')) return photo.storage_path;
+        return base + (photo.storage_path || '');
+    },
+
+    getDaysTogether() {
+        try {
+            const cached = localStorage.getItem('app_settings_cache');
+            if (cached) {
+                const map = JSON.parse(cached);
+                if (map.anniversary_start_date) {
+                    return Math.floor((new Date() - new Date(map.anniversary_start_date)) / 86400000);
+                }
+            }
+        } catch(e) {}
+        return 0;
+    },
+
     async showBirthdayWelcomeOverlay() {
-        await this.loadBirthdayConfig();
-        const cfg = this.birthdayConfig || { month: 6, day: 22, name: '老大' };
-        const monthOptions = [1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}" ${m === cfg.month ? 'selected' : ''}>${m}月</option>`).join('');
-        const dayOptions = Array.from({length: 31}, (_, i) => i + 1).map(d => `<option value="${d}" ${d === cfg.day ? 'selected' : ''}>${d}日</option>`).join('');
+        const self = this;
+        await self.loadBirthdayConfig();
+        const cfg = self.birthdayConfig || { month: 6, day: 22, name: '老大' };
+
+        // 预加载照片
+        const carouselPhotos = await self.loadPhotosByCategory('老大和小弟');
+        const couplePhotos = await self.loadPhotosByCategory('合照');
+        let couplePhoto = null;
+        if (couplePhotos.length > 0) couplePhoto = couplePhotos[Math.floor(Math.random() * couplePhotos.length)];
+
+        const daysTogether = self.getDaysTogether();
+        const daysText = daysTogether > 0 ? '一起走过了 ' + daysTogether + ' 天 💙' : '';
 
         const overlay = document.createElement('div');
         overlay.id = 'mobileBirthdayOverlay';
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;z-index:9999;';
-        overlay.innerHTML = `
-            <canvas id="mobilePetalsCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9998;"></canvas>
-            <div style="text-align:center;color:white;z-index:9999;padding:20px;">
-                <div style="font-size:60px;margin-bottom:16px;">🎂</div>
-                <h1 style="font-size:1.5rem;margin-bottom:16px;">生日快乐！</h1>
-                <h2 style="font-size:2.5rem;margin-bottom:10px;font-weight:bold;">老大 🎉</h2>
-                <p style="font-size:1rem;opacity:0.9;margin-bottom:24px;">老大万岁万岁万万岁≧▽≦</p>
-                <button onclick="mobile.enterFromBirthday()" style="
-                    padding:12px 40px;font-size:1rem;background:white;color:#764ba2;
-                    border:none;border-radius:50px;cursor:pointer;font-weight:bold;
-                    box-shadow:0 4px 15px rgba(0,0,0,0.2);">进入系统 🎈</button>
-                <p style="margin-top:16px;font-size:0.85rem;opacity:0.7;">
-                    生日日期:
-                    <select id="mobileBirthdayMonth" onchange="mobile.updateBirthdayConfigMobile()" style="padding:4px 8px;border:none;border-radius:6px;font-size:13px;">${monthOptions}</select>
-                    <select id="mobileBirthdayDay" onchange="mobile.updateBirthdayConfigMobile()" style="padding:4px 8px;border:none;border-radius:6px;font-size:13px;">${dayOptions}</select>
-                </p>
-                <button id="mobileMusicToggle" onclick="mobile.toggleBirthdayMusicMobile(event)" style="
-                    margin-top:8px;background:rgba(255,255,255,0.2);border:2px solid white;color:white;
-                    width:40px;height:40px;border-radius:50%;font-size:16px;cursor:pointer;">🔇</button>
-            </div>
-        `;
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:flex;align-items:center;justify-content:center;background:#0b1a3b;overflow:hidden;';
+
+        overlay.innerHTML =
+            '<canvas id="mobileStarsCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;"></canvas>' +
+            '<canvas id="mobileBurstCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;"></canvas>' +
+            '<div id="mbPhase1" class="mb-phase" style="position:relative;z-index:2;text-align:center;color:white;padding:20px;">' +
+              '<p style="font-size:1rem;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:0.5s;letter-spacing:2px;">今天是个特别的日子 ✨</p>' +
+            '</div>' +
+            '<div id="mbPhase2" class="mb-phase" style="display:none;position:relative;z-index:2;text-align:center;color:white;padding:20px;">' +
+              '<div class="mb-shooting-star" style="position:absolute;top:-40px;left:-80px;width:80px;height:2px;background:linear-gradient(90deg,transparent,#A8D8EA,#fff);border-radius:2px;transform:rotate(-35deg);opacity:0;animation:mbShootStar 1.5s ease-in forwards;"></div>' +
+              '<h1 style="font-size:1.6rem;font-weight:bold;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:1.2s;text-shadow:0 2px 10px rgba(168,216,234,0.5);">提前祝老大生日快乐 🩵</h1>' +
+              '<p style="font-size:0.8rem;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:1.5s;margin-top:6px;color:rgba(168,216,234,0.7);">🎂 真正生日是6月22日</p>' +
+            '</div>' +
+            '<div id="mbPhase3" class="mb-phase" style="display:none;position:relative;z-index:2;text-align:center;color:white;width:90%;max-width:360px;">' +
+              '<div class="carousel-frame" style="background:rgba(255,255,255,0.1);border-radius:16px;padding:12px;backdrop-filter:blur(10px);border:1.5px solid rgba(168,216,234,0.3);">' +
+                '<img id="mbCarouselImg" src="" style="width:100%;max-height:40vh;object-fit:contain;border-radius:10px;transition:opacity 0.6s ease;" />' +
+              '</div>' +
+              '<p style="font-size:0.9rem;opacity:0.7;margin-top:12px;letter-spacing:1px;">我们的回忆 💙</p>' +
+              '<p id="mbCarouselCounter" style="font-size:0.75rem;opacity:0.5;margin-top:2px;"></p>' +
+            '</div>' +
+            '<div id="mbPhase4" class="mb-phase" style="display:none;position:relative;z-index:2;text-align:center;color:white;padding:20px;">' +
+              '<div id="mbGiftBox" onclick="mobile.openMobileGift()" style="cursor:pointer;position:relative;margin-bottom:20px;">' +
+                '<div style="width:100px;height:80px;background:linear-gradient(135deg,#6CB4EE,#4A90D9);border-radius:10px;margin:0 auto;position:relative;box-shadow:0 6px 25px rgba(74,144,217,0.4);">' +
+                  '<div style="position:absolute;top:38%;left:0;width:100%;height:14px;background:rgba(255,255,255,0.5);border-radius:3px;"></div>' +
+                  '<div style="position:absolute;left:50%;top:0;width:14px;height:100%;background:rgba(255,255,255,0.35);border-radius:3px;transform:translateX(-50%);"></div>' +
+                '</div>' +
+                '<div id="mbGiftLid" style="width:110px;height:24px;background:linear-gradient(135deg,#7EC8F8,#5BA0E8);border-radius:6px;margin:0 auto;position:relative;top:-2px;transform-origin:right bottom;transition:transform 0.6s ease;box-shadow:0 3px 12px rgba(74,144,217,0.3);">' +
+                  '<div style="position:absolute;top:4px;left:50%;transform:translateX(-50%);">' +
+                    '<div style="width:24px;height:16px;border:2.5px solid rgba(255,255,255,0.7);border-radius:50% 50% 0 0;border-bottom:none;"></div>' +
+                    '<div style="width:5px;height:5px;background:rgba(255,255,255,0.7);border-radius:50%;margin:1.5px auto 0;"></div>' +
+                  '</div>' +
+                '</div>' +
+                '<p style="margin-top:14px;font-size:0.85rem;opacity:0.6;animation:bounceHint 1.5s ease-in-out infinite;">点击打开 🎀</p>' +
+              '</div>' +
+              '<div id="mbGiftCard" style="display:none;background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);border-radius:20px;padding:20px;max-width:320px;margin:0 auto;border:1.5px solid rgba(168,216,234,0.3);animation:scaleIn 0.6s ease;">' +
+                (couplePhoto ? '<img src="'+self.getStorageUrl(couplePhoto)+'" style="width:100%;max-height:160px;object-fit:cover;border-radius:14px;margin-bottom:14px;" />' : '<div style="font-size:50px;margin-bottom:14px;">🎂</div>') +
+                '<p style="font-size:1rem;margin-bottom:6px;">提前祝老大生日快乐 🩵</p>' +
+                '<p style="font-size:0.7rem;opacity:0.6;margin-bottom:2px;">🎂 真正生日：6月22日</p>' +
+                '<p style="font-size:0.8rem;opacity:0.7;margin-bottom:14px;">' + daysText + '</p>' +
+                '<button onclick="mobile.enterFromBirthday()" style="padding:12px 40px;font-size:1rem;background:rgba(255,255,255,0.9);color:#4A90D9;border:none;border-radius:50px;cursor:pointer;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,0.1);">进入系统 💙</button>' +
+              '</div>' +
+            '</div>' +
+            '<div style="position:fixed;bottom:20px;right:16px;z-index:10;display:flex;gap:8px;align-items:center;">' +
+              '<p style="color:rgba(255,255,255,0.4);font-size:0.7rem;margin-right:2px;">' +
+                '<select id="mobileBirthdayMonth" onchange="mobile.updateBirthdayConfigMobile()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:2px 4px;font-size:10px;">' +
+                  [1,2,3,4,5,6,7,8,9,10,11,12].map(m => '<option value="'+m+'"'+(m===cfg.month?' selected':'')+'>'+m+'月</option>').join('') +
+                '</select>' +
+                '<select id="mobileBirthdayDay" onchange="mobile.updateBirthdayConfigMobile()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:2px 4px;font-size:10px;">' +
+                  Array.from({length:31},(_,i) => '<option value="'+(i+1)+'"'+(i+1===cfg.day?' selected':'')+'>'+(i+1)+'日</option>').join('') +
+                '</select>' +
+              '</p>' +
+              '<button id="mobileMusicToggle" onclick="mobile.toggleBirthdayMusicMobile(event)" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;width:32px;height:32px;border-radius:50%;font-size:13px;cursor:pointer;">🔇</button>' +
+            '</div>' +
+            '<style>' +
+              '.mb-phase { transition: opacity 0.8s ease; }' +
+              '@keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }' +
+              '@keyframes mbShootStar { 0% { opacity:0; left:-80px; } 20% { opacity:1; } 80% { opacity:1; } 100% { opacity:0; left:calc(100% + 80px); } }' +
+              '@keyframes bounceHint { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }' +
+              '@keyframes scaleIn { from { transform:scale(0.7); opacity:0; } to { transform:scale(1); opacity:1; } }' +
+              '@keyframes fadeOut { to { opacity:0; } }' +
+            '</style>';
+
         document.body.appendChild(overlay);
-        this.startMobilePetalAnimation();
+        self._startMobileStars();
+
+        // 阶段调度
+        const p1 = document.getElementById('mbPhase1');
+        const p2 = document.getElementById('mbPhase2');
+        const p3 = document.getElementById('mbPhase3');
+        const p4 = document.getElementById('mbPhase4');
+
+        function switchPhase(from, to) {
+            if (from) { from.style.opacity = '0'; setTimeout(() => { from.style.display = 'none'; }, 800); }
+            setTimeout(() => { if (to) { to.style.display = 'block'; requestAnimationFrame(() => { to.style.opacity = '1'; }); } }, 400);
+        }
+
+        setTimeout(() => {
+            switchPhase(p1, p2);
+            setTimeout(() => {
+                switchPhase(p2, p3);
+                self._startMobileCarousel(carouselPhotos);
+                setTimeout(() => {
+                    switchPhase(p3, p4);
+                    overlay.style.background = 'linear-gradient(180deg, #0b1a3b 0%, #1a3a6b 40%, #2A5C8A 100%)';
+                    overlay.style.transition = 'background 1.5s ease';
+                }, (carouselPhotos.length || 3) * 2500 + 500);
+            }, 2800);
+        }, 2200);
+    },
+
+    _startMobileStars() {
+        const canvas = document.getElementById('mobileStarsCanvas');
+        if (!canvas) return;
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const ctx = canvas.getContext('2d');
+        const stars = [];
+        for (let i = 0; i < 80; i++) {
+            stars.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: 0.5+Math.random()*1.8, twinkle: Math.random()*Math.PI*2, speed: 0.01+Math.random()*0.03 });
+        }
+        const self = this;
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            stars.forEach(s => { s.twinkle += s.speed; ctx.fillStyle = 'rgba(255,255,255,'+(0.3+0.7*(0.5+0.5*Math.sin(s.twinkle)))+')'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill(); });
+            self.__mobileStarsId = requestAnimationFrame(draw);
+        }
+        draw();
+    },
+
+    _startMobileCarousel(photos) {
+        const self = this;
+        const img = document.getElementById('mbCarouselImg');
+        const counter = document.getElementById('mbCarouselCounter');
+        if (!img || photos.length === 0) return;
+        let idx = 0;
+        function showNext() {
+            const p3 = document.getElementById('mbPhase3');
+            if (!p3 || p3.style.display === 'none') { clearInterval(self.__mobileCarouselTimer); return; }
+            img.style.opacity = '0';
+            setTimeout(() => { img.src = self.getStorageUrl(photos[idx]); img.style.opacity = '1'; counter.textContent = (idx+1)+' / '+photos.length; idx = (idx+1) % photos.length; }, 600);
+        }
+        showNext();
+        self.__mobileCarouselTimer = setInterval(showNext, 2500);
+    },
+
+    openMobileGift() {
+        const lid = document.getElementById('mbGiftLid');
+        const box = document.getElementById('mbGiftBox');
+        const card = document.getElementById('mbGiftCard');
+        if (!lid || lid.style.transform === 'rotate(-130deg)') return;
+        lid.style.transform = 'rotate(-130deg)';
+        lid.style.transition = 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        const hint = box.querySelector('p');
+        if (hint) hint.style.display = 'none';
+
+        // 粒子
+        const rect = box.getBoundingClientRect();
+        const canvas = document.getElementById('mobileBurstCanvas');
+        if (canvas) {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            const ctx = canvas.getContext('2d');
+            const particles = [];
+            const colors = ['#89CFF0','#A8D8EA','#BFE4F5','#FFB6C1','#E8D5F5','#FFE4E1','#FFFFFF','#87CEEB'];
+            const cx = rect.left + rect.width/2, cy = rect.top;
+            for (let i = 0; i < 60; i++) {
+                const angle = Math.random()*Math.PI*2, speed = 3+Math.random()*6;
+                particles.push({ x:cx, y:cy, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed-Math.random()*5, size:3+Math.random()*10, color:colors[Math.floor(Math.random()*colors.length)], alpha:1, life:50+Math.random()*60, age:0 });
+            }
+            const self = this;
+            function anim() {
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                let alive = false;
+                particles.forEach(p => {
+                    p.x += p.vx*0.5; p.y += p.vy*0.5; p.vy += 0.08; p.age++;
+                    p.alpha = 1 - p.age/p.life;
+                    if (p.alpha <= 0) return;
+                    alive = true;
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.alpha;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+                    ctx.globalAlpha = 1;
+                });
+                if (alive) self.__mobileBurstId = requestAnimationFrame(anim);
+                else canvas.style.display = 'none';
+            }
+            anim();
+        }
+
+        setTimeout(() => { if (card) card.style.display = 'block'; box.style.pointerEvents = 'none'; }, 600);
     },
 
     enterFromBirthday() {
-        this.stopMobilePetalAnimation();
+        if (this.__mobileStarsId) { cancelAnimationFrame(this.__mobileStarsId); }
+        if (this.__mobileBurstId) { cancelAnimationFrame(this.__mobileBurstId); }
+        if (this.__mobileCarouselTimer) { clearInterval(this.__mobileCarouselTimer); }
         const overlay = document.getElementById('mobileBirthdayOverlay');
         if (overlay) overlay.remove();
         this.showPage('home');
@@ -395,10 +825,10 @@ const mobile = {
     },
 
     async updateBirthdayConfigMobile() {
-        const monthEl = document.getElementById('mobileBirthdayMonth');
-        const dayEl = document.getElementById('mobileBirthdayDay');
-        if (!monthEl || !dayEl) return;
-        await this.saveBirthdayConfig({ month: parseInt(monthEl.value), day: parseInt(dayEl.value), name: '老大' });
+        const m = document.getElementById('mobileBirthdayMonth');
+        const d = document.getElementById('mobileBirthdayDay');
+        if (!m || !d) return;
+        await this.saveBirthdayConfig({ month: parseInt(m.value), day: parseInt(d.value), name: '老大' });
     },
 
     toggleBirthdayMusicMobile(e) {
@@ -413,70 +843,8 @@ const mobile = {
             audio.innerHTML = '<source src="assets/birthday-bgm.mp3" type="audio/mpeg">';
             document.body.appendChild(audio);
         }
-        if (audio.paused) {
-            audio.play().catch(() => {});
-            if (btn) btn.textContent = '🔊';
-        } else {
-            audio.pause();
-            if (btn) btn.textContent = '🔇';
-        }
-    },
-
-    startMobilePetalAnimation() {
-        const canvas = document.getElementById('mobilePetalsCanvas');
-        if (!canvas) return;
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        const ctx = canvas.getContext('2d');
-        const petals = [];
-        const colors = ['#ff6b6b', '#ffa502', '#ff6348', '#ff4757', '#ff9ff3', '#feca57', '#ff6b81', '#eccc68'];
-
-        for (let i = 0; i < 30; i++) {
-            petals.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height - canvas.height,
-                size: 6 + Math.random() * 12,
-                speed: 0.8 + Math.random() * 1.5,
-                wobble: Math.random() * 2 - 1,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                rotation: Math.random() * Math.PI * 2,
-                rotSpeed: (Math.random() - 0.5) * 0.04
-            });
-        }
-
-        const self = this;
-        function drawPetal(p) {
-            ctx.save();
-            ctx.translate(p.x, p.y);
-            ctx.rotate(p.rotation);
-            ctx.fillStyle = p.color;
-            ctx.beginPath();
-            ctx.ellipse(0, 0, p.size, p.size * 0.4, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        }
-
-        function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            petals.forEach(p => {
-                p.y += p.speed;
-                p.x += Math.sin(p.y * 0.02) * p.wobble;
-                p.rotation += p.rotSpeed;
-                if (p.y > canvas.height + 20) { p.y = -20; p.x = Math.random() * canvas.width; }
-                drawPetal(p);
-            });
-            self.__petalAnimId = requestAnimationFrame(animate);
-        }
-        animate();
-    },
-
-    stopMobilePetalAnimation() {
-        if (this.__petalAnimId) {
-            cancelAnimationFrame(this.__petalAnimId);
-            this.__petalAnimId = null;
-        }
-        const canvas = document.getElementById('mobilePetalsCanvas');
-        if (canvas) canvas.remove();
+        if (audio.paused) { audio.play().catch(()=>{}); if (btn) btn.textContent = '🔊'; }
+        else { audio.pause(); if (btn) btn.textContent = '🔇'; }
     },
 
     // ========================================
@@ -522,6 +890,43 @@ const mobile = {
             }
         }
 
+        // 尝试自动登录（记住我）
+        const savedCreds = localStorage.getItem('pm2_creds');
+        if (savedCreds) {
+            try {
+                const dec = atob(savedCreds);
+                const colon = dec.indexOf(':');
+                if (colon > 0) {
+                    const savedAccount = dec.substring(0, colon);
+                    const savedPwd = dec.substring(colon + 1);
+                    const savedEmail = USER_EMAIL_MAP[savedAccount];
+                    if (savedEmail) {
+                        const { data, error: autoErr } = await client.auth.signInWithPassword({ email: savedEmail, password: savedPwd });
+                        if (!autoErr && data?.session) {
+                            localStorage.setItem('pm2_session', JSON.stringify({
+                                access_token: data.session.access_token,
+                                refresh_token: data.session.refresh_token,
+                                expires_at: data.session.expires_at
+                            }));
+                            const { data: autoProfile } = await client.from('profiles').select('username, role').eq('user_id', data.user.id).single();
+                            if (autoProfile) {
+                                this.currentUser = _getUserFromSession({ username: autoProfile.username, role: autoProfile.role });
+                                this.showPage('home');
+                                this.renderFeatureCards();
+                                this._renderFloatingBall();
+                                this._loadFeatureCardOrderFromServer().then(() => this.renderFeatureCards());
+                                this.loadData().catch(err => { console.error('加载数据失败:', err); this.showToast('数据加载失败，请刷新重试'); });
+                                setTimeout(() => self.checkUpdate(), 3000);
+                                return;
+                            }
+                        }
+                    }
+                }
+            } catch(e) {}
+            // 自动登录失败，清除失效凭证
+            localStorage.removeItem('pm2_creds');
+        }
+
         this.currentUser = null;
         this.showPage('login');
     },
@@ -530,6 +935,7 @@ const mobile = {
         e.preventDefault();
         const account = document.getElementById('loginUsername').value.trim();
         const password = document.getElementById('loginPassword').value;
+        const rememberMe = document.getElementById('rememberMe')?.checked;
         const errorEl = document.getElementById('loginError');
         const client = this.initSupabase();
 
@@ -552,9 +958,20 @@ const mobile = {
         const { data, error } = await client.auth.signInWithPassword({ email, password });
 
         if (error) {
-            if (error) console.error('账号登录失败:', error);
-            errorEl.textContent = '登录失败，请检查账号或密码';
+            console.error('登录失败:', error);
+            alert('登录失败\n' + (error.message || JSON.stringify(error)) + '\n\n请截图发给我');
+            errorEl.textContent = '登录失败: ' + (error.message || '未知错误');
             return;
+        }
+
+        // 记住我：加密保存凭证
+        if (rememberMe) {
+            try {
+                const enc = btoa(account + ':' + password);
+                localStorage.setItem('pm2_creds', enc);
+            } catch(e) {}
+        } else {
+            localStorage.removeItem('pm2_creds');
         }
 
         // 手动持久化 session
@@ -597,6 +1014,8 @@ const mobile = {
             console.error('加载数据失败:', err);
             this.showToast('数据加载失败，请刷新重试');
         });
+        // 静默检测更新
+        setTimeout(() => this.checkUpdate(), 3000);
     },
 
     async handleLogout() {
@@ -668,8 +1087,8 @@ const mobile = {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(page + 'Page').classList.add('active');
 
-        // 为非主页添加返回按钮
-        if (page !== 'home' && page !== 'login') {
+        // 为非主页添加返回按钮（照片页已有导航栏，不需要自动加）
+        if (page !== 'home' && page !== 'login' && page !== 'photos' && page !== 'detail') {
             const pageEl = document.getElementById(page + 'Page');
             const topBar = pageEl ? pageEl.querySelector('.top-bar') : null;
             if (topBar && !topBar.querySelector('.back-btn')) {
@@ -1039,9 +1458,9 @@ const mobile = {
         this._ensureModule('map').then(function() { self.pickLocationOnMap(); });
     },
 
-    // 模块懒加载：确保功能模块已加载（含轻量 loading 动画）
-    async _ensureModule(name) {
-        if (this._loadedModules[name]) return;
+    // 模块懒加载：用 <script> 标签注入代替 import()（兼容 Android WebView file:// 限制）
+    _ensureModule(name) {
+        if (this._loadedModules[name]) return Promise.resolve();
         var moduleMap = {
             'photos': 'modules/photos-module.js',
             'categories': 'modules/photos-module.js',
@@ -1052,26 +1471,33 @@ const mobile = {
             'records': 'modules/records-module.js',
             'extras': 'modules/extras-module.js'
         };
-        // 依赖：photos 依赖 extras（addXP），diary/records 依赖 photos+extras，albums 依赖 extras
         var deps = { 'photos': ['extras'], 'diary': ['photos', 'extras'], 'records': ['photos', 'extras'], 'albums': ['extras'] };
-        if (deps[name]) {
-            for (var i = 0; i < deps[name].length; i++) {
-                await this._ensureModule(deps[name][i]);
+        var self = this;
+
+        // 递归加载依赖
+        function loadWithDeps(n) {
+            var chain = Promise.resolve();
+            if (deps[n]) {
+                deps[n].forEach(function(d) { chain = chain.then(function() { return self._ensureModule(d); }); });
             }
+            return chain.then(function() {
+                var f = moduleMap[n];
+                if (!f || self._loadedModules[n]) return;
+                return new Promise(function(resolve, reject) {
+                    var script = document.createElement('script');
+                    script.src = f + '?v=' + self._MODULE_VERSION;
+                    script.onload = function() {
+                        self._loadedModules[n] = true;
+                        resolve();
+                    };
+                    script.onerror = function() {
+                        reject(new Error('Failed to load: ' + f));
+                    };
+                    document.head.appendChild(script);
+                });
+            });
         }
-        var filename = moduleMap[name];
-        if (filename) {
-            // 200ms 后才显示 loading 条，避免缓存命中时闪烁
-            var self = this;
-            var loadingTimer = setTimeout(function() { self._showModuleLoading(); }, 200);
-            try {
-                await import('./' + filename + '?v=' + this._MODULE_VERSION);
-            } finally {
-                clearTimeout(loadingTimer);
-                this._hideModuleLoading();
-            }
-        }
-        this._loadedModules[name] = true;
+        return loadWithDeps(name);
     },
 
     _showModuleLoading() {
@@ -1148,19 +1574,36 @@ const mobile = {
         } else if (tab === 'photos') {
             this.showPage('photos');
             this._showPageLoading();
-            this._ensureModule('photos').then(() => {
-                this.updateCategorySelects();
-                if (this.updateCategoryPathDisplay) this.updateCategoryPathDisplay();
-                this.renderPhotos();
+            var self = this;
+            Promise.all([
+                this.photos.length === 0 && this.categories.length === 0 ? this.loadData() : Promise.resolve(),
+                this._ensureModule('photos')
+            ]).then(function() {
+                self.updateCategorySelects();
+                if (self.updateCategoryPathDisplay) self.updateCategoryPathDisplay();
+                self.renderPhotos();
             }).finally(() => this._hidePageLoading());
         } else if (tab === 'upload') {
             this.showPage('upload');
             this._showPageLoading();
-            this._ensureModule('photos').then(() => this.renderUploadCategoryCascade()).finally(() => this._hidePageLoading());
+            // 确保分类数据已加载
+            var self = this;
+            Promise.all([
+                this.categories.length === 0 ? this.loadCategories() : Promise.resolve(),
+                this._ensureModule('photos')
+            ]).then(function() {
+                self.renderUploadCategoryCascade();
+            }).finally(() => this._hidePageLoading());
         } else if (tab === 'category') {
             this.showPage('category');
             this._showPageLoading();
-            this._ensureModule('categories').then(() => this.renderCategories()).finally(() => this._hidePageLoading());
+            var self = this;
+            Promise.all([
+                this.categories.length === 0 ? this.loadCategories() : Promise.resolve(),
+                this._ensureModule('categories')
+            ]).then(function() {
+                self.renderCategories();
+            }).finally(() => this._hidePageLoading());
         } else if (tab === 'map') {
             this.showPage('map');
             this._showPageLoading();

@@ -151,159 +151,373 @@ async function saveBirthdayConfig(config) {
 
 // 检查登录状态
 
-async function showBirthdayWelcome() {
-    const overlay = document.createElement('div')
-    overlay.id = 'birthdayOverlay'
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-        animation: fadeIn 0.5s ease;
-    `
-    
-    await loadBirthdayConfig();
-    const cfg = birthdayConfig || { month: 6, day: 22, name: '老大' };
-    const monthOptions = [1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}" ${m === cfg.month ? 'selected' : ''}>${m}月</option>`).join('');
-    const dayOptions = Array.from({length: 31}, (_, i) => i + 1).map(d => `<option value="${d}" ${d === cfg.day ? 'selected' : ''}>${d}日</option>`).join('');
+// ========== 生日惊喜：蓝色星愿礼盒 ==========
 
-    overlay.innerHTML = `
-        <canvas id="petalsCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9998;"></canvas>
-        <div style="text-align:center;color:white;animation: scaleIn 0.8s ease;position:relative;z-index:9999;">
-            <div style="font-size:80px;margin-bottom:20px;">🎂</div>
-            <h1 style="font-size:2rem;margin-bottom:20px;text-shadow:2px 2px 4px rgba(0,0,0,0.3);">生日快乐！</h1>
-
-            <!-- 箭头提示区域 - 放在老大左侧 -->
-            <div id="arrowHint" style="position:absolute;top:50%;left:-80px;transform:translateY(-100%);cursor:pointer;animation: arrowPoint 1s infinite;" onclick="hideLaoda()">
-                <div style="font-size:3rem;text-shadow:2px 2px 4px rgba(0,0,0,0.3);">➜</div>
-            </div>
-
-            <h2 id="laodaText" onclick="hideLaoda()" style="font-size:6rem;margin-bottom:10px;font-weight:bold;cursor:pointer;text-shadow:4px 4px 8px rgba(0,0,0,0.3);transition: all 0.3s;display:inline-block;"
-                onmouseover="this.style.transform='scale(1.1)'"
-                onmouseout="this.style.transform='scale(1)'">
-                老大 🎉
-            </h2>
-            <p id="prankText" style="font-size:1.5rem;opacity:0;margin-bottom:30px;transition: opacity 0.3s;color:#FFD700;font-weight:bold;"></p>
-            <p id="wishText" style="font-size:1.3rem;opacity:0.9;margin-bottom:40px;text-shadow:1px 1px 2px rgba(0,0,0,0.3);">老大万岁万岁万万岁≧▽≦</p>
-            <button id="enterBtn" onclick="enterMainApp()" style="
-                padding: 15px 50px;
-                font-size: 1.2rem;
-                background: white;
-                color: #764ba2;
-                border: none;
-                border-radius: 50px;
-                cursor: pointer;
-                font-weight: bold;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-                transition: transform 0.2s;
-            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                进入系统 🎈
-            </button>
-            <p style="margin-top:20px;font-size:0.9rem;opacity:0.7;">
-                生日日期:
-                <select id="birthdayMonth" onchange="window.updateBirthdayConfig()" style="padding:4px 8px;border:none;border-radius:6px;font-size:13px;">${monthOptions}</select>
-                <select id="birthdayDay" onchange="window.updateBirthdayConfig()" style="padding:4px 8px;border:none;border-radius:6px;font-size:13px;">${dayOptions}</select>
-            </p>
-            <button id="musicToggle" onclick="window.toggleBirthdayMusic(event)" style="
-                margin-top:12px;background:rgba(255,255,255,0.2);border:2px solid white;color:white;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;">
-                🔇
-            </button>
-        </div>
-        <style>
-            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-            @keyframes fadeOut { to { opacity: 0; } }
-            @keyframes scaleIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-            @keyframes arrowPoint { 0%, 100% { transform: translateY(-100%) translateX(0); } 50% { transform: translateY(-100%) translateX(15px); } }
-            @keyframes laodaSpin { to { transform: rotate(720deg) scale(0); opacity: 0; } }
-            @keyframes arrowFade { to { opacity: 0; transform: translateY(-100%) scale(0.5); } }
-        </style>
-    `
-
-    document.body.appendChild(overlay)
-    startPetalAnimation()
+// 从分类加载照片
+async function loadPhotosByCategory(categoryName) {
+    try {
+        var _c = await supabase.from('categories').select('id').eq('name', categoryName).single();
+        if (!_c.data) return [];
+        var _p = await supabase.from('photo_categories').select('photo_id').eq('category_id', _c.data.id);
+        if (!_p.data || _p.data.length === 0) return [];
+        var ids = _p.data.map(function(r) { return r.photo_id; });
+        var _photos = await supabase.from('photos').select('*').in('id', ids);
+        return _photos.data || [];
+    } catch(e) { return []; }
 }
-window.showBirthdayWelcome = showBirthdayWelcome;
-window.startPetalAnimation = startPetalAnimation;
-window.stopPetalAnimation = stopPetalAnimation;
 
-function startPetalAnimation() {
-    const canvas = document.getElementById('petalsCanvas');
+function getStorageUrl(photo) {
+    var base = (window.__APP_CONFIG__ && window.__APP_CONFIG__.SUPABASE_STORAGE_URL) || '';
+    if (photo.storage_path && photo.storage_path.startsWith('http')) return photo.storage_path;
+    return base + (photo.storage_path || '');
+}
+
+function getDaysTogether() {
+    try {
+        var key = 'anniversary_start_date';
+        // 从已加载的 settings 里取缓存
+        var cached = localStorage.getItem('app_settings_cache');
+        if (cached) {
+            var map = JSON.parse(cached);
+            if (map[key]) {
+                var start = new Date(map[key]);
+                var now = new Date();
+                return Math.floor((now - start) / 86400000);
+            }
+        }
+    } catch(e) {}
+    return 0;
+}
+
+// ---- Canvas: 星空 ----
+function startStarsCanvas() {
+    var canvas = document.getElementById('starsCanvas');
     if (!canvas) return;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    const ctx = canvas.getContext('2d');
-    const petals = [];
-    const colors = ['#ff6b6b', '#ffa502', '#ff6348', '#ff4757', '#ff9ff3', '#feca57', '#ff6b81', '#eccc68'];
-
-    for (let i = 0; i < 40; i++) {
-        petals.push({
+    var ctx = canvas.getContext('2d');
+    var stars = [];
+    for (var i = 0; i < 120; i++) {
+        stars.push({
             x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height - canvas.height,
-            size: 8 + Math.random() * 16,
-            speed: 1 + Math.random() * 2,
-            wobble: Math.random() * 2 - 1,
-            color: colors[Math.floor(Math.random() * colors.length)],
-            rotation: Math.random() * Math.PI * 2,
-            rotSpeed: (Math.random() - 0.5) * 0.05
+            y: Math.random() * canvas.height,
+            r: 0.5 + Math.random() * 2,
+            twinkle: Math.random() * Math.PI * 2,
+            speed: 0.01 + Math.random() * 0.03
         });
     }
 
-    function drawPetal(p) {
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation);
-        ctx.fillStyle = p.color;
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        stars.forEach(function(s) {
+            s.twinkle += s.speed;
+            var alpha = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(s.twinkle));
+            ctx.fillStyle = 'rgba(255,255,255,' + alpha + ')';
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        window.__starsAnimId = requestAnimationFrame(draw);
+    }
+    draw();
+}
+
+function stopStarsCanvas() {
+    if (window.__starsAnimId) { cancelAnimationFrame(window.__starsAnimId); window.__starsAnimId = null; }
+    var c = document.getElementById('starsCanvas');
+    if (c) c.remove();
+}
+
+// ---- Canvas: 粒子喷涌 ----
+function burstParticles(x, y) {
+    var canvas = document.getElementById('burstCanvas');
+    if (!canvas) return;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    var ctx = canvas.getContext('2d');
+    var particles = [];
+    var colors = ['#89CFF0','#A8D8EA','#BFE4F5','#FFB6C1','#E8D5F5','#FFE4E1','#FFFFFF','#87CEEB'];
+    var shapes = ['circle','heart','star'];
+
+    for (var i = 0; i < 80; i++) {
+        var angle = Math.random() * Math.PI * 2;
+        var speed = 3 + Math.random() * 8;
+        particles.push({
+            x: x, y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - Math.random() * 6,
+            size: 4 + Math.random() * 14,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            alpha: 1,
+            life: 60 + Math.random() * 80,
+            age: 0,
+            shape: shapes[Math.floor(Math.random() * shapes.length)]
+        });
+    }
+
+    function drawHeart(cx, cy, s) {
         ctx.beginPath();
-        ctx.ellipse(0, 0, p.size, p.size * 0.4, 0, 0, Math.PI * 2);
+        var topY = cy - s * 0.4;
+        ctx.moveTo(cx, cy + s * 0.4);
+        ctx.bezierCurveTo(cx, topY, cx - s * 0.6, topY, cx - s * 0.6, cy + s * 0.15);
+        ctx.bezierCurveTo(cx - s * 0.6, cy + s * 0.6, cx, cy + s, cx, cy + s * 0.9);
+        ctx.bezierCurveTo(cx, cy + s, cx + s * 0.6, cy + s * 0.6, cx + s * 0.6, cy + s * 0.15);
+        ctx.bezierCurveTo(cx + s * 0.6, topY, cx, topY, cx, cy + s * 0.4);
         ctx.fill();
-        ctx.restore();
+    }
+
+    function drawStar(cx, cy, s) {
+        var spikes = 5, outerR = s, innerR = s * 0.4;
+        ctx.beginPath();
+        for (var j = 0; j < spikes * 2; j++) {
+            var r = j % 2 === 0 ? outerR : innerR;
+            var a = Math.PI / 2 * 3 + j * Math.PI / spikes;
+            var px = cx + Math.cos(a) * r;
+            var py = cy + Math.sin(a) * r;
+            if (j === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
     }
 
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        petals.forEach(p => {
-            p.y += p.speed;
-            p.x += Math.sin(p.y * 0.02) * p.wobble;
-            p.rotation += p.rotSpeed;
-            if (p.y > canvas.height + 20) {
-                p.y = -20;
-                p.x = Math.random() * canvas.width;
+        var alive = false;
+        particles.forEach(function(p) {
+            p.x += p.vx * 0.5;
+            p.y += p.vy * 0.5;
+            p.vy += 0.08;
+            p.age++;
+            p.alpha = 1 - p.age / p.life;
+            if (p.alpha <= 0) return;
+            alive = true;
+            ctx.fillStyle = p.color.replace(')', ', ' + p.alpha + ')').replace('rgb', 'rgba');
+            if (p.color === '#FFFFFF' || p.color === '#FFE4E1') {
+                ctx.fillStyle = 'rgba(255,255,255,' + p.alpha + ')';
+            } else {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.alpha;
             }
-            drawPetal(p);
+            if (p.shape === 'heart') drawHeart(p.x, p.y, p.size);
+            else if (p.shape === 'star') drawStar(p.x, p.y, p.size);
+            else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill(); }
+            ctx.globalAlpha = 1;
         });
-        window.__petalAnimId = requestAnimationFrame(animate);
+        if (alive) window.__burstAnimId = requestAnimationFrame(animate);
+        else { canvas.style.display = 'none'; }
     }
     animate();
 }
 
-function stopPetalAnimation() {
-    if (window.__petalAnimId) {
-        cancelAnimationFrame(window.__petalAnimId);
-        window.__petalAnimId = null;
+// ---- 主流程 ----
+async function showBirthdayWelcome() {
+    await loadBirthdayConfig();
+    var cfg = birthdayConfig || { month: 6, day: 22, name: '老大' };
+
+    // 预加载照片
+    var carouselPhotos = await loadPhotosByCategory('老大和小弟');
+    var couplePhoto = null;
+    var couplePhotos = await loadPhotosByCategory('合照');
+    if (couplePhotos.length > 0) couplePhoto = couplePhotos[Math.floor(Math.random() * couplePhotos.length)];
+
+    var daysTogether = getDaysTogether();
+    var daysText = daysTogether > 0 ? '一起走过了 ' + daysTogether + ' 天 💙' : '';
+
+    // 构建 overlay
+    var overlay = document.createElement('div');
+    overlay.id = 'birthdayOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:flex;align-items:center;justify-content:center;background:#0b1a3b;overflow:hidden;';
+
+    overlay.innerHTML =
+        '<canvas id="starsCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;"></canvas>' +
+        '<canvas id="burstCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;"></canvas>' +
+        // 阶段一：星夜开场
+        '<div id="phase1" class="bd-phase" style="position:relative;z-index:2;text-align:center;color:white;">' +
+          '<p style="font-size:1.2rem;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:0.5s;letter-spacing:3px;">今天是个特别的日子 ✨</p>' +
+        '</div>' +
+        // 阶段二：流星许愿
+        '<div id="phase2" class="bd-phase" style="display:none;position:relative;z-index:2;text-align:center;color:white;">' +
+          '<div style="position:relative;">' +
+            '<div class="shooting-star" style="position:absolute;top:-60px;left:-120px;width:120px;height:3px;background:linear-gradient(90deg, transparent, #A8D8EA, #fff);border-radius:3px;transform:rotate(-35deg);opacity:0;animation:shootStar 1.5s ease-in forwards;"></div>' +
+            '<h1 style="font-size:2.5rem;font-weight:bold;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:1.2s;text-shadow:0 2px 12px rgba(168,216,234,0.5);">提前祝老大生日快乐 🩵</h1>' +
+            '<p style="font-size:0.9rem;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:1.5s;margin-top:8px;color:rgba(168,216,234,0.7);">🎂 真正生日是6月22日</p>' +
+          '</div>' +
+        '</div>' +
+        // 阶段三：回忆轮播
+        '<div id="phase3" class="bd-phase" style="display:none;position:relative;z-index:2;text-align:center;color:white;width:90%;max-width:600px;">' +
+          '<div class="carousel-frame" style="background:rgba(255,255,255,0.1);border-radius:20px;padding:16px;backdrop-filter:blur(10px);border:2px solid rgba(168,216,234,0.3);">' +
+            '<img id="carouselImg" src="" style="width:100%;max-height:50vh;object-fit:contain;border-radius:12px;transition:opacity 0.6s ease;" />' +
+          '</div>' +
+          '<p style="font-size:1rem;opacity:0.7;margin-top:16px;letter-spacing:2px;">我们的回忆 💙</p>' +
+          '<p id="carouselCounter" style="font-size:0.8rem;opacity:0.5;margin-top:4px;"></p>' +
+        '</div>' +
+        // 阶段四：礼盒
+        '<div id="phase4" class="bd-phase" style="display:none;position:relative;z-index:2;text-align:center;color:white;">' +
+          // 礼物盒
+          '<div id="giftBox" onclick="window.openBirthdayGift()" style="cursor:pointer;transition:transform 0.2s;position:relative;">' +
+            // 盒体
+            '<div style="width:120px;height:100px;background:linear-gradient(135deg,#6CB4EE,#4A90D9);border-radius:12px;margin:0 auto;position:relative;box-shadow:0 8px 30px rgba(74,144,217,0.4);">' +
+              // 丝带横条
+              '<div style="position:absolute;top:40%;left:0;width:100%;height:16px;background:rgba(255,255,255,0.5);border-radius:3px;"></div>' +
+              // 丝带竖条
+              '<div style="position:absolute;left:50%;top:0;width:16px;height:100%;background:rgba(255,255,255,0.35);border-radius:3px;transform:translateX(-50%);"></div>' +
+            '</div>' +
+            // 盒盖
+            '<div id="giftLid" style="width:130px;height:30px;background:linear-gradient(135deg,#7EC8F8,#5BA0E8);border-radius:8px;margin:0 auto;position:relative;top:-2px;transform-origin:right bottom;transition:transform 0.6s ease;box-shadow:0 4px 15px rgba(74,144,217,0.3);">' +
+              '<div style="position:absolute;top:5px;left:50%;transform:translateX(-50%);">' +
+                '<div style="width:30px;height:20px;border:3px solid rgba(255,255,255,0.7);border-radius:50% 50% 0 0;border-bottom:none;"></div>' +
+                '<div style="width:6px;height:6px;background:rgba(255,255,255,0.7);border-radius:50%;margin:2px auto 0;"></div>' +
+              '</div>' +
+            '</div>' +
+            // 提示文字
+            '<p style="margin-top:16px;font-size:0.9rem;opacity:0.6;animation:bounceHint 1.5s ease-in-out infinite;">点击打开 🎀</p>' +
+          '</div>' +
+          // 卡片（初始隐藏）
+          '<div id="giftCard" style="display:none;background:rgba(255,255,255,0.15);backdrop-filter:blur(12px);border-radius:24px;padding:24px;max-width:400px;margin:0 auto;border:2px solid rgba(168,216,234,0.3);animation:scaleIn 0.6s ease;">' +
+            (couplePhoto ? '<img src="'+getStorageUrl(couplePhoto)+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:16px;margin-bottom:16px;" />' : '<div style="font-size:60px;margin-bottom:16px;">🎂</div>') +
+            '<p style="font-size:1.1rem;margin-bottom:8px;text-shadow:0 1px 4px rgba(0,0,0,0.2);">提前祝老大生日快乐 🩵</p>' +
+            '<p style="font-size:0.8rem;opacity:0.6;margin-bottom:4px;">🎂 真正生日：6月22日</p>' +
+            '<p style="font-size:0.9rem;opacity:0.7;margin-bottom:16px;">' + daysText + '</p>' +
+            '<button onclick="window.enterMainApp()" style="padding:14px 48px;font-size:1.1rem;background:rgba(255,255,255,0.9);color:#4A90D9;border:none;border-radius:50px;cursor:pointer;font-weight:bold;box-shadow:0 4px 15px rgba(0,0,0,0.1);transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'">进入系统 💙</button>' +
+          '</div>' +
+        '</div>' +
+        // 音乐按钮和日期选择
+        '<div style="position:fixed;bottom:30px;right:30px;z-index:10;display:flex;gap:10px;align-items:center;">' +
+          '<p style="color:rgba(255,255,255,0.4);font-size:0.75rem;margin-right:4px;">' +
+            '<select id="birthdayMonth" onchange="window.updateBirthdayConfig()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:2px 6px;font-size:11px;">' +
+              [1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){return '<option value="'+m+'"'+(m===cfg.month?' selected':'')+'>'+m+'月</option>';}).join('') +
+            '</select>' +
+            '<select id="birthdayDay" onchange="window.updateBirthdayConfig()" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:2px 6px;font-size:11px;">' +
+              Array.from({length:31},function(_,i){return '<option value="'+(i+1)+'"'+(i+1===cfg.day?' selected':'')+'>'+(i+1)+'日</option>';}).join('') +
+            '</select>' +
+          '</p>' +
+          '<button id="musicToggle" onclick="window.toggleBirthdayMusic(event)" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;width:36px;height:36px;border-radius:50%;font-size:14px;cursor:pointer;">🔇</button>' +
+        '</div>' +
+        '<style>' +
+          '.bd-phase { transition: opacity 0.8s ease; }' +
+          '@keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }' +
+          '@keyframes shootStar { 0% { opacity:0; left:-120px; } 20% { opacity:1; } 80% { opacity:1; } 100% { opacity:0; left:calc(100% + 120px); } }' +
+          '@keyframes bounceHint { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }' +
+          '@keyframes scaleIn { from { transform:scale(0.7); opacity:0; } to { transform:scale(1); opacity:1; } }' +
+          '@keyframes fadeOut { to { opacity:0; } }' +
+        '</style>';
+
+    document.body.appendChild(overlay);
+
+    // 启动星空
+    startStarsCanvas();
+
+    // ---- 阶段调度 ----
+    var phase1 = document.getElementById('phase1');
+    var phase2 = document.getElementById('phase2');
+    var phase3 = document.getElementById('phase3');
+    var phase4 = document.getElementById('phase4');
+    var starsCanvas = document.getElementById('starsCanvas');
+
+    function switchPhase(from, to) {
+        if (from) { from.style.opacity = '0'; setTimeout(function(){ from.style.display = 'none'; }, 800); }
+        setTimeout(function() {
+            if (to) { to.style.display = 'block'; requestAnimationFrame(function(){ to.style.opacity = '1'; }); }
+        }, 400);
     }
-    const canvas = document.getElementById('petalsCanvas');
-    if (canvas) canvas.remove();
+
+    // 阶段1→2：星夜 → 流星 (2.5s)
+    setTimeout(function() {
+        switchPhase(phase1, phase2);
+        // 阶段2→3：流星 → 回忆轮播 (流星动画1.5s + 停留1.5s)
+        setTimeout(function() {
+            switchPhase(phase2, phase3);
+            startCarousel();
+            // 阶段3→4：轮播结束 → 礼盒
+            setTimeout(function() {
+                switchPhase(phase3, phase4);
+                // 背景亮起来
+                overlay.style.background = 'linear-gradient(180deg, #0b1a3b 0%, #1a3a6b 40%, #2A5C8A 100%)';
+                overlay.style.transition = 'background 1.5s ease';
+            }, (carouselPhotos.length || 3) * 2500 + 500);
+        }, 2800);
+    }, 2200);
+
+    // ---- 回忆轮播 ----
+    var carouselIndex = 0;
+    function startCarousel() {
+        var img = document.getElementById('carouselImg');
+        var counter = document.getElementById('carouselCounter');
+        if (!img || carouselPhotos.length === 0) {
+            img && (img.src = '');
+            return;
+        }
+        function showNext() {
+            if (!document.getElementById('phase3') || document.getElementById('phase3').style.display === 'none') return;
+            img.style.opacity = '0';
+            setTimeout(function() {
+                img.src = getStorageUrl(carouselPhotos[carouselIndex]);
+                img.style.opacity = '1';
+                counter.textContent = (carouselIndex + 1) + ' / ' + carouselPhotos.length;
+                carouselIndex = (carouselIndex + 1) % carouselPhotos.length;
+            }, 600);
+        }
+        showNext();
+        window.__carouselTimer = setInterval(showNext, 2500);
+    }
 }
 
-window.updateBirthdayConfig = async function() {
-    const monthEl = document.getElementById('birthdayMonth');
-    const dayEl = document.getElementById('birthdayDay');
-    if (!monthEl || !dayEl) return;
-    const month = parseInt(monthEl.value);
-    const day = parseInt(dayEl.value);
-    await saveBirthdayConfig({ month, day, name: birthdayConfig?.name || '老大' });
+window.showBirthdayWelcome = showBirthdayWelcome;
+
+// ---- 礼盒交互 ----
+window.openBirthdayGift = function() {
+    var lid = document.getElementById('giftLid');
+    var box = document.getElementById('giftBox');
+    var card = document.getElementById('giftCard');
+    if (!lid || lid.style.transform === 'rotate(-130deg)') return;
+
+    // 盒盖弹开
+    lid.style.transform = 'rotate(-130deg)';
+    lid.style.transition = 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)';
+    // 隐藏提示
+    var hint = box.querySelector('p');
+    if (hint) hint.style.display = 'none';
+
+    // 粒子喷涌
+    var rect = box.getBoundingClientRect();
+    var cx = rect.left + rect.width / 2;
+    var cy = rect.top;
+    burstParticles(cx, cy);
+
+    // 延迟显示卡片
+    setTimeout(function() {
+        if (card) card.style.display = 'block';
+        box.style.pointerEvents = 'none';
+    }, 600);
 };
 
+// ---- 进入主应用 ----
+window.enterMainApp = function() {
+    stopStarsCanvas();
+    if (window.__burstAnimId) { cancelAnimationFrame(window.__burstAnimId); window.__burstAnimId = null; }
+    if (window.__carouselTimer) { clearInterval(window.__carouselTimer); window.__carouselTimer = null; }
+    var overlay = document.getElementById('birthdayOverlay');
+    if (overlay) {
+        overlay.style.animation = 'fadeOut 0.8s ease forwards';
+        document.body.style.transition = 'opacity 0.8s ease';
+        document.body.style.opacity = '0';
+        setTimeout(function() {
+            overlay.remove();
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'block';
+            document.body.style.opacity = '1';
+            loadCategories();
+            loadPhotos();
+        }, 800);
+    }
+};
+
+// ---- 音乐 ----
 window.toggleBirthdayMusic = function(e) {
     e.stopPropagation();
-    let audio = document.getElementById('birthdayMusic');
-    const btn = document.getElementById('musicToggle');
+    var audio = document.getElementById('birthdayMusic');
+    var btn = document.getElementById('musicToggle');
     if (!audio) {
         audio = document.createElement('audio');
         audio.id = 'birthdayMusic';
@@ -313,7 +527,7 @@ window.toggleBirthdayMusic = function(e) {
         document.body.appendChild(audio);
     }
     if (audio.paused) {
-        audio.play().catch(() => {});
+        audio.play().catch(function(){});
         if (btn) btn.textContent = '🔊';
     } else {
         audio.pause();
@@ -321,46 +535,13 @@ window.toggleBirthdayMusic = function(e) {
     }
 };
 
-window.hideLaoda = function() {
-    const laodaText = document.getElementById('laodaText')
-    const arrowHint = document.getElementById('arrowHint')
-    const wishText = document.getElementById('wishText')
-    const prankText = document.getElementById('prankText')
-    
-    // 老大旋转消失
-    laodaText.style.animation = 'laodaSpin 0.8s ease forwards'
-    
-    // 箭头逐渐消失
-    arrowHint.style.animation = 'arrowFade 0.5s ease forwards'
-    
-    // 显示小弟文字
-    setTimeout(() => {
-        laodaText.style.display = 'none'
-        arrowHint.style.display = 'none'
-        prankText.textContent = '你是小弟嘻嘻嘻'
-        prankText.style.opacity = '1'
-        prankText.style.fontSize = '2.5rem'
-        wishText.style.display = 'none'
-    }, 800)
-}
-
-window.enterMainApp = function() {
-    stopPetalAnimation();
-    const overlay = document.getElementById('birthdayOverlay')
-    if (overlay) {
-        overlay.style.animation = 'fadeOut 0.8s ease forwards'
-        document.body.style.transition = 'opacity 0.8s ease'
-        document.body.style.opacity = '0'
-
-        setTimeout(() => {
-            overlay.remove()
-            showMainApp()
-            document.body.style.opacity = '1'
-            loadCategories()
-            loadPhotos()
-        }, 800)
-    }
-}
+// ---- 日期配置 ----
+window.updateBirthdayConfig = async function() {
+    var m = document.getElementById('birthdayMonth');
+    var d = document.getElementById('birthdayDay');
+    if (!m || !d) return;
+    await saveBirthdayConfig({ month: parseInt(m.value), day: parseInt(d.value), name: (birthdayConfig && birthdayConfig.name) || '老大' });
+};
 
 // ========== 数据加载（维护本地 state 供剩余代码使用）==========
 async function loadCategories() {
