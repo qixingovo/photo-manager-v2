@@ -311,19 +311,47 @@ function burstParticles(x, y) {
     animate();
 }
 
+// 生日文案解析：替换 {name}, {realBirthday}, {days} 占位符
+function resolveBirthdayText(template, cfg, daysTogether) {
+    var name = (cfg && cfg.name) || '老大';
+    var rb = (cfg && cfg.realBirthday) || '6月22日';
+    var days = (daysTogether > 0 ? daysTogether : '{days}');
+    return (template || '')
+        .replace(/\{name\}/g, name)
+        .replace(/\{realBirthday\}/g, rb)
+        .replace(/\{days\}/g, days);
+}
+
+// 读取生日文案（优先 config.texts，fallback 默认值）
+function bdText(config, key, fallback) {
+    return (config && config.texts && config.texts[key]) || fallback;
+}
+
 // ---- 主流程 ----
 async function showBirthdayWelcome() {
     await loadBirthdayConfig();
     var cfg = birthdayConfig || { month: 6, day: 22, name: '老大' };
 
     // 预加载照片
-    var carouselPhotos = await loadPhotosByCategory('老大和小弟');
+    var carouselCat = cfg.carouselCategory || '老大和小弟';
+    var coupleCat = cfg.coupleCategory || '合照';
+    var carouselPhotos = await loadPhotosByCategory(carouselCat);
     var couplePhoto = null;
-    var couplePhotos = await loadPhotosByCategory('合照');
+    var couplePhotos = await loadPhotosByCategory(coupleCat);
     if (couplePhotos.length > 0) couplePhoto = couplePhotos[Math.floor(Math.random() * couplePhotos.length)];
 
     var daysTogether = getDaysTogether();
-    var daysText = daysTogether > 0 ? '一起走过了 ' + daysTogether + ' 天 💙' : '';
+    // 生成所有文案（支持 config.texts 覆盖）
+    var t_phase1     = resolveBirthdayText(bdText(cfg, 'phase1', '今天是个特别的日子 ✨'), cfg, daysTogether);
+    var t_title      = resolveBirthdayText(bdText(cfg, 'title', '提前祝{name}生日快乐 🩵'), cfg, daysTogether);
+    var t_subtitle   = resolveBirthdayText(bdText(cfg, 'subtitle', '🎂 真正生日是{realBirthday}'), cfg, daysTogether);
+    var t_crslLabel  = resolveBirthdayText(bdText(cfg, 'carouselLabel', '我们的回忆 💙'), cfg, daysTogether);
+    var t_cardTitle  = resolveBirthdayText(bdText(cfg, 'cardTitle', '提前祝{name}生日快乐 🩵'), cfg, daysTogether);
+    var t_cardSub    = resolveBirthdayText(bdText(cfg, 'cardSubtitle', '🎂 真正生日：{realBirthday}'), cfg, daysTogether);
+    var t_daysLabel  = resolveBirthdayText(bdText(cfg, 'daysLabel', '一起走过了 {days} 天 💙'), cfg, daysTogether);
+    var t_enterBtn   = resolveBirthdayText(bdText(cfg, 'enterButton', '进入系统 💙'), cfg, daysTogether);
+    var t_giftHint   = resolveBirthdayText(bdText(cfg, 'giftHint', '点击打开 🎀'), cfg, daysTogether);
+    var daysText = daysTogether > 0 ? t_daysLabel : '';
 
     // 构建 overlay
     var overlay = document.createElement('div');
@@ -335,14 +363,14 @@ async function showBirthdayWelcome() {
         '<canvas id="burstCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;"></canvas>' +
         // 阶段一：星夜开场
         '<div id="phase1" class="bd-phase" style="position:relative;z-index:2;text-align:center;color:white;">' +
-          '<p style="font-size:1.2rem;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:0.5s;letter-spacing:3px;">今天是个特别的日子 ✨</p>' +
+          '<p style="font-size:1.2rem;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:0.5s;letter-spacing:3px;">' + t_phase1 + '</p>' +
         '</div>' +
         // 阶段二：流星许愿
         '<div id="phase2" class="bd-phase" style="display:none;position:relative;z-index:2;text-align:center;color:white;">' +
           '<div style="position:relative;">' +
             '<div class="shooting-star" style="position:absolute;top:-60px;left:-120px;width:120px;height:3px;background:linear-gradient(90deg, transparent, #A8D8EA, #fff);border-radius:3px;transform:rotate(-35deg);opacity:0;animation:shootStar 1.5s ease-in forwards;"></div>' +
-            '<h1 style="font-size:2.5rem;font-weight:bold;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:1.2s;text-shadow:0 2px 12px rgba(168,216,234,0.5);">提前祝老大生日快乐 🩵</h1>' +
-            '<p style="font-size:0.9rem;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:1.5s;margin-top:8px;color:rgba(168,216,234,0.7);">🎂 真正生日是6月22日</p>' +
+            '<h1 style="font-size:2.5rem;font-weight:bold;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:1.2s;text-shadow:0 2px 12px rgba(168,216,234,0.5);">' + t_title + '</h1>' +
+            '<p style="font-size:0.9rem;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:1.5s;margin-top:8px;color:rgba(168,216,234,0.7);">' + t_subtitle + '</p>' +
           '</div>' +
         '</div>' +
         // 阶段三：回忆轮播
@@ -350,7 +378,7 @@ async function showBirthdayWelcome() {
           '<div class="carousel-frame" style="background:rgba(255,255,255,0.1);border-radius:20px;padding:16px;backdrop-filter:blur(10px);border:2px solid rgba(168,216,234,0.3);">' +
             '<img id="carouselImg" src="" style="width:100%;max-height:50vh;object-fit:contain;border-radius:12px;transition:opacity 0.6s ease;" />' +
           '</div>' +
-          '<p style="font-size:1rem;opacity:0.7;margin-top:16px;letter-spacing:2px;">我们的回忆 💙</p>' +
+          '<p style="font-size:1rem;opacity:0.7;margin-top:16px;letter-spacing:2px;">' + t_crslLabel + '</p>' +
           '<p id="carouselCounter" style="font-size:0.8rem;opacity:0.5;margin-top:4px;"></p>' +
         '</div>' +
         // 阶段四：礼盒
@@ -372,15 +400,15 @@ async function showBirthdayWelcome() {
               '</div>' +
             '</div>' +
             // 提示文字
-            '<p style="margin-top:16px;font-size:0.9rem;opacity:0.6;animation:bounceHint 1.5s ease-in-out infinite;">点击打开 🎀</p>' +
+            '<p style="margin-top:16px;font-size:0.9rem;opacity:0.6;animation:bounceHint 1.5s ease-in-out infinite;">' + t_giftHint + '</p>' +
           '</div>' +
           // 卡片（初始隐藏）
           '<div id="giftCard" style="display:none;background:rgba(255,255,255,0.15);backdrop-filter:blur(12px);border-radius:24px;padding:24px;max-width:400px;margin:0 auto;border:2px solid rgba(168,216,234,0.3);animation:scaleIn 0.6s ease;">' +
             (couplePhoto ? '<img src="'+getStorageUrl(couplePhoto)+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:16px;margin-bottom:16px;" />' : '<div style="font-size:60px;margin-bottom:16px;">🎂</div>') +
-            '<p style="font-size:1.1rem;margin-bottom:8px;text-shadow:0 1px 4px rgba(0,0,0,0.2);">提前祝老大生日快乐 🩵</p>' +
-            '<p style="font-size:0.8rem;opacity:0.6;margin-bottom:4px;">🎂 真正生日：6月22日</p>' +
+            '<p style="font-size:1.1rem;margin-bottom:8px;text-shadow:0 1px 4px rgba(0,0,0,0.2);">' + t_cardTitle + '</p>' +
+            '<p style="font-size:0.8rem;opacity:0.6;margin-bottom:4px;">' + t_cardSub + '</p>' +
             '<p style="font-size:0.9rem;opacity:0.7;margin-bottom:16px;">' + daysText + '</p>' +
-            '<button onclick="window.enterMainApp()" style="padding:14px 48px;font-size:1.1rem;background:rgba(255,255,255,0.9);color:#4A90D9;border:none;border-radius:50px;cursor:pointer;font-weight:bold;box-shadow:0 4px 15px rgba(0,0,0,0.1);transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'">进入系统 💙</button>' +
+            '<button onclick="window.enterMainApp()" style="padding:14px 48px;font-size:1.1rem;background:rgba(255,255,255,0.9);color:#4A90D9;border:none;border-radius:50px;cursor:pointer;font-weight:bold;box-shadow:0 4px 15px rgba(0,0,0,0.1);transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'">' + t_enterBtn + '</button>' +
           '</div>' +
         '</div>' +
         // 音乐按钮和日期选择

@@ -624,19 +624,46 @@ const mobile = {
         return 0;
     },
 
+    // 生日文案解析：替换占位符
+    _resolveBirthdayText(template, cfg, daysTogether) {
+        const name = (cfg && cfg.name) || '老大';
+        const rb = (cfg && cfg.realBirthday) || '6月22日';
+        const days = (daysTogether > 0 ? daysTogether : '{days}');
+        return (template || '')
+            .replace(/\{name\}/g, name)
+            .replace(/\{realBirthday\}/g, rb)
+            .replace(/\{days\}/g, days);
+    },
+
+    _bdText(config, key, fallback) {
+        return (config && config.texts && config.texts[key]) || fallback;
+    },
+
     async showBirthdayWelcomeOverlay() {
         const self = this;
         await self.loadBirthdayConfig();
         const cfg = self.birthdayConfig || { month: 6, day: 22, name: '老大' };
 
         // 预加载照片
-        const carouselPhotos = await self.loadPhotosByCategory('老大和小弟');
-        const couplePhotos = await self.loadPhotosByCategory('合照');
+        const carouselCat = cfg.carouselCategory || '老大和小弟';
+        const coupleCat = cfg.coupleCategory || '合照';
+        const carouselPhotos = await self.loadPhotosByCategory(carouselCat);
+        const couplePhotos = await self.loadPhotosByCategory(coupleCat);
         let couplePhoto = null;
         if (couplePhotos.length > 0) couplePhoto = couplePhotos[Math.floor(Math.random() * couplePhotos.length)];
 
         const daysTogether = self.getDaysTogether();
-        const daysText = daysTogether > 0 ? '一起走过了 ' + daysTogether + ' 天 💙' : '';
+        // 生成所有文案
+        const t_phase1     = self._resolveBirthdayText(self._bdText(cfg, 'phase1', '今天是个特别的日子 ✨'), cfg, daysTogether);
+        const t_title      = self._resolveBirthdayText(self._bdText(cfg, 'title', '提前祝{name}生日快乐 🩵'), cfg, daysTogether);
+        const t_subtitle   = self._resolveBirthdayText(self._bdText(cfg, 'subtitle', '🎂 真正生日是{realBirthday}'), cfg, daysTogether);
+        const t_crslLabel  = self._resolveBirthdayText(self._bdText(cfg, 'carouselLabel', '我们的回忆 💙'), cfg, daysTogether);
+        const t_cardTitle  = self._resolveBirthdayText(self._bdText(cfg, 'cardTitle', '提前祝{name}生日快乐 🩵'), cfg, daysTogether);
+        const t_cardSub    = self._resolveBirthdayText(self._bdText(cfg, 'cardSubtitle', '🎂 真正生日：{realBirthday}'), cfg, daysTogether);
+        const t_daysLabel  = self._resolveBirthdayText(self._bdText(cfg, 'daysLabel', '一起走过了 {days} 天 💙'), cfg, daysTogether);
+        const t_enterBtn   = self._resolveBirthdayText(self._bdText(cfg, 'enterButton', '进入系统 💙'), cfg, daysTogether);
+        const t_giftHint   = self._resolveBirthdayText(self._bdText(cfg, 'giftHint', '点击打开 🎀'), cfg, daysTogether);
+        const daysText = daysTogether > 0 ? t_daysLabel : '';
 
         const overlay = document.createElement('div');
         overlay.id = 'mobileBirthdayOverlay';
@@ -646,18 +673,18 @@ const mobile = {
             '<canvas id="mobileStarsCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;"></canvas>' +
             '<canvas id="mobileBurstCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;"></canvas>' +
             '<div id="mbPhase1" class="mb-phase" style="position:relative;z-index:2;text-align:center;color:white;padding:20px;">' +
-              '<p style="font-size:1rem;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:0.5s;letter-spacing:2px;">今天是个特别的日子 ✨</p>' +
+              '<p style="font-size:1rem;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:0.5s;letter-spacing:2px;">' + t_phase1 + '</p>' +
             '</div>' +
             '<div id="mbPhase2" class="mb-phase" style="display:none;position:relative;z-index:2;text-align:center;color:white;padding:20px;">' +
               '<div class="mb-shooting-star" style="position:absolute;top:-40px;left:-80px;width:80px;height:2px;background:linear-gradient(90deg,transparent,#A8D8EA,#fff);border-radius:2px;transform:rotate(-35deg);opacity:0;animation:mbShootStar 1.5s ease-in forwards;"></div>' +
-              '<h1 style="font-size:1.6rem;font-weight:bold;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:1.2s;text-shadow:0 2px 10px rgba(168,216,234,0.5);">提前祝老大生日快乐 🩵</h1>' +
-              '<p style="font-size:0.8rem;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:1.5s;margin-top:6px;color:rgba(168,216,234,0.7);">🎂 真正生日是6月22日</p>' +
+              '<h1 style="font-size:1.6rem;font-weight:bold;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:1.2s;text-shadow:0 2px 10px rgba(168,216,234,0.5);">' + t_title + '</h1>' +
+              '<p style="font-size:0.8rem;opacity:0;animation:fadeInUp 1s ease forwards;animation-delay:1.5s;margin-top:6px;color:rgba(168,216,234,0.7);">' + t_subtitle + '</p>' +
             '</div>' +
             '<div id="mbPhase3" class="mb-phase" style="display:none;position:relative;z-index:2;text-align:center;color:white;width:90%;max-width:360px;">' +
               '<div class="carousel-frame" style="background:rgba(255,255,255,0.1);border-radius:16px;padding:12px;backdrop-filter:blur(10px);border:1.5px solid rgba(168,216,234,0.3);">' +
                 '<img id="mbCarouselImg" src="" style="width:100%;max-height:40vh;object-fit:contain;border-radius:10px;transition:opacity 0.6s ease;" />' +
               '</div>' +
-              '<p style="font-size:0.9rem;opacity:0.7;margin-top:12px;letter-spacing:1px;">我们的回忆 💙</p>' +
+              '<p style="font-size:0.9rem;opacity:0.7;margin-top:12px;letter-spacing:1px;">' + t_crslLabel + '</p>' +
               '<p id="mbCarouselCounter" style="font-size:0.75rem;opacity:0.5;margin-top:2px;"></p>' +
             '</div>' +
             '<div id="mbPhase4" class="mb-phase" style="display:none;position:relative;z-index:2;text-align:center;color:white;padding:20px;">' +
@@ -672,14 +699,14 @@ const mobile = {
                     '<div style="width:5px;height:5px;background:rgba(255,255,255,0.7);border-radius:50%;margin:1.5px auto 0;"></div>' +
                   '</div>' +
                 '</div>' +
-                '<p style="margin-top:14px;font-size:0.85rem;opacity:0.6;animation:bounceHint 1.5s ease-in-out infinite;">点击打开 🎀</p>' +
+                '<p style="margin-top:14px;font-size:0.85rem;opacity:0.6;animation:bounceHint 1.5s ease-in-out infinite;">' + t_giftHint + '</p>' +
               '</div>' +
               '<div id="mbGiftCard" style="display:none;background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);border-radius:20px;padding:20px;max-width:320px;margin:0 auto;border:1.5px solid rgba(168,216,234,0.3);animation:scaleIn 0.6s ease;">' +
                 (couplePhoto ? '<img src="'+self.getStorageUrl(couplePhoto)+'" style="width:100%;max-height:160px;object-fit:cover;border-radius:14px;margin-bottom:14px;" />' : '<div style="font-size:50px;margin-bottom:14px;">🎂</div>') +
-                '<p style="font-size:1rem;margin-bottom:6px;">提前祝老大生日快乐 🩵</p>' +
-                '<p style="font-size:0.7rem;opacity:0.6;margin-bottom:2px;">🎂 真正生日：6月22日</p>' +
+                '<p style="font-size:1rem;margin-bottom:6px;">' + t_cardTitle + '</p>' +
+                '<p style="font-size:0.7rem;opacity:0.6;margin-bottom:2px;">' + t_cardSub + '</p>' +
                 '<p style="font-size:0.8rem;opacity:0.7;margin-bottom:14px;">' + daysText + '</p>' +
-                '<button onclick="mobile.enterFromBirthday()" style="padding:12px 40px;font-size:1rem;background:rgba(255,255,255,0.9);color:#4A90D9;border:none;border-radius:50px;cursor:pointer;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,0.1);">进入系统 💙</button>' +
+                '<button onclick="mobile.enterFromBirthday()" style="padding:12px 40px;font-size:1rem;background:rgba(255,255,255,0.9);color:#4A90D9;border:none;border-radius:50px;cursor:pointer;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,0.1);">' + t_enterBtn + '</button>' +
               '</div>' +
             '</div>' +
             '<div style="position:fixed;bottom:20px;right:16px;z-index:10;display:flex;gap:8px;align-items:center;">' +
