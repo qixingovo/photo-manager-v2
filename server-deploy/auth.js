@@ -5,6 +5,17 @@ const { PHOTO_JWT_SECRET, pool } = require('../config');
 
 const router = express.Router();
 
+// CORS 中间件 — 允许 ours.qixingovo.cn 跨域请求
+router.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', req.headers.origin || 'https://ours.qixingovo.cn');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Headers', 'Authorization, Content-Type, apikey, x-client-info');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Max-Age', '86400');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+});
+
 // POST /auth/v1/token — 登录
 router.post('/v1/token', async (req, res) => {
     if (req.query.grant_type !== 'password') return res.status(400).json({ error: 'unsupported_grant_type' });

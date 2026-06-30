@@ -64,6 +64,7 @@ export let currentTaskTab = 'tasks';
 export const INTIMATE_STORAGE_KEY = 'intimate_unlocked';
 
 export let currentUser = null;
+export function setCurrentUser(user) { currentUser = user; }
 
 // ========== 主题 ==========
 function initTheme() {

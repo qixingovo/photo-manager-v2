@@ -1,6 +1,7 @@
 // src/desktop/views/auth.js — 桌面端登录/登出/改密码
 import { supabase, USER_EMAIL_MAP, getUserFromSession } from '../../core/supabase.js';
 import * as Main from '../main.js';
+import { setCurrentUser } from '../main.js';
 
 const APP_CONFIG = window.__APP_CONFIG__ || {};
 
@@ -53,7 +54,7 @@ export async function handleLogin(e) {
         username: profile.username,
         role: profile.role
     };
-    Main.currentUser = getUserFromSession(session);
+    setCurrentUser(getUserFromSession(session));
     errorEl.textContent = '';
     // 如果是老大且今天是生日，显示生日快乐欢迎界面
     await Main.loadBirthdayConfig();
@@ -69,7 +70,7 @@ export async function handleLogin(e) {
 }
 
 export async function handleLogout() {
-    Main.currentUser = null;
+    setCurrentUser(null);
     await supabase.auth.signOut();
     Main.showLoginPage();
 }
