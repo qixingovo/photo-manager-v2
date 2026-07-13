@@ -19,6 +19,7 @@ public class MainActivity extends BridgeActivity {
 
     private static final String PRIMARY_URL = "https://ours.qixingovo.cn";
     private static final String FALLBACK_URL = "https://photo.qixingovo.cn";
+    private static final int TIMEOUT_MS = 3000;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,7 +31,7 @@ public class MainActivity extends BridgeActivity {
         final Handler handler = new Handler(Looper.getMainLooper());
         final WebViewClient originalClient = webView.getWebViewClient();
 
-        // 5 秒超时：如果主域名没加载完，切到备用域名
+        // 3 秒超时：如果主域名没加载完，切到备用域名
         final Runnable fallbackRunner = () -> {
             if (!triedFallback[0]) {
                 triedFallback[0] = true;
@@ -38,7 +39,7 @@ public class MainActivity extends BridgeActivity {
                 webView.loadUrl(FALLBACK_URL);
             }
         };
-        handler.postDelayed(fallbackRunner, 5000);
+        handler.postDelayed(fallbackRunner, TIMEOUT_MS);
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
