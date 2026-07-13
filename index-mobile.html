@@ -37,8 +37,12 @@
                 <div class="input-group">
                     <input type="password" id="loginPassword" placeholder="密码" required autocomplete="current-password">
                 </div>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#888;margin-top:4px;">
+                    <input type="checkbox" id="rememberMe" checked style="width:16px;height:16px;"> 记住我，下次自动登录
+                </label>
                 <p id="loginError" class="error-msg"></p>
                 <button type="submit" class="btn-primary">登录</button>
+                <a href="/download/app-release.apk" class="download-link" style="display:block;margin-top:12px;text-align:center;color:#4A90D9;font-size:13px;text-decoration:none;">📱 下载 Android App</a>
             </form>
         </div>
     </div>
@@ -175,14 +179,14 @@
 
         <div class="upload-card">
             <!-- 拖拽/点击上传区域 -->
-            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('photoInput').click()">
-                <input type="file" id="photoInput" accept="image/*" multiple hidden onchange="mobile.handleFileSelect(event)">
+            <div class="upload-zone" id="uploadZone" onclick="mobile.pickPhotos()">
                 <div class="upload-hint">
                     <span class="upload-icon">📤</span>
                     <p>点击选择照片</p>
-                    <small>或拖放到这里</small>
+                    <small>使用系统相册选择</small>
                 </div>
             </div>
+            <input type="file" id="photoInput" accept="image/*" multiple onchange="mobile.handleFileSelect(event)" style="display:none;">
 
             <!-- 预览区域 -->
             <div id="previewArea" class="preview-area" style="display:none;">

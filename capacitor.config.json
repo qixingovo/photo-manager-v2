@@ -1,0 +1,9 @@
+{
+  "appId": "com.qixingovo.photos",
+  "appName": "回忆",
+  "webDir": "dist",
+  "server": {
+    "url": "https://ours.qixingovo.cn",
+    "cleartext": true
+  }
+}

@@ -8,3 +8,13 @@ src/core/config.js
 docs/
 .superpowers/
 *.bak
+# Android
+android/app/build/
+android/.gradle/
+android/build/
+android/capacitor-cordova-android-plugins/build/
+android/local.properties
+android/keystore.properties
+android/*.keystore
+*.apk
+*.aab

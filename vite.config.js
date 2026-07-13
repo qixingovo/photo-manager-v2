@@ -29,6 +29,23 @@ function copyStaticFiles() {
           console.log(`  复制: ${file}`)
         }
       })
+      // 复制 modules 目录（懒加载模块，APK 需要）
+      const modulesSrc = path.resolve(__dirname, 'modules')
+      const modulesDest = path.resolve(distDir, 'modules')
+      if (fs.existsSync(modulesSrc)) {
+        fs.cpSync(modulesSrc, modulesDest, { recursive: true })
+        console.log('  复制: modules/')
+      }
+      // 复制 download 目录（APK 下载）
+      const dlSrc = path.resolve(__dirname, 'download')
+      const dlDest = path.resolve(distDir, 'download')
+      if (fs.existsSync(dlSrc)) {
+        fs.mkdirSync(dlDest, { recursive: true })
+        fs.readdirSync(dlSrc).forEach(f => {
+          fs.copyFileSync(path.join(dlSrc, f), path.join(dlDest, f))
+          console.log('  复制: download/' + f)
+        })
+      }
     }
   }
 }

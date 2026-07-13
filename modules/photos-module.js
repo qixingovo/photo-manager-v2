@@ -272,41 +272,80 @@
     // ========================================
     // 上传相关
     // ========================================
-    handleFileSelect(e) {
-        const files = Array.from(e.target.files);
-        if (files.length === 0) return;
+    // pickPhotos 现在由 mobile-app.js 统一处理，这里保留 handleFileSelect 作为浏览器回退
 
-        this.previewFiles = files;
+    handleFileSelect(e) {
+        var files = e.target.files;
+        if (!files || files.length === 0) return;
+        this._onFilesSelected(Array.from(files));
+        e.target.value = '';
+    },
+
+    _onFilesSelected(fileArr) {
+        this.showToast && this.showToast('已选择 ' + fileArr.length + ' 张照片');
+        this.previewFiles = fileArr;
+        this._showPreviews(fileArr);
+    },
+
+    _showPreviews(files) {
         const previewArea = document.getElementById('previewArea');
         const previewGrid = document.getElementById('previewGrid');
-
+        if (!previewArea || !previewGrid) return;
         previewArea.style.display = 'block';
-        previewGrid.innerHTML = files.map((file, index) => `
-            <div class="preview-item">
-                <img src="${URL.createObjectURL(file)}" alt="Preview">
-                <button class="remove-btn" onclick="mobile.removePreview(${index})">×</button>
-            </div>
-        `).join('');
+        previewGrid.innerHTML = '';
+
+        for (let i = 0; i < files.length; i++) {
+            const item = document.createElement('div');
+            item.className = 'preview-item';
+            const img = document.createElement('img');
+            img.alt = 'Preview';
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'cover';
+
+            const file = files[i];
+            // 优先 createObjectURL（浏览器），FileReader 做 fallback（Android WebView）
+            try {
+                const url = URL.createObjectURL(file);
+                img.src = url;
+                // 验证 blob URL 是否可用
+                img.onerror = () => { this._fallbackPreview(img, file); };
+            } catch(e) {
+                this._fallbackPreview(img, file);
+            }
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn';
+            removeBtn.textContent = '×';
+            removeBtn.onclick = (function(idx) { return function() { mobile.removePreview(idx); }; })(i);
+
+            item.appendChild(img);
+            item.appendChild(removeBtn);
+            previewGrid.appendChild(item);
+        }
+    },
+
+    _fallbackPreview(img, file) {
+        const reader = new FileReader();
+        reader.onload = function() { img.src = reader.result; };
+        reader.onerror = function() { img.parentElement.innerHTML = '<div style="color:red;font-size:12px;">预览失败</div>'; };
+        reader.readAsDataURL(file);
     },
 
     removePreview(index) {
         this.previewFiles.splice(index, 1);
         if (this.previewFiles.length === 0) {
             document.getElementById('previewArea').style.display = 'none';
+            document.getElementById('photoInput').value = '';
         } else {
-            this.renderPreviews();
+            this._showPreviews(this.previewFiles);
         }
     },
 
     renderPreviews() {
-        const previewGrid = document.getElementById('previewGrid');
-        if (!previewGrid) return;
-        previewGrid.innerHTML = this.previewFiles.map((file, index) => `
-            <div class="preview-item">
-                <img src="${URL.createObjectURL(file)}" alt="Preview">
-                <button class="remove-btn" onclick="mobile.removePreview(${index})">×</button>
-            </div>
-        `).join('');
+        if (this.previewFiles && this.previewFiles.length > 0) {
+            this._showPreviews(this.previewFiles);
+        }
     },
 
     clearPreviews() {
@@ -316,7 +355,9 @@
     },
 
     async uploadPhotos() {
-        if (this.previewFiles.length === 0) {
+        this.showToast('开始上传，共' + (this.previewFiles ? this.previewFiles.length : 0) + '张');
+        try {
+        if (!this.previewFiles || this.previewFiles.length === 0) {
             this.showToast('请先选择照片');
             return;
         }
@@ -451,11 +492,15 @@
         if (categoryId) {
             localStorage.setItem('lastUploadCategoryId', categoryId);
         }
-        
+
         // 重新加载照片和分类关联
         await this.loadPhotos();
         await this.loadAllPhotoCategories();
         this.renderPhotos();
+        } catch(e) {
+            this.showToast('上传异常: ' + (e.message || '未知错误'));
+            console.error(e);
+        }
     },
 
 
