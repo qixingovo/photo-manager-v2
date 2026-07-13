@@ -25,17 +25,35 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         WebView webView = getBridge().getWebView();
 
-        // 双域名自动切换：Vercel 不可达时切到 ECS
+        // 双域名自动切换：5 秒超时 + 错误回调，双重保险
         final boolean[] triedFallback = {false};
         final Handler handler = new Handler(Looper.getMainLooper());
         final WebViewClient originalClient = webView.getWebViewClient();
 
+        // 5 秒超时：如果主域名没加载完，切到备用域名
+        final Runnable fallbackRunner = () -> {
+            if (!triedFallback[0]) {
+                triedFallback[0] = true;
+                webView.stopLoading();
+                webView.loadUrl(FALLBACK_URL);
+            }
+        };
+        handler.postDelayed(fallbackRunner, 5000);
+
         webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                // 任意域名加载成功 → 取消超时
+                handler.removeCallbacks(fallbackRunner);
+                if (originalClient != null) originalClient.onPageFinished(view, url);
+            }
+
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request,
                                          WebResourceError error) {
                 if (!triedFallback[0] && request.isForMainFrame()) {
                     triedFallback[0] = true;
+                    handler.removeCallbacks(fallbackRunner);
                     handler.post(() -> view.loadUrl(FALLBACK_URL));
                 } else if (originalClient != null) {
                     originalClient.onReceivedError(view, request, error);
@@ -43,8 +61,18 @@ public class MainActivity extends BridgeActivity {
             }
 
             @Override
-            public void onPageFinished(WebView view, String url) {
-                if (originalClient != null) originalClient.onPageFinished(view, url);
+            public void onReceivedSslError(WebView view,
+                                            android.webkit.SslErrorHandler sslHandler,
+                                            android.net.http.SslError error) {
+                // SSL 错误也触发 fallback
+                if (!triedFallback[0]) {
+                    triedFallback[0] = true;
+                    handler.removeCallbacks(fallbackRunner);
+                    sslHandler.cancel();
+                    handler.post(() -> view.loadUrl(FALLBACK_URL));
+                } else if (originalClient != null) {
+                    originalClient.onReceivedSslError(view, sslHandler, error);
+                }
             }
 
             @Override
