@@ -14,13 +14,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="config.js?v=2"></script>
-    <script>
-    // ours 域走同源 API（Vercel rewrites 内网代理到 ECS），绕过 ECS 证书问题
-    if (location.hostname === 'ours.qixingovo.cn' && window.__APP_CONFIG__) {
-        window.__APP_CONFIG__.SUPABASE_URL = 'https://ours.qixingovo.cn';
-        window.__APP_CONFIG__.SUPABASE_STORAGE_URL = 'https://ours.qixingovo.cn/storage/v1/object/public/photo/';
-    }
-    </script>
     <script src="common.js?v=mp8lpeav"></script>
 </head>
 <body>

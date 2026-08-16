@@ -3,7 +3,7 @@
   "appName": "回忆",
   "webDir": "dist",
   "server": {
-    "url": "https://ours.qixingovo.cn",
+    "url": "https://photo.qixingovo.cn",
     "cleartext": true
   }
 }
