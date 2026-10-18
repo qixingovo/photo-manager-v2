@@ -3,7 +3,7 @@
   "appName": "回忆",
   "webDir": "dist",
   "server": {
-    "url": "https://photo.qixingovo.cn",
+    "url": "https://47.114.121.178.nip.io",
     "cleartext": true
   }
 }

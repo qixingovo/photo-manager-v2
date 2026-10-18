@@ -21,7 +21,11 @@ function loadEnvFile() {
 }
 loadEnvFile()
 
-const SUPABASE_URL = process.env.SUPABASE_URL
+const SUPABASE_URL_RAW = process.env.SUPABASE_URL
+// SUPABASE_URL 设为 auto 或 origin 时，前端使用当前访问域名（同源），
+// 便于多域名/应急入口部署（如 SNI 阻断时切换到备用域名）。
+const SUPABASE_URL_AUTO = SUPABASE_URL_RAW === 'auto' || SUPABASE_URL_RAW === 'origin'
+const SUPABASE_URL = SUPABASE_URL_AUTO ? 'window.location.origin' : SUPABASE_URL_RAW
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
 const SUPABASE_STORAGE_URL = process.env.SUPABASE_STORAGE_URL || ''
 const PEPPER = process.env.PEPPER || ''
@@ -29,7 +33,7 @@ const USER_EMAILS_LAODA = process.env.USER_EMAILS_LAODA || ''
 const USER_EMAILS_XIAODI = process.env.USER_EMAILS_XIAODI || ''
 const DEBUG = process.env.DEBUG || 'false'
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+if (!SUPABASE_URL_RAW || !SUPABASE_ANON_KEY) {
     console.error('错误：缺少环境变量 SUPABASE_URL 和 SUPABASE_ANON_KEY')
     console.error('请复制 .env.example 为 .env 并填入实际值')
     process.exit(1)
@@ -37,11 +41,15 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 
 const lines = [
     `window.__APP_CONFIG__ = {`,
-    `    SUPABASE_URL: ${JSON.stringify(SUPABASE_URL)},`,
+    SUPABASE_URL_AUTO
+        ? `    SUPABASE_URL: window.location.origin,`
+        : `    SUPABASE_URL: ${JSON.stringify(SUPABASE_URL_RAW)},`,
     `    SUPABASE_ANON_KEY: ${JSON.stringify(SUPABASE_ANON_KEY)},`,
 ]
 
-if (SUPABASE_STORAGE_URL) {
+if (SUPABASE_URL_AUTO) {
+    lines.push(`    SUPABASE_STORAGE_URL: window.location.origin + "/storage/v1/object/public/photo/",`)
+} else if (SUPABASE_STORAGE_URL) {
     lines.push(`    SUPABASE_STORAGE_URL: ${JSON.stringify(SUPABASE_STORAGE_URL)},`)
 }
 
