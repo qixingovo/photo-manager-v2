@@ -1,8 +1,9 @@
 // app.js — 桌面版入口：导入 main.js（状态 + 初始化）+ 各视图模块
 import './src/desktop/main.js';
 import { supabase } from './src/core/supabase.js';
+import { authStorage } from './src/core/session-service.js';
 // 视图模块（side-effect 导入，自动注册 window.* 函数）
-import './src/desktop/views/auth.js';
+import { handleLogout as handleDesktopLogout } from './src/desktop/views/auth.js';
 import './src/desktop/views/album.js';
 import './src/desktop/views/category-manager.js';
 import './src/desktop/views/map.js';
@@ -630,8 +631,7 @@ async function loadPhotos() {
 
 window.handleLogout = async function() {
     currentUser = null;
-    await supabase.auth.signOut();
-    showLoginPage();
+    await handleDesktopLogout();
 }
 
 // ---- 修改密码 ----
@@ -661,7 +661,7 @@ window.handleChangePassword = async function(e) {
     if (newPwd !== confirmPwd) { errorEl.textContent = '两次输入的新密码不一致'; errorEl.style.display = 'block'; return }
     if (newPwd.length < 4) { errorEl.textContent = '新密码至少4个字符'; errorEl.style.display = 'block'; return }
 
-    const session = JSON.parse(localStorage.getItem('pm2_session') || '{}')
+    const session = JSON.parse(authStorage.getItem('pm2_session') || '{}')
     const token = session.access_token
     if (!token) { errorEl.textContent = '未登录，请刷新页面后重试'; errorEl.style.display = 'block'; return }
 
@@ -680,6 +680,72 @@ window.handleChangePassword = async function(e) {
     }
 }
 
+function setActiveNavSection(activeKey) {
+    document.querySelectorAll('#topNav .nav-section').forEach(el => {
+        const key = el.getAttribute('data-section')
+        el.classList.toggle('active', key === activeKey)
+    })
+}
+
+function hideAllDesktopSections() {
+    const ids = [
+        'uploadSection',
+        'categorySection',
+        'mapSection',
+        'timelineSection',
+        'collageSection',
+        'achievementsSection',
+        'albumsSection',
+        'albumDetailSection',
+        'passportSection',
+        'moodDiarySection',
+        'dailyChatterSection',
+        'intimateRecordsSection',
+        'coupleTasksSection',
+        'partnerProfileSection',
+        'secretNoteSection',
+        'nudgeSection',
+        'emotionTimelineSection',
+        'timeCapsuleSection',
+        'gameCenterSection'
+    ]
+    ids.forEach(id => {
+        const el = document.getElementById(id)
+        if (el) el.style.display = 'none'
+    })
+}
+
+window.showPhotoBrowse = function() {
+    hideAllDesktopSections()
+    setActiveNavSection('browse')
+    const photosSec = document.querySelector('.photos-section')
+    if (photosSec) photosSec.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+window.toggleSidebarCollapse = function() {
+    const shell = document.getElementById('appShell') || document.getElementById('mainContainer')
+    if (!shell) return
+    const collapsed = shell.classList.toggle('sidebar-collapsed')
+    try { localStorage.setItem('desktop_sidebar_collapsed', collapsed ? '1' : '0') } catch (e) {}
+}
+
+;(function initSidebarState() {
+    const apply = () => {
+        const shell = document.getElementById('appShell') || document.getElementById('mainContainer')
+        if (!shell) return
+        try {
+            if (localStorage.getItem('desktop_sidebar_collapsed') === '1') {
+                shell.classList.add('sidebar-collapsed')
+            }
+        } catch (e) {}
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', apply)
+    } else {
+        apply()
+    }
+})()
+
 window.toggleSection = function(section) {
     const uploadSection = document.getElementById('uploadSection')
     const categorySection = document.getElementById('categorySection')
@@ -688,200 +754,64 @@ window.toggleSection = function(section) {
     const collageSection = document.getElementById('collageSection')
     const achievementsSection = document.getElementById('achievementsSection')
     const albumsSection = document.getElementById('albumsSection')
-    const albumDetailSection = document.getElementById('albumDetailSection')
     const passportSection = document.getElementById('passportSection')
     const partnerProfileSection = document.getElementById('partnerProfileSection')
-    const timeCapsuleSection = document.getElementById('timeCapsuleSection')
-    const gameCenterSection = document.getElementById('gameCenterSection')
 
-    // 辅助：隐藏所有分区
     const hideAll = () => {
-        uploadSection.style.display = 'none'
-        categorySection.style.display = 'none'
-        if (mapSection) mapSection.style.display = 'none'
-        if (timelineSection) timelineSection.style.display = 'none'
-        if (collageSection) collageSection.style.display = 'none'
-        if (achievementsSection) achievementsSection.style.display = 'none'
-        if (albumsSection) albumsSection.style.display = 'none'
-        if (albumDetailSection) albumDetailSection.style.display = 'none'
-        if (passportSection) passportSection.style.display = 'none'
-        if (document.getElementById('moodDiarySection')) document.getElementById('moodDiarySection').style.display = 'none'
-        if (document.getElementById('dailyChatterSection')) document.getElementById('dailyChatterSection').style.display = 'none'
-        if (document.getElementById('intimateRecordsSection')) document.getElementById('intimateRecordsSection').style.display = 'none'
-        if (document.getElementById('coupleTasksSection')) document.getElementById('coupleTasksSection').style.display = 'none'
-        if (partnerProfileSection) partnerProfileSection.style.display = 'none'
-        if (timeCapsuleSection) timeCapsuleSection.style.display = 'none'
-        if (gameCenterSection) gameCenterSection.style.display = 'none'
+        hideAllDesktopSections()
+        setActiveNavSection('browse')
+    }
+
+    const openSection = (el, key, onOpen) => {
+        if (!el) return
+        if (el.style.display === 'none' || !el.style.display) {
+            hideAll()
+            el.style.display = 'block'
+            setActiveNavSection(key)
+            if (onOpen) onOpen()
+            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        } else {
+            el.style.display = 'none'
+            setActiveNavSection('browse')
+        }
     }
 
     if (section === 'upload') {
-        if (uploadSection.style.display === 'none' || !uploadSection.style.display) {
-            hideAll()
-            uploadSection.style.display = 'block'
-        } else {
-            uploadSection.style.display = 'none'
-        }
+        openSection(uploadSection, 'upload')
     } else if (section === 'category') {
-        if (categorySection.style.display === 'none' || !categorySection.style.display) {
-            hideAll()
-            categorySection.style.display = 'block'
-            renderParentCategorySelect()
-        } else {
-            categorySection.style.display = 'none'
-        }
+        openSection(categorySection, 'category', () => renderParentCategorySelect())
     } else if (section === 'map') {
-        if (!mapSection) return
-        if (mapSection.style.display === 'none' || !mapSection.style.display) {
-            hideAll()
-            mapSection.style.display = 'block'
-            initMapView()
-        } else {
-            mapSection.style.display = 'none'
-        }
+        openSection(mapSection, 'map', () => initMapView())
     } else if (section === 'timeline') {
-        if (!timelineSection) return
-        if (timelineSection.style.display === 'none' || !timelineSection.style.display) {
-            hideAll()
-            timelineSection.style.display = 'block'
-            initTimeline()
-        } else {
-            timelineSection.style.display = 'none'
-        }
+        openSection(timelineSection, 'timeline', () => initTimeline())
     } else if (section === 'collage') {
-        if (!collageSection) return
-        if (collageSection.style.display === 'none' || !collageSection.style.display) {
-            hideAll()
-            collageSection.style.display = 'block'
-            loadAllPhotoCategories().then(() => renderCollageCategorySelect())
-        } else {
-            collageSection.style.display = 'none'
-        }
+        openSection(collageSection, 'collage', () => loadAllPhotoCategories().then(() => renderCollageCategorySelect()))
     } else if (section === 'achievements') {
-        if (!achievementsSection) return
-        if (achievementsSection.style.display === 'none' || !achievementsSection.style.display) {
-            hideAll()
-            achievementsSection.style.display = 'block'
-            loadAchievements()
-        } else {
-            achievementsSection.style.display = 'none'
-        }
+        openSection(achievementsSection, 'achievements', () => loadAchievements())
     } else if (section === 'albums') {
-        if (!albumsSection) return
-        if (albumsSection.style.display === 'none' || !albumsSection.style.display) {
-            hideAll()
-            albumsSection.style.display = 'block'
-            loadAlbums()
-        } else {
-            albumsSection.style.display = 'none'
-        }
+        openSection(albumsSection, 'albums', () => loadAlbums())
     } else if (section === 'passport') {
-        if (!passportSection) return
-        if (passportSection.style.display === 'none' || !passportSection.style.display) {
-            hideAll()
-            passportSection.style.display = 'block'
-            loadPassport()
-        } else {
-            passportSection.style.display = 'none'
-        }
+        openSection(passportSection, 'passport', () => loadPassport())
     } else if (section === 'moodDiary') {
-        const sec = document.getElementById('moodDiarySection')
-        if (!sec) return
-        if (sec.style.display === 'none' || !sec.style.display) {
-            hideAll()
-            sec.style.display = 'block'
-            loadMoodDiary()
-        } else {
-            sec.style.display = 'none'
-        }
+        openSection(document.getElementById('moodDiarySection'), 'moodDiary', () => loadMoodDiary())
     } else if (section === 'dailyChatter') {
-        const sec = document.getElementById('dailyChatterSection')
-        if (!sec) return
-        if (sec.style.display === 'none' || !sec.style.display) {
-            hideAll()
-            sec.style.display = 'block'
-            loadDailyChatter()
-        } else {
-            sec.style.display = 'none'
-        }
+        openSection(document.getElementById('dailyChatterSection'), 'dailyChatter', () => loadDailyChatter())
     } else if (section === 'intimateRecords') {
-        const sec = document.getElementById('intimateRecordsSection')
-        if (!sec) return
-        if (sec.style.display === 'none' || !sec.style.display) {
-            hideAll()
-            sec.style.display = 'block'
-            checkIntimateLock()
-        } else {
-            sec.style.display = 'none'
-        }
+        openSection(document.getElementById('intimateRecordsSection'), 'intimateRecords', () => checkIntimateLock())
     } else if (section === 'coupleTasks') {
-        const sec = document.getElementById('coupleTasksSection')
-        if (!sec) return
-        if (sec.style.display === 'none' || !sec.style.display) {
-            hideAll()
-            sec.style.display = 'block'
-            loadCoupleTasks()
-        } else {
-            sec.style.display = 'none'
-        }
+        openSection(document.getElementById('coupleTasksSection'), 'coupleTasks', () => loadCoupleTasks())
     } else if (section === 'partnerProfile') {
-        if (!partnerProfileSection) return
-        if (partnerProfileSection.style.display === 'none' || !partnerProfileSection.style.display) {
-            hideAll()
-            partnerProfileSection.style.display = 'block'
-            loadPartnerProfile()
-        } else {
-            partnerProfileSection.style.display = 'none'
-        }
+        openSection(partnerProfileSection, 'partnerProfile', () => loadPartnerProfile())
     } else if (section === 'secretNote') {
-        const sec = document.getElementById('secretNoteSection')
-        if (!sec) return
-        if (sec.style.display === 'none' || !sec.style.display) {
-            hideAll()
-            sec.style.display = 'block'
-            loadSecretNoteInbox()
-        } else {
-            sec.style.display = 'none'
-        }
+        openSection(document.getElementById('secretNoteSection'), 'secretNote', () => loadSecretNoteInbox())
     } else if (section === 'nudge') {
-        const sec = document.getElementById('nudgeSection')
-        if (!sec) return
-        if (sec.style.display === 'none' || !sec.style.display) {
-            hideAll()
-            sec.style.display = 'block'
-            window.checkIncomingNudges()
-        } else {
-            sec.style.display = 'none'
-        }
+        openSection(document.getElementById('nudgeSection'), 'nudge', () => window.checkIncomingNudges())
     } else if (section === 'emotionTimeline') {
-        const sec = document.getElementById('emotionTimelineSection')
-        if (!sec) return
-        if (sec.style.display === 'none' || !sec.style.display) {
-            hideAll()
-            sec.style.display = 'block'
-            window.loadEmotionTimeline()
-        } else {
-            sec.style.display = 'none'
-        }
+        openSection(document.getElementById('emotionTimelineSection'), 'emotionTimeline', () => window.loadEmotionTimeline())
     } else if (section === 'timeCapsule') {
-        const sec = document.getElementById('timeCapsuleSection')
-        if (!sec) return
-        if (sec.style.display === 'none' || !sec.style.display) {
-            hideAll()
-            sec.style.display = 'block'
-            window.loadTimeCapsules()
-        } else {
-            sec.style.display = 'none'
-        }
+        openSection(document.getElementById('timeCapsuleSection'), 'timeCapsule', () => window.loadTimeCapsules())
     } else if (section === 'gameCenter') {
-        const sec = document.getElementById('gameCenterSection')
-        if (!sec) return
-        if (sec.style.display === 'none' || !sec.style.display) {
-            hideAll()
-            sec.style.display = 'block'
-            window.loadGameCenter()
-        } else {
-            sec.style.display = 'none'
-        }
+        openSection(document.getElementById('gameCenterSection'), 'gameCenter', () => window.loadGameCenter())
     }
 }
 function updateMarkedCount() {

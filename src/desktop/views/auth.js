@@ -2,6 +2,7 @@
 import { supabase, USER_EMAIL_MAP, getUserFromSession } from '../../core/supabase.js';
 import * as Main from '../main.js';
 import { setCurrentUser } from '../main.js';
+import { signOutLocally, markSignedIn, authStorage, setRememberMe } from '../../core/session-service.js';
 
 const APP_CONFIG = window.__APP_CONFIG__ || {};
 
@@ -23,6 +24,7 @@ export async function handleLogin(e) {
         return;
     }
 
+    setRememberMe(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
@@ -33,7 +35,7 @@ export async function handleLogin(e) {
 
     // 手动持久化 session（CDN 版 supabase-js 的 localStorage 可能不生效）
     if (data?.session) {
-        localStorage.setItem('pm2_session', JSON.stringify({
+        authStorage.setItem('pm2_session', JSON.stringify({
             access_token: data.session.access_token,
             refresh_token: data.session.refresh_token,
             expires_at: data.session.expires_at
@@ -46,7 +48,7 @@ export async function handleLogin(e) {
 
     if (!profile) {
         errorEl.textContent = '用户档案缺失，请联系管理员';
-        await supabase.auth.signOut();
+        await signOutLocally(supabase);
         return;
     }
 
@@ -55,6 +57,7 @@ export async function handleLogin(e) {
         role: profile.role
     };
     setCurrentUser(getUserFromSession(session));
+    markSignedIn();
     errorEl.textContent = '';
     // 如果是老大且今天是生日，显示生日快乐欢迎界面
     await Main.loadBirthdayConfig();
@@ -71,7 +74,7 @@ export async function handleLogin(e) {
 
 export async function handleLogout() {
     setCurrentUser(null);
-    await supabase.auth.signOut();
+    await signOutLocally(supabase);
     Main.showLoginPage();
 }
 
@@ -102,7 +105,7 @@ export async function handleChangePassword(e) {
     if (newPwd !== confirmPwd) { errorEl.textContent = '两次输入的新密码不一致'; errorEl.style.display = 'block'; return; }
     if (newPwd.length < 4) { errorEl.textContent = '新密码至少4个字符'; errorEl.style.display = 'block'; return; }
 
-    const session = JSON.parse(localStorage.getItem('pm2_session') || '{}');
+    const session = JSON.parse(authStorage.getItem('pm2_session') || '{}');
     const token = session.access_token;
     if (!token) { errorEl.textContent = '未登录，请刷新页面后重试'; errorEl.style.display = 'block'; return; }
 

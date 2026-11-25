@@ -4,6 +4,7 @@
    ======================================== */
 
 import { supabase, USER_EMAIL_MAP, getUserFromSession as _getUserFromSession } from './src/core/supabase.js';
+import { signOutLocally, wasExplicitlyLoggedOut, markSignedIn, authStorage, setRememberMe } from './src/core/session-service.js';
 import { escapeHtml, sha256, getRelativeTime, formatFileSize, formatRelativeTime, highlightKeywords, safeBigint, generateShareToken, getCategoryAndChildrenIds as _getCatChildrenIds, getCategoryPath as _getCatPath, getDefaultMilestones, EMOTION_TYPES, MOOD_EMOJIS, DIETARY_RESTRICTIONS } from './src/core/utils.js';
 import { loadPhotos as _loadPhotos, toggleFavorite as _toggleFavorite, deletePhoto as _deletePhoto, updatePhoto as _updatePhoto, loadAllPhotoCategories as _loadAllPhotoCategories, batchDeletePhotos as _batchDeletePhotos } from './src/core/photo-service.js';
 import { loadCategories as _loadCategories, createCategory as _createCategory, deleteCategory as _deleteCategory } from './src/core/category-service.js';
@@ -34,8 +35,9 @@ const mobile = {
     currentPhotoId: null,
     _detailTouchX: 0,
     _timelinePage: 1,
-    _mainTabs: ['home', 'photos', 'profile'],
+    _mainTabs: ['home', 'photos', 'space', 'profile'],
     _currentMainTab: 'home',
+    _lastMainTab: 'home',
     _tabTouchStartX: 0,
     _gridTouchStartX: 0,
     _gridTouchStartY: 0,
@@ -61,6 +63,9 @@ const mobile = {
     
     // 多选状态
     selectMode: false,
+
+    // 照片视图密度：'grid-3' | 'grid-2' | 'grid-1'
+    photoViewMode: localStorage.getItem('mobile_photo_view_mode') || 'grid-2',
 
     // 主题状态
     isDarkMode: false,
@@ -922,6 +927,12 @@ const mobile = {
     // 登录相关
     // ========================================
     async checkLogin() {
+        if (wasExplicitlyLoggedOut()) {
+            await signOutLocally();
+            this.currentUser = null;
+            this.showPage('login');
+            return;
+        }
         const client = this.initSupabase();
         if (!client) {
             this.showPage('login');
@@ -930,7 +941,7 @@ const mobile = {
 
         let { data: { session } } = await client.auth.getSession();
         if (!session) {
-            const saved = localStorage.getItem('pm2_session');
+            const saved = authStorage.getItem('pm2_session');
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
@@ -957,45 +968,11 @@ const mobile = {
                 });
                 return;
             } else {
-                await client.auth.signOut();
+                await signOutLocally(client);
+                this.currentUser = null;
+                this.showPage('login');
+                return;
             }
-        }
-
-        // 尝试自动登录（记住我）
-        const savedCreds = localStorage.getItem('pm2_creds');
-        if (savedCreds) {
-            try {
-                const dec = atob(savedCreds);
-                const colon = dec.indexOf(':');
-                if (colon > 0) {
-                    const savedAccount = dec.substring(0, colon);
-                    const savedPwd = dec.substring(colon + 1);
-                    const savedEmail = USER_EMAIL_MAP[savedAccount];
-                    if (savedEmail) {
-                        const { data, error: autoErr } = await client.auth.signInWithPassword({ email: savedEmail, password: savedPwd });
-                        if (!autoErr && data?.session) {
-                            localStorage.setItem('pm2_session', JSON.stringify({
-                                access_token: data.session.access_token,
-                                refresh_token: data.session.refresh_token,
-                                expires_at: data.session.expires_at
-                            }));
-                            const { data: autoProfile } = await client.from('profiles').select('username, role').eq('user_id', data.user.id).single();
-                            if (autoProfile) {
-                                this.currentUser = _getUserFromSession({ username: autoProfile.username, role: autoProfile.role });
-                                this.showPage('home');
-                                this.renderFeatureCards();
-                                this._renderFloatingBall();
-                                this._loadFeatureCardOrderFromServer().then(() => this.renderFeatureCards());
-                                this.loadData().catch(err => { console.error('加载数据失败:', err); this.showToast('数据加载失败，请刷新重试'); });
-                                setTimeout(() => self.checkUpdate(), 3000);
-                                return;
-                            }
-                        }
-                    }
-                }
-            } catch(e) {}
-            // 自动登录失败，清除失效凭证
-            localStorage.removeItem('pm2_creds');
         }
 
         this.currentUser = null;
@@ -1026,6 +1003,7 @@ const mobile = {
             return;
         }
 
+        setRememberMe(rememberMe);
         const { data, error } = await client.auth.signInWithPassword({ email, password });
 
         if (error) {
@@ -1035,19 +1013,9 @@ const mobile = {
             return;
         }
 
-        // 记住我：加密保存凭证
-        if (rememberMe) {
-            try {
-                const enc = btoa(account + ':' + password);
-                localStorage.setItem('pm2_creds', enc);
-            } catch(e) {}
-        } else {
-            localStorage.removeItem('pm2_creds');
-        }
-
         // 手动持久化 session
         if (data?.session) {
-            localStorage.setItem('pm2_session', JSON.stringify({
+            authStorage.setItem('pm2_session', JSON.stringify({
                 access_token: data.session.access_token,
                 refresh_token: data.session.refresh_token,
                 expires_at: data.session.expires_at
@@ -1060,11 +1028,12 @@ const mobile = {
 
         if (!profile) {
             errorEl.textContent = '用户档案缺失，请联系管理员';
-            await client.auth.signOut();
+            await signOutLocally(client);
             return;
         }
 
         this.currentUser = _getUserFromSession({ username: profile.username, role: profile.role });
+        markSignedIn();
         errorEl.textContent = '';
 
         // 老大生日彩蛋
@@ -1092,7 +1061,7 @@ const mobile = {
     async handleLogout() {
         const client = this.initSupabase();
         this.currentUser = null;
-        if (client) await client.auth.signOut();
+        await signOutLocally(client);
         this.showPage('login');
         this.showToast('已退出登录');
     },
@@ -1123,7 +1092,7 @@ const mobile = {
         if (newPwd !== confirmPwd) { errorEl.textContent = '两次输入的新密码不一致'; errorEl.style.display = 'block'; return; }
         if (newPwd.length < 4) { errorEl.textContent = '新密码至少4个字符'; errorEl.style.display = 'block'; return; }
 
-        const saved = JSON.parse(localStorage.getItem('pm2_session') || '{}');
+        const saved = JSON.parse(authStorage.getItem('pm2_session') || '{}');
         const token = saved?.access_token;
         if (!token) { errorEl.textContent = '未登录，请刷新后重试'; errorEl.style.display = 'block'; return; }
 
@@ -1158,24 +1127,25 @@ const mobile = {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(page + 'Page').classList.add('active');
 
-        // 为非主页添加返回按钮（照片页已有导航栏，不需要自动加）
-        if (page !== 'home' && page !== 'login' && page !== 'photos' && page !== 'detail') {
+        // 为非主 Tab 子页面添加或更新返回按钮
+        const isMainTab = this._mainTabs.includes(page);
+        if (!isMainTab && page !== 'login' && page !== 'detail') {
             const pageEl = document.getElementById(page + 'Page');
             const topBar = pageEl ? pageEl.querySelector('.top-bar') : null;
-            if (topBar && !topBar.querySelector('.back-btn')) {
-                const backBtn = document.createElement('button');
-                backBtn.className = 'icon-btn back-btn';
-                const backTarget = (page === 'upload' || page === 'category') ? 'photos'
-                                 : (page === 'secretNote') ? 'dailyChatter'
-                                 : (page === 'timeline' || page === 'timeCapsule') ? 'emotionTimeline'
-                                 : 'home';
-                backBtn.innerHTML = '←';
-                backBtn.title = backTarget === 'photos' ? '返回照片'
-                              : backTarget === 'dailyChatter' ? '返回每日叨叨'
-                              : backTarget === 'emotionTimeline' ? '返回情感时间轴'
-                              : '返回首页';
+            if (topBar) {
+                const backTarget = (page === 'upload' || page === 'category' || page === 'albums') ? 'photos'
+                                 : (page === 'secretNote') ? (this._lastMainTab === 'space' ? 'space' : 'dailyChatter')
+                                 : (page === 'timeline' || page === 'timeCapsule') ? (this._lastMainTab === 'space' ? 'space' : this._lastMainTab === 'home' ? 'home' : 'emotionTimeline')
+                                 : (this._lastMainTab || 'home');
+                let backBtn = topBar.querySelector('.back-btn');
+                if (!backBtn) {
+                    backBtn = document.createElement('button');
+                    backBtn.className = 'icon-btn back-btn';
+                    backBtn.innerHTML = '←';
+                    topBar.insertBefore(backBtn, topBar.firstChild);
+                }
+                backBtn.title = '返回';
                 backBtn.onclick = function(e) { e.stopPropagation(); mobile.switchTab(backTarget); };
-                topBar.insertBefore(backBtn, topBar.firstChild);
             }
         }
 
@@ -1185,9 +1155,9 @@ const mobile = {
         });
 
         // 主 tab 支持滑动切换，子页面禁用
-        const isMainTab = this._mainTabs.includes(page);
         if (isMainTab) {
             this._currentMainTab = page;
+            this._lastMainTab = page;
             if (!this._tabSwipeBound) {
                 this._tabSwipeBound = true;
                 this._boundTabTouchStart = this._tabTouchStart.bind(this);
@@ -1342,9 +1312,13 @@ const mobile = {
         const today = new Date();
         const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
         const daysEl = document.getElementById('coupleDays');
+        const daysNumEl = document.getElementById('coupleDaysNum');
         const name1El = document.getElementById('coupleName1');
         const name2El = document.getElementById('coupleName2');
 
+        if (daysNumEl) {
+            daysNumEl.textContent = isNaN(diffDays) ? '--' : diffDays.toLocaleString('zh-CN');
+        }
         if (daysEl) {
             daysEl.textContent = '在一起的第 ' + diffDays + ' 天';
         }
@@ -1427,7 +1401,7 @@ const mobile = {
             card.className = 'feature-card';
             card.setAttribute('data-card-id', id);
             card.setAttribute('data-card-index', index);
-            card.style.background = cfg.gradient;
+            card.style.setProperty('--card-tint', cfg.gradient);
 
             card.addEventListener('click', (e) => {
                 if (this._featureCardEditMode) return;
@@ -1630,20 +1604,170 @@ const mobile = {
         });
     },
 
+    setPhotoViewMode(mode) {
+        if (!['grid-3', 'grid-2', 'grid-1'].includes(mode)) return;
+        this.photoViewMode = mode;
+        try { localStorage.setItem('mobile_photo_view_mode', mode); } catch (e) {}
+        this._applyPhotoViewModeUI();
+    },
+
+    _applyPhotoViewModeUI() {
+        const feed = document.getElementById('photoFeed');
+        const mode = ['grid-3', 'grid-2', 'grid-1'].includes(this.photoViewMode) ? this.photoViewMode : 'grid-2';
+        if (feed) {
+            feed.classList.remove('view-grid-3', 'view-grid-2', 'view-grid-1');
+            feed.classList.add('view-' + mode);
+        }
+        document.querySelectorAll('.view-mode-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.view === mode);
+        });
+    },
+
+    renderPhotoCategoryChips() {
+        const bar = document.getElementById('photoCategoryChips');
+        if (!bar) return;
+        const topLevel = (this.categories || []).filter(c => !c.parent_id);
+        if (topLevel.length === 0) {
+            bar.style.display = 'none';
+            return;
+        }
+        bar.style.display = 'flex';
+        const cur = String(this.currentCategory || 'all');
+        const chips = [
+            `<button type="button" class="cat-chip ${cur === 'all' && !this.showFavoritesOnly ? 'active' : ''}" onclick="mobile.selectPhotoChip('all')">全部</button>`
+        ];
+        topLevel.forEach(cat => {
+            const cid = String(cat.id);
+            const active = cur === cid ? 'active' : '';
+            chips.push(`<button type="button" class="cat-chip ${active}" onclick="mobile.selectPhotoChip('${cid}')">${this.escapeHtml(cat.name)}</button>`);
+        });
+        bar.innerHTML = chips.join('');
+    },
+
+    selectPhotoChip(catId) {
+        this.showFavoritesOnly = false;
+        this.currentCategory = catId;
+        this.currentPage = 1;
+        const select = document.getElementById('mobileFilterCategory');
+        if (select) select.value = catId;
+        this._syncPhotoSegmentUI();
+        this.renderPhotoCategoryChips();
+        if (this.updateCategoryPathDisplay) this.updateCategoryPathDisplay();
+        this.loadPhotos();
+    },
+
+    clearSearchInput() {
+        const input = document.getElementById('searchInput');
+        if (input && input.value) {
+            input.value = '';
+            this.searchPhotos();
+        }
+    },
+
+    clearPhotoFilters() {
+        this.showFavoritesOnly = false;
+        this.currentCategory = 'all';
+        this.currentPage = 1;
+        const input = document.getElementById('searchInput');
+        if (input) input.value = '';
+        const select = document.getElementById('mobileFilterCategory');
+        if (select) select.value = 'all';
+        this._syncPhotoSegmentUI();
+        this.renderPhotoCategoryChips();
+        if (this.updateCategoryPathDisplay) this.updateCategoryPathDisplay();
+        this.loadPhotos();
+    },
+
+    _updatePhotosMetaSummary() {
+        const summaryEl = document.getElementById('photosCountSummary');
+        const clearBtn = document.getElementById('photosClearFilterBtn');
+        const searchVal = (document.getElementById('searchInput')?.value || '').trim();
+        const isFiltered = !!(this.showFavoritesOnly || (this.currentCategory && this.currentCategory !== 'all') || searchVal);
+
+        if (summaryEl) {
+            let label = '全部照片';
+            if (this.showFavoritesOnly) {
+                label = '❤️ 已收藏';
+            } else if (this.currentCategory && this.currentCategory !== 'all') {
+                const cat = (this.categories || []).find(c => String(c.id) === String(this.currentCategory));
+                label = cat ? `📁 ${cat.name}` : '当前分类';
+            }
+            if (searchVal) label = `🔍 "${searchVal}"`;
+            summaryEl.textContent = this.totalPhotos > 0 ? `${label} · ${this.totalPhotos} 张` : label;
+        }
+        if (clearBtn) {
+            clearBtn.style.display = isFiltered ? 'inline-flex' : 'none';
+        }
+    },
+
+    _formatShortPhotoDate(isoStr) {
+        if (!isoStr) return '';
+        const d = new Date(isoStr);
+        if (isNaN(d.getTime())) return '';
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return y === new Date().getFullYear() ? `${m}-${day}` : `${y}-${m}-${day}`;
+    },
+
+    renderHomeMemories() {
+        const countEl = document.getElementById('homePhotoCount');
+        const stripEl = document.getElementById('homeRecentStrip');
+        if (countEl) {
+            countEl.textContent = this.totalPhotos > 0 ? `共 ${this.totalPhotos} 张` : '查看全部';
+        }
+        if (!stripEl) return;
+        const recent = (this.photos || []).slice(0, 4);
+        if (recent.length === 0) {
+            stripEl.innerHTML = '<div class="bento-photo-empty">点击浏览你们的照片回忆</div>';
+            return;
+        }
+        stripEl.innerHTML = recent.map(p => {
+            const url = this.escapeHtml(this.getPhotoUrl(p.storage_path) || '');
+            const name = this.escapeHtml(p.name || '照片');
+            return `<div class="bento-thumb" onclick="event.stopPropagation(); mobile.openDetail('${p.id}')"><img src="${url}" alt="${name}" loading="lazy"></div>`;
+        }).join('');
+    },
+
+    setPhotoFilterTab(mode, navigateToPhotos) {
+        this.showFavoritesOnly = (mode === 'favorites');
+        this.currentCategory = 'all';
+        this.currentPage = 1;
+        const catSelect = document.getElementById('mobileFilterCategory');
+        if (catSelect) catSelect.value = 'all';
+        this._syncPhotoSegmentUI();
+        if (navigateToPhotos) {
+            this.switchTab('photos');
+        }
+        this.loadPhotos();
+    },
+
+    _syncPhotoSegmentUI() {
+        const allBtn = document.getElementById('segAllBtn');
+        const favBtn = document.getElementById('segFavBtn');
+        if (allBtn) allBtn.classList.toggle('active', !this.showFavoritesOnly);
+        if (favBtn) favBtn.classList.toggle('active', !!this.showFavoritesOnly);
+    },
+
     switchTab(tab) {
         if (tab === 'home') {
             this.showPage('home');
             this.renderFeatureCards();
             this._renderFloatingBall();
             this.renderCoupleBanner();
+            this.renderHomeMemories();
             this._ensureModule('extras').then(() => {
                 this.checkIncomingBottles();
                 this.checkIncomingNotes();
                 this.checkIncomingNudges();
                 this.checkTimeCapsules();
             });
+        } else if (tab === 'space') {
+            this.showPage('space');
         } else if (tab === 'photos') {
             this.showPage('photos');
+            this._syncPhotoSegmentUI();
+            this._applyPhotoViewModeUI();
             this._showPageLoading();
             var self = this;
             Promise.all([
@@ -1651,6 +1775,7 @@ const mobile = {
                 this._ensureModule('photos')
             ]).then(function() {
                 self.updateCategorySelects();
+                self.renderPhotoCategoryChips();
                 if (self.updateCategoryPathDisplay) self.updateCategoryPathDisplay();
                 self.renderPhotos();
             }).finally(() => this._hidePageLoading());
@@ -1890,12 +2015,17 @@ const mobile = {
         const feed = document.getElementById('photoFeed');
         const empty = document.getElementById('emptyFeed');
 
+        this._applyPhotoViewModeUI();
+        this.renderPhotoCategoryChips();
+        this._updatePhotosMetaSummary();
+
         const pagePhotos = this.photos; // 已由服务端分页 + 筛选
 
         if (pagePhotos.length === 0) {
             feed.style.display = 'none';
             empty.style.display = 'flex';
             this.renderLoadMoreButton(0, 0);
+            this.renderHomeMemories();
             return;
         }
 
@@ -1907,28 +2037,40 @@ const mobile = {
         const searchValue = document.getElementById('searchInput')?.value || '';
         feed.innerHTML = pagePhotos.map((photo, index) => {
             const safeName = this.highlightKeywords(this.escapeHtml(photo.name || '未命名'), searchValue);
-            const safeDesc = this.highlightKeywords(this.escapeHtml(photo.description || ''), searchValue);
+            const rawDesc = (photo.description || '').trim();
+            const safeDesc = rawDesc ? this.highlightKeywords(this.escapeHtml(rawDesc), searchValue) : '';
             const safeImg = this.escapeHtml(this.getPhotoUrl(photo.storage_path) || ('https://picsum.photos/400/400?random=' + photo.id));
+            const dateStr = this._formatShortPhotoDate(photo.taken_at || photo.created_at);
+            const locStr = (photo.location_name || '').trim();
+            const metaParts = [];
+            if (locStr) metaParts.push(`📍 ${this.escapeHtml(locStr)}`);
+            if (dateStr) metaParts.push(dateStr);
+            const metaHtml = metaParts.length > 0 ? `<div class="photo-card-meta">${metaParts.join(' · ')}</div>` : '';
+
             return `
             <div class="photo-card ${this.selectMode ? 'select-mode' : ''} ${this.selectedPhotos.has(photo.id) ? 'selected' : ''}" 
                  onclick="${this.selectMode ? "mobile.togglePhotoSelect('" + photo.id + "')" : "mobile.openDetail('" + photo.id + "')"}" 
-                 style="animation-delay: ${index * 50}ms">
+                 style="animation-delay: ${Math.min(index, 10) * 30}ms">
                 ${this.selectMode ? `
                     <div class="photo-checkbox">
                         <input type="checkbox" ${this.selectedPhotos.has(photo.id) ? 'checked' : ''} onclick="event.stopPropagation(); mobile.togglePhotoSelect('${photo.id}')">
                     </div>
                 ` : ''}
-                <img src="${safeImg}" alt="${safeName}">
+                <div class="photo-card-media">
+                    <img src="${safeImg}" alt="${safeName}" loading="lazy">
+                    ${photo.is_favorite ? '<span class="photo-card-fav" aria-label="已收藏">❤️</span>' : ''}
+                </div>
                 <div class="photo-card-info">
                     <h4>${safeName}</h4>
-                    <p>${safeDesc}</p>
+                    ${safeDesc ? `<p class="photo-card-desc">${safeDesc}</p>` : ''}
+                    ${metaHtml}
                 </div>
-                ${photo.is_favorite ? '<span class="photo-card-fav">❤️</span>' : ''}
             </div>
         `}).join('');
         
         // 渲染分页控制
         this.renderLoadMoreButton(totalPages, this.totalPhotos);
+        this.renderHomeMemories();
     },
 
     updatePaginationInfo(displayed, total, pages) {
@@ -1974,6 +2116,10 @@ const mobile = {
     },
 
     scrollToTop() {
+        const photosPage = document.getElementById('photosPage');
+        if (photosPage) {
+            photosPage.scrollTo({ top: 0, behavior: 'smooth' });
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },
 
@@ -2037,20 +2183,27 @@ const mobile = {
 
     updateSelectModeUI() {
         const selectBtn = document.getElementById('selectModeBtn');
+        const batchBar = document.getElementById('batchActionsBar');
         const batchActions = document.getElementById('batchActions');
         const selectedCount = document.getElementById('selectedCount');
         const exportBtn = document.getElementById('batchExportBtn');
 
         if (this.selectMode) {
-            selectBtn.textContent = '❌ 取消';
-            selectBtn.classList.add('active');
-            batchActions.style.display = 'flex';
+            if (selectBtn) {
+                selectBtn.textContent = '完成';
+                selectBtn.classList.add('active');
+            }
+            if (batchBar) batchBar.style.display = 'flex';
+            if (batchActions) batchActions.style.display = 'flex';
             if (exportBtn) exportBtn.style.display = '';
-            selectedCount.textContent = this.selectedPhotos.size;
+            if (selectedCount) selectedCount.textContent = this.selectedPhotos.size;
         } else {
-            selectBtn.textContent = '☑️ 多选';
-            selectBtn.classList.remove('active');
-            batchActions.style.display = 'none';
+            if (selectBtn) {
+                selectBtn.textContent = '多选';
+                selectBtn.classList.remove('active');
+            }
+            if (batchBar) batchBar.style.display = 'none';
+            if (batchActions) batchActions.style.display = 'none';
             if (exportBtn) exportBtn.style.display = 'none';
         }
     },

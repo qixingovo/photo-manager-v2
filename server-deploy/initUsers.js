@@ -3,7 +3,15 @@ const pool = require('../../../db/pg');
 
 async function initUsers() {
     try {
-        const passwords = JSON.parse(process.env.USER_PASSWORDS || '{"laoda":"change-me","xiaodi":"change-me"}');
+        if (!process.env.USER_PASSWORDS) {
+            console.warn('USER_PASSWORDS is not configured; skipping account bootstrap');
+            return;
+        }
+        const passwords = JSON.parse(process.env.USER_PASSWORDS);
+        if (!passwords || ['laoda', 'xiaodi'].some(name =>
+            typeof passwords[name] !== 'string' || passwords[name].length < 12)) {
+            throw new Error('Bootstrap passwords must each contain at least 12 characters');
+        }
         const h1 = await bcrypt.hash(passwords.laoda, 10);
         const h2 = await bcrypt.hash(passwords.xiaodi, 10);
         await pool.query(

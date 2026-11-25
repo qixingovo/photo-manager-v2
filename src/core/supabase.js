@@ -1,4 +1,5 @@
 // src/core/supabase.js — Supabase 客户端初始化 + 认证 session 管理（单例）
+import { authStorage } from './session-service.js';
 
 const APP_CONFIG = window.__APP_CONFIG__ || {};
 const SUPABASE_URL = APP_CONFIG.SUPABASE_URL || '';
@@ -11,7 +12,7 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 
 // 单例：防止 Vite HMR 或多次 import 创建重复 GoTrueClient
 const supabase = window.__sb_client__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { persistSession: true, storage: window.localStorage, autoRefreshToken: true, detectSessionInUrl: true }
+    auth: { persistSession: true, storage: authStorage, autoRefreshToken: true, detectSessionInUrl: true }
 });
 window.__sb_client__ = supabase;
 

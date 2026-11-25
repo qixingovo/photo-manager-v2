@@ -2,19 +2,20 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>📷 回忆</title>
-    <meta name="theme-color" content="#A8D8EA">
+    <meta name="theme-color" content="#6e9ed8">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
     <link rel="apple-touch-icon" sizes="192x192" href="favicon-192.png">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="mobile.css?v=75">
+    <link rel="stylesheet" href="mobile.css?v=77">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="config.js?v=2"></script>
-    <script src="common.js?v=mvd7pl5w"></script>
+    <script src="config.js?v=security20261022"></script>
+    <script src="common.js?v=security20261022"></script>
 </head>
 <body>
     <!-- 页面切换加载遮罩 -->
@@ -37,40 +38,60 @@
                 <div class="input-group">
                     <input type="password" id="loginPassword" placeholder="密码" required autocomplete="current-password">
                 </div>
-                <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#888;margin-top:4px;">
-                    <input type="checkbox" id="rememberMe" checked style="width:16px;height:16px;"> 记住我，下次自动登录
+                <label class="login-remember-label">
+                    <input type="checkbox" id="rememberMe" checked> 记住我，下次自动登录
                 </label>
                 <p id="loginError" class="error-msg"></p>
                 <button type="submit" class="btn-primary">登录</button>
-                <a href="/download/app-release.apk" class="download-link" style="display:block;margin-top:12px;text-align:center;color:#4A90D9;font-size:13px;text-decoration:none;">📱 下载 Android App</a>
+                <a href="/download/app-release.apk" class="download-link">📱 下载 Android App</a>
             </form>
         </div>
     </div>
 
-    <!-- ========== 主页 - 暖粉风格 ========== -->
+    <!-- ========== 主页 - Bento 毛玻璃看板 ========== -->
     <div id="homePage" class="page">
-        <!-- 情侣横幅 -->
-        <div id="coupleBanner" class="couple-banner">
-            <div class="couple-avatars">
-                <div class="couple-avatar clickable" id="avatar1" onclick="mobile.pickAvatar(1)" title="点击上传头像">
-                    <img id="avatarImg1" src="" style="display:none;" onerror="this.style.display='none';this.parentElement.querySelector('.avatar-placeholder').style.display='';">
-                    <span class="avatar-placeholder">🧑🏻</span>
+        <!-- 顶部极简情侣头栏 -->
+        <div class="home-top-header">
+            <div class="home-identity">
+                <div class="couple-avatars">
+                    <div class="couple-avatar clickable" id="avatar1" onclick="mobile.pickAvatar(1)" title="点击上传头像">
+                        <img id="avatarImg1" src="" style="display:none;" onerror="this.style.display='none';this.parentElement.querySelector('.avatar-placeholder').style.display='';">
+                        <span class="avatar-placeholder">🧑🏻</span>
+                    </div>
+                    <div class="couple-heart">💕</div>
+                    <div class="couple-avatar clickable" id="avatar2" onclick="mobile.pickAvatar(2)" title="点击上传头像">
+                        <img id="avatarImg2" src="" style="display:none;" onerror="this.style.display='none';this.parentElement.querySelector('.avatar-placeholder').style.display='';">
+                        <span class="avatar-placeholder">👩🏻</span>
+                    </div>
                 </div>
-                <div class="couple-heart">💕</div>
-                <div class="couple-avatar clickable" id="avatar2" onclick="mobile.pickAvatar(2)" title="点击上传头像">
-                    <img id="avatarImg2" src="" style="display:none;" onerror="this.style.display='none';this.parentElement.querySelector('.avatar-placeholder').style.display='';">
-                    <span class="avatar-placeholder">👩🏻</span>
+                <div class="home-identity-meta">
+                    <div class="couple-names">
+                        <span id="coupleName1">老大</span>
+                        <span class="couple-and">&amp;</span>
+                        <span id="coupleName2">小弟</span>
+                    </div>
+                    <div class="home-identity-sub">OUR MEMORY ARCHIVE</div>
                 </div>
             </div>
-            <div class="couple-names">
-                <span id="coupleName1">老大</span>
-                <span class="couple-and">&</span>
-                <span id="coupleName2">小弟</span>
-            </div>
-            <div id="coupleDays" class="couple-days">在一起的每一天</div>
+            <button type="button" class="glass-icon-btn" onclick="mobile.showSettings()" title="外观与设置" aria-label="外观与设置">⚙️</button>
         </div>
         <input type="file" id="avatarInput1" accept="image/*" style="display:none;" onchange="mobile.uploadAvatar(1, event)">
         <input type="file" id="avatarInput2" accept="image/*" style="display:none;" onchange="mobile.uploadAvatar(2, event)">
+
+        <!-- Bento 1：大字排版纪念天数主卡 -->
+        <div id="coupleBanner" class="bento-days-card" onclick="mobile.switchTab('timeline')">
+            <div class="bento-days-left">
+                <div class="bento-kicker">TOGETHER</div>
+                <div class="bento-days-number-row">
+                    <span id="coupleDaysNum" class="bento-days-num">--</span>
+                    <span class="bento-days-unit">天</span>
+                </div>
+                <div id="coupleDays" class="couple-days">在一起的每一天</div>
+            </div>
+            <div class="bento-days-right">
+                <span class="bento-pill-link">纪念日 ›</span>
+            </div>
+        </div>
 
         <!-- 漂流瓶提示 -->
         <div id="mobileDriftBottleAlert" class="drift-bottle-alert" style="display:none;" onclick="mobile.openReceivedBottle()">
@@ -78,18 +99,44 @@
             <span class="bottle-text">一个漂流瓶漂到了...</span>
         </div>
 
-        <!-- 快捷入口：戳一戳 + 游戏中心 -->
-        <div class="home-quick-actions" style="display:flex;gap:8px;padding:0 12px;margin-bottom:8px;">
-            <button id="mobileNudgeBtn" class="btn-nudge-mobile" onclick="mobile.nudgeOrLoad()" style="flex:1;">
+        <!-- Bento 2：回忆照片快捷窗口 -->
+        <div class="bento-photos-card">
+            <div class="bento-card-head">
+                <div class="bento-card-title-group" onclick="mobile.switchTab('photos')">
+                    <span class="bento-card-title">📸 回忆照片</span>
+                    <span id="homePhotoCount" class="bento-count-pill">查看全部</span>
+                </div>
+                <button type="button" class="bento-upload-btn" onclick="mobile.switchTab('upload')">＋ 上传</button>
+            </div>
+            <div id="homeRecentStrip" class="bento-photo-strip" onclick="mobile.switchTab('photos')">
+                <div class="bento-photo-empty">点击浏览你们的照片回忆</div>
+            </div>
+            <div class="bento-photo-links">
+                <button type="button" class="bento-mini-link" onclick="mobile.setPhotoFilterTab('all', true)">全部照片</button>
+                <button type="button" class="bento-mini-link" onclick="mobile.switchTab('albums')">相册集</button>
+                <button type="button" class="bento-mini-link" onclick="mobile.setPhotoFilterTab('favorites', true)">❤️ 收藏</button>
+                <button type="button" class="bento-mini-link" onclick="mobile.switchTab('category')">分类</button>
+            </div>
+        </div>
+
+        <!-- Bento 3：快捷双卡（戳一戳 + 游戏中心） -->
+        <div class="home-quick-actions">
+            <button id="mobileNudgeBtn" class="btn-nudge-mobile" onclick="mobile.nudgeOrLoad()">
                 <span class="nudge-heart-mobile">💗</span>
-                <span>戳一戳</span>
+                <span class="quick-btn-copy">
+                    <strong>戳一戳</strong>
+                    <small>轻互动一下</small>
+                </span>
             </button>
-            <button class="btn-game-mobile" onclick="mobile.switchTab('gameCenter')" style="flex:1;">
-                <span style="font-size:20px;">🎮</span>
-                <span>游戏中心</span>
+            <button class="btn-game-mobile" onclick="mobile.switchTab('gameCenter')">
+                <span class="game-icon-mobile">🎮</span>
+                <span class="quick-btn-copy">
+                    <strong>游戏中心</strong>
+                    <small>双人小游戏</small>
+                </span>
             </button>
         </div>
-        <p id="mobileNudgeCooldown" style="font-size:11px;color:#999;text-align:center;margin-top:4px;display:none;"></p>
+        <p id="mobileNudgeCooldown" class="nudge-cooldown-text" style="display:none;"></p>
 
         <!-- 忌口打卡浮球（仅窗口期显示） -->
         <div id="dietaryFloatingBall" class="dietary-floating-ball" style="display:none;" onclick="mobile._openDietaryCheckinModal()">
@@ -98,9 +145,12 @@
             <span id="dietaryBallDot" class="dietary-ball-dot"></span>
         </div>
 
-        <!-- 功能入口卡片 3x2（可编辑排序） -->
-        <div id="featureCardEditBar" class="feature-card-edit-bar" style="display:none;">
-            <button id="featureCardEditToggle" class="feature-edit-toggle" onclick="mobile.toggleFeatureCardEdit()">✏️ 编辑排序</button>
+        <!-- Bento 4：日常记录精选（可编辑排序） -->
+        <div class="bento-section-head">
+            <span class="bento-section-title">日常精选</span>
+            <div id="featureCardEditBar" class="feature-card-edit-bar" style="display:none;">
+                <button id="featureCardEditToggle" class="feature-edit-toggle" onclick="mobile.toggleFeatureCardEdit()">✏️ 编辑排序</button>
+            </div>
         </div>
         <div class="feature-cards" id="featureCardsContainer">
             <!-- JS 动态渲染 -->
@@ -112,43 +162,67 @@
         <header class="top-bar">
             <div class="logo">
                 <span>📸</span>
-                <span>回忆相册</span>
+                <span>照片</span>
             </div>
             <div class="top-actions">
-                <button class="icon-btn" onclick="mobile.switchTab('albums')" title="相册">📸</button>
-                <button class="icon-btn" onclick="mobile.switchTab('upload')" title="上传">📤</button>
-                <button class="icon-btn" onclick="mobile.switchTab('category')" title="分类">📁</button>
-                <button class="icon-btn" onclick="mobile.toggleSearch()">🔍</button>
+                <button class="icon-btn" onclick="mobile.toggleSearch()" title="搜索">🔍</button>
+                <button id="selectModeBtn" class="top-pill-btn" onclick="mobile.toggleSelectMode()">多选</button>
             </div>
         </header>
+
+        <!-- 分段切换栏：全部 / 收藏 / 相册 / 分类 -->
+        <div class="photos-segment-bar">
+            <button type="button" id="segAllBtn" class="segment-btn active" onclick="mobile.setPhotoFilterTab('all')">全部</button>
+            <button type="button" id="segFavBtn" class="segment-btn" onclick="mobile.setPhotoFilterTab('favorites')">❤️ 收藏</button>
+            <button type="button" class="segment-btn" onclick="mobile.switchTab('albums')">相册</button>
+            <button type="button" class="segment-btn" onclick="mobile.switchTab('category')">分类</button>
+        </div>
+
+        <!-- 横向分类快捷胶囊条 -->
+        <div id="photoCategoryChips" class="photo-category-chips" style="display:none;"></div>
 
         <!-- 分类路径显示 -->
         <div id="categoryPathDisplay" class="category-path-display" style="display:none;"></div>
 
         <!-- 搜索栏（可折叠） -->
         <div id="searchBar" class="search-bar">
-            <input type="text" id="searchInput" placeholder="搜索照片..." oninput="mobile.searchPhotos()">
+            <div class="search-input-row">
+                <input type="text" id="searchInput" placeholder="🔍 搜索照片名称或描述..." oninput="mobile.searchPhotos()">
+                <button type="button" class="search-clear-btn" onclick="mobile.clearSearchInput()" aria-label="清空搜索">✕</button>
+            </div>
             <select id="mobileFilterCategory" onchange="mobile.filterByCategory()">
-                <option value="all">全部</option>
+                <option value="all">全部分类</option>
             </select>
         </div>
 
-        <!-- 照片操作栏 -->
-        <div class="photo-actions-bar">
-            <button id="selectModeBtn" class="btn-secondary" onclick="mobile.toggleSelectMode()">☑️ 多选</button>
+        <!-- 多选批量操作条（仅多选模式展开，不占平时高度） -->
+        <div id="batchActionsBar" class="photo-actions-bar" style="display:none;">
             <div id="batchActions" class="batch-actions" style="display:none;">
                 <button id="selectAllBtn" class="btn-secondary" onclick="mobile.selectAllPhotos()">全选</button>
                 <button id="batchFavoriteBtn" class="btn-secondary" onclick="mobile.batchToggleFavorite()">❤️ 收藏 (<span id="selectedCount">0</span>)</button>
-                <button id="batchDeleteBtn" class="btn-danger" onclick="mobile.batchDeletePhotos()">🗑️ 删除</button>
+                <button id="batchCategoryBtn" class="btn-secondary" onclick="mobile.openBatchCategoryModal()">📁 改分类</button>
                 <button id="batchLocationBtn" class="btn-secondary" onclick="mobile.openBatchLocationModal()">📍 设位置</button>
                 <button id="batchDateBtn" class="btn-secondary" onclick="mobile.openBatchDateModal()">📅 改日期</button>
-                <button id="batchCategoryBtn" class="btn-secondary" onclick="mobile.openBatchCategoryModal()">📁 改分类</button>
-                <button id="batchExportBtn" class="btn-secondary" onclick="mobile.exportSelectedPhotos()">📦 导出选中</button>
+                <button id="batchExportBtn" class="btn-secondary" onclick="mobile.exportSelectedPhotos()">📦 导出</button>
+                <button id="batchDeleteBtn" class="btn-danger" onclick="mobile.batchDeletePhotos()">🗑️ 删除</button>
             </div>
         </div>
 
-        <!-- 照片瀑布流 -->
-        <main class="photo-feed" id="photoFeed">
+        <!-- 视图密度切换与统计条 -->
+        <div class="photos-meta-bar">
+            <div class="photos-meta-left">
+                <span id="photosCountSummary" class="photos-count-summary">全部照片</span>
+                <button type="button" id="photosClearFilterBtn" class="photos-clear-chip" style="display:none;" onclick="mobile.clearPhotoFilters()">× 重置</button>
+            </div>
+            <div class="photos-view-switch" role="group" aria-label="视图模式">
+                <button type="button" class="view-mode-btn" data-view="grid-3" onclick="mobile.setPhotoViewMode('grid-3')" title="三列图墙">三列</button>
+                <button type="button" class="view-mode-btn active" data-view="grid-2" onclick="mobile.setPhotoViewMode('grid-2')" title="双列卡片">双列</button>
+                <button type="button" class="view-mode-btn" data-view="grid-1" onclick="mobile.setPhotoViewMode('grid-1')" title="大图浏览">大图</button>
+            </div>
+        </div>
+
+        <!-- 照片网格 -->
+        <main class="photo-feed view-grid-2" id="photoFeed">
             <!-- 照片卡片会动态插入 -->
         </main>
 
@@ -157,13 +231,158 @@
 
         <!-- 分页控件 -->
         <div id="paginationControls" class="pagination-bar">
-            <span style="color:red;">分页加载中...</span>
+            <span class="pagination-loading">分页加载中...</span>
         </div>
 
         <div id="emptyFeed" class="empty-state" style="display:none;">
             <span class="empty-icon">📭</span>
             <p>还没有照片</p>
-            <small>上传一些照片开始吧</small>
+            <small>点右下角 ＋ 上传第一张照片吧</small>
+        </div>
+
+        <!-- 悬浮上传按钮 -->
+        <button type="button" class="photos-fab" onclick="mobile.switchTab('upload')" title="上传照片" aria-label="上传照片">＋</button>
+    </div>
+
+    <!-- ========== 双人空间 Hub 页面 ========== -->
+    <div id="spacePage" class="page">
+        <header class="top-bar">
+            <div class="logo">
+                <span>✨</span>
+                <span>空间</span>
+            </div>
+        </header>
+
+        <div class="space-content">
+            <div class="space-group">
+                <div class="space-group-title">每日互动</div>
+                <div class="space-grid">
+                    <div class="space-tile" onclick="mobile.switchTab('moodDiary')">
+                        <span class="space-tile-icon tint-rose">📝</span>
+                        <div class="space-tile-info">
+                            <strong>心情日记</strong>
+                            <small>记录每天情绪</small>
+                        </div>
+                    </div>
+                    <div class="space-tile" onclick="mobile.switchTab('dailyChatter')">
+                        <span class="space-tile-icon tint-sky">💬</span>
+                        <div class="space-tile-info">
+                            <strong>每日叨叨</strong>
+                            <small>碎碎念动态</small>
+                        </div>
+                    </div>
+                    <div class="space-tile" onclick="mobile.switchTab('secretNote')">
+                        <span class="space-tile-icon tint-pink">💌</span>
+                        <div class="space-tile-info">
+                            <strong>悄悄话</strong>
+                            <small>给 Ta 写纸条</small>
+                        </div>
+                    </div>
+                    <div class="space-tile" onclick="mobile.nudgeOrLoad()">
+                        <span class="space-tile-icon tint-coral">💗</span>
+                        <div class="space-tile-info">
+                            <strong>戳一戳</strong>
+                            <small>轻量提醒一下</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-group">
+                <div class="space-group-title">足迹与时光</div>
+                <div class="space-grid">
+                    <div class="space-tile" onclick="mobile.switchTab('map')">
+                        <span class="space-tile-icon tint-mint">🗺️</span>
+                        <div class="space-tile-info">
+                            <strong>我们的地图</strong>
+                            <small>走过的城市</small>
+                        </div>
+                    </div>
+                    <div class="space-tile" onclick="mobile.switchTab('passport')">
+                        <span class="space-tile-icon tint-amber">🛂</span>
+                        <div class="space-tile-info">
+                            <strong>足迹护照</strong>
+                            <small>地点印章集</small>
+                        </div>
+                    </div>
+                    <div class="space-tile" onclick="mobile.switchTab('timeline')">
+                        <span class="space-tile-icon tint-rose">💝</span>
+                        <div class="space-tile-info">
+                            <strong>纪念日</strong>
+                            <small>重要日子倒数</small>
+                        </div>
+                    </div>
+                    <div class="space-tile" onclick="mobile.switchTab('emotionTimeline')">
+                        <span class="space-tile-icon tint-indigo">📜</span>
+                        <div class="space-tile-info">
+                            <strong>情感时间轴</strong>
+                            <small>所有回忆汇总</small>
+                        </div>
+                    </div>
+                    <div class="space-tile" onclick="mobile.switchTab('timeCapsule')">
+                        <span class="space-tile-icon tint-violet">⏳</span>
+                        <div class="space-tile-info">
+                            <strong>时光胶囊</strong>
+                            <small>寄给未来的信</small>
+                        </div>
+                    </div>
+                    <div class="space-tile" onclick="mobile.switchTab('collage')">
+                        <span class="space-tile-icon tint-pink">🖼️</span>
+                        <div class="space-tile-info">
+                            <strong>照片拼贴墙</strong>
+                            <small>生成爱心拼图</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-group">
+                <div class="space-group-title">生活与趣味</div>
+                <div class="space-grid">
+                    <div class="space-tile" onclick="mobile.switchTab('coupleTasks')">
+                        <span class="space-tile-icon tint-amber">✅</span>
+                        <div class="space-tile-info">
+                            <strong>情侣打卡</strong>
+                            <small>任务与愿望单</small>
+                        </div>
+                    </div>
+                    <div class="space-tile" onclick="mobile.switchTab('periodTracker')">
+                        <span class="space-tile-icon tint-rose">🩸</span>
+                        <div class="space-tile-info">
+                            <strong>周期追踪</strong>
+                            <small>记录与提醒</small>
+                        </div>
+                    </div>
+                    <div class="space-tile" onclick="mobile.switchTab('gameCenter')">
+                        <span class="space-tile-icon tint-indigo">🎮</span>
+                        <div class="space-tile-info">
+                            <strong>游戏中心</strong>
+                            <small>翻牌·象棋·黑白棋</small>
+                        </div>
+                    </div>
+                    <div class="space-tile" onclick="mobile.switchTab('achievements')">
+                        <span class="space-tile-icon tint-amber">🏆</span>
+                        <div class="space-tile-info">
+                            <strong>恋爱成就</strong>
+                            <small>等级与称号</small>
+                        </div>
+                    </div>
+                    <div class="space-tile" onclick="mobile.switchTab('partnerProfile')">
+                        <span class="space-tile-icon tint-pink">💝</span>
+                        <div class="space-tile-info">
+                            <strong>对方喜好</strong>
+                            <small>Ta 的专属档案</small>
+                        </div>
+                    </div>
+                    <div class="space-tile" onclick="mobile.switchTab('intimateRecords')">
+                        <span class="space-tile-icon tint-violet">🔒</span>
+                        <div class="space-tile-info">
+                            <strong>亲密记录</strong>
+                            <small>私密加密空间</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -674,49 +893,68 @@
         </div>
 
         <div class="menu-list">
-            <div class="menu-item" onclick="mobile.toggleFavorites()">
-                <span class="menu-icon">❤️</span>
-                <span class="menu-text">我的收藏</span>
-                <span class="menu-arrow">›</span>
+            <div class="menu-group">
+                <div class="menu-group-title">我的内容</div>
+                <div class="menu-group-card">
+                    <div class="menu-item" onclick="mobile.toggleFavorites()">
+                        <span class="menu-icon">❤️</span>
+                        <span class="menu-text">我的收藏</span>
+                        <span class="menu-arrow">›</span>
+                    </div>
+                    <div class="menu-item" onclick="mobile.showMarkedCategories()">
+                        <span class="menu-icon">⭐</span>
+                        <span class="menu-text">已标记分类</span>
+                        <span class="menu-arrow">›</span>
+                    </div>
+                    <div class="menu-item" onclick="mobile.switchTab('collage')">
+                        <span class="menu-icon">🖼️</span>
+                        <span class="menu-text">照片拼贴墙</span>
+                        <span class="menu-arrow">›</span>
+                    </div>
+                </div>
             </div>
-            <div class="menu-item" onclick="mobile.showMarkedCategories()">
-                <span class="menu-icon">⭐</span>
-                <span class="menu-text">已标记分类</span>
-                <span class="menu-arrow">›</span>
+
+            <div class="menu-group">
+                <div class="menu-group-title">双人空间</div>
+                <div class="menu-group-card">
+                    <div class="menu-item" onclick="mobile.switchTab('achievements')">
+                        <span class="menu-icon">🏆</span>
+                        <span class="menu-text">回忆成就</span>
+                        <span class="menu-arrow">›</span>
+                    </div>
+                    <div class="menu-item" onclick="mobile.switchTab('partnerProfile')">
+                        <span class="menu-icon">💝</span>
+                        <span class="menu-text">对方喜好档案</span>
+                        <span class="menu-arrow">›</span>
+                    </div>
+                    <div class="menu-item" onclick="mobile.switchTab('intimateRecords')">
+                        <span class="menu-icon">🔒</span>
+                        <span class="menu-text">亲密记录</span>
+                        <span class="menu-arrow">›</span>
+                    </div>
+                </div>
             </div>
-            <div class="menu-item" onclick="mobile.switchTab('collage')">
-                <span class="menu-icon">❤️</span>
-                <span class="menu-text">照片拼贴墙</span>
-                <span class="menu-arrow">›</span>
-            </div>
-            <div class="menu-item" onclick="mobile.switchTab('achievements')">
-                <span class="menu-icon">🏆</span>
-                <span class="menu-text">回忆成就</span>
-                <span class="menu-arrow">›</span>
-            </div>
-            <div class="menu-item" onclick="mobile.switchTab('partnerProfile')">
-                <span class="menu-icon">💝</span>
-                <span class="menu-text">对方喜好档案</span>
-                <span class="menu-arrow">›</span>
-            </div>
-            <div class="menu-item" onclick="mobile.switchTab('intimateRecords')">
-                <span class="menu-icon">🔒</span>
-                <span class="menu-text">亲密记录</span>
-                <span class="menu-arrow">›</span>
-            </div>
-            <div class="menu-item" onclick="mobile.openChangePasswordModal()">
-                <span class="menu-icon">🔑</span>
-                <span class="menu-text">修改密码</span>
-                <span class="menu-arrow">›</span>
-            </div>
-            <div class="menu-item" onclick="mobile.showSettings()">
-                <span class="menu-icon">⚙️</span>
-                <span class="menu-text">设置</span>
-                <span class="menu-arrow">›</span>
+
+            <div class="menu-group">
+                <div class="menu-group-title">账号与偏好</div>
+                <div class="menu-group-card">
+                    <div class="menu-item" onclick="mobile.openChangePasswordModal()">
+                        <span class="menu-icon">🔑</span>
+                        <span class="menu-text">修改密码</span>
+                        <span class="menu-arrow">›</span>
+                    </div>
+                    <div class="menu-item" onclick="mobile.showSettings()">
+                        <span class="menu-icon">⚙️</span>
+                        <span class="menu-text">外观与设置</span>
+                        <span class="menu-arrow">›</span>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <button class="btn-danger btn-full" onclick="mobile.handleLogout()">退出登录</button>
+        <div class="profile-logout-wrap">
+            <button class="btn-danger btn-full" onclick="mobile.handleLogout()">退出登录</button>
+        </div>
     </div>
 
     <!-- ========== 照片详情页 ========== -->
@@ -756,10 +994,22 @@
 
             <!-- 操作按钮 -->
             <div class="detail-actions">
-                <button class="btn-secondary" onclick="mobile.downloadPhoto()">⬇️ 下载</button>
-                <button class="btn-secondary" onclick="mobile.openCategoryModal()">📁 改分类</button>
-                <button class="btn-secondary" onclick="mobile.openThrowBottleModal()">🍾 扔进海里</button>
-                <button class="btn-danger" onclick="mobile.deletePhoto()">🗑️ 删除</button>
+                <button class="detail-action-btn" onclick="mobile.downloadPhoto()">
+                    <span class="detail-action-icon">⬇️</span>
+                    <span>下载</span>
+                </button>
+                <button class="detail-action-btn" onclick="mobile.openCategoryModal()">
+                    <span class="detail-action-icon">📁</span>
+                    <span>改分类</span>
+                </button>
+                <button class="detail-action-btn" onclick="mobile.openThrowBottleModal()">
+                    <span class="detail-action-icon">🍾</span>
+                    <span>漂流瓶</span>
+                </button>
+                <button class="detail-action-btn detail-action-danger" onclick="mobile.deletePhoto()">
+                    <span class="detail-action-icon">🗑️</span>
+                    <span>删除</span>
+                </button>
             </div>
         </div>
     </div>
@@ -826,8 +1076,8 @@
     </div>
     <div id="sheetOverlay" class="sheet-overlay" style="display:none;" onclick="mobile.closeMarkedPanel()"></div>
 
-    <!-- ========== 底部导航 ========== -->
-    <nav class="bottom-nav" id="bottomNav">
+    <!-- ========== 底部导航（4 Tab 悬浮毛玻璃栏） ========== -->
+    <nav class="bottom-nav" id="bottomNav" style="display:none;">
         <div class="nav-item active" data-page="home" onclick="mobile.switchTab('home')">
             <span class="nav-icon">🏠</span>
             <span class="nav-label">首页</span>
@@ -835,6 +1085,10 @@
         <div class="nav-item" data-page="photos" onclick="mobile.switchTab('photos')">
             <span class="nav-icon">📸</span>
             <span class="nav-label">照片</span>
+        </div>
+        <div class="nav-item" data-page="space" onclick="mobile.switchTab('space')">
+            <span class="nav-icon">✨</span>
+            <span class="nav-label">空间</span>
         </div>
         <div class="nav-item" data-page="profile" onclick="mobile.switchTab('profile')">
             <span class="nav-icon">👤</span>
@@ -851,7 +1105,7 @@
     <script src="games/memory-card.js?v=1"></script>
     <script src="games/chinese-chess.js?v=1"></script>
     <script src="games/reversi.js?v=1"></script>
-    <script type="module" src="mobile-app.js?v=mvd7pl5w"></script>
+    <script type="module" src="mobile-app.js?v=security20261022"></script>
     <script>
         if ('serviceWorker' in navigator) {
             let refreshing = false;
@@ -870,29 +1124,30 @@
     <!-- 修改密码弹窗 -->
     <div id="changePasswordMobileModal" class="modal-overlay" style="display:none;">
         <div class="modal-card">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                <h3 style="margin:0;font-size:18px;">修改密码</h3>
-                <button onclick="mobile.closeChangePasswordModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;">&times;</button>
+            <div class="modal-card-header">
+                <h3>🔑 修改密码</h3>
+                <button type="button" class="modal-close-x" onclick="mobile.closeChangePasswordModal()" aria-label="关闭">&times;</button>
             </div>
             <form onsubmit="mobile.handleChangePassword(event)">
-                <div style="margin-bottom:14px;">
-                    <label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">当前密码</label>
-                    <input type="password" id="oldPasswordMobile" required autocomplete="current-password" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:16px;">
+                <div class="form-item">
+                    <label for="oldPasswordMobile">当前密码</label>
+                    <input type="password" id="oldPasswordMobile" required autocomplete="current-password" placeholder="请输入当前密码">
                 </div>
-                <div style="margin-bottom:14px;">
-                    <label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">新密码</label>
-                    <input type="password" id="newPasswordMobile" required minlength="4" autocomplete="new-password" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:16px;">
+                <div class="form-item">
+                    <label for="newPasswordMobile">新密码</label>
+                    <input type="password" id="newPasswordMobile" required minlength="4" autocomplete="new-password" placeholder="至少 4 位字符">
                 </div>
-                <div style="margin-bottom:14px;">
-                    <label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">确认新密码</label>
-                    <input type="password" id="confirmPasswordMobile" required minlength="4" autocomplete="new-password" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:16px;">
+                <div class="form-item">
+                    <label for="confirmPasswordMobile">确认新密码</label>
+                    <input type="password" id="confirmPasswordMobile" required minlength="4" autocomplete="new-password" placeholder="请再次输入新密码">
                 </div>
-                <p id="changePasswordMobileError" style="color:#dc2626;font-size:13px;display:none;"></p>
-                <p id="changePasswordMobileSuccess" style="color:#059669;font-size:13px;display:none;">密码修改成功</p>
-                <button type="submit" style="width:100%;padding:12px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:600;">确认修改</button>
+                <p id="changePasswordMobileError" class="modal-status-error" style="display:none;"></p>
+                <p id="changePasswordMobileSuccess" class="modal-status-success" style="display:none;">密码修改成功</p>
+                <button type="submit" class="btn-primary btn-full">确认修改</button>
             </form>
         </div>
     </div>
 
+    <footer id="qixing-icp-footer" aria-label="网站备案"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">浙ICP备2026102527号-1</a></footer>
 </body>
 </html>

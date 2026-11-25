@@ -1,13 +1,10 @@
 /* ========================================
-   Service Worker - 照片管理系统 v6
-   离线模式：页面壳 → 缓存第一
-            API → 网络优先 + 缓存兜底
-            照片 → 缓存优先
+   Service Worker - 照片管理系统 v7
+   页面壳与静态资源：网络优先，离线回退
+   配置、API、照片及带身份的请求：仅网络，不缓存
    ======================================== */
 
-const CACHE_NAME = 'photo-manager-v6';
-const API_CACHE = 'photo-api-v1';
-const IMG_CACHE = 'photo-images-v1';
+const CACHE_NAME = 'photo-manager-v7';
 
 // 预缓存壳资源
 const SHELL_ASSETS = [
@@ -32,18 +29,16 @@ self.addEventListener('install', (event) => {
 // ---- 激活：清理旧缓存，通知客户端 ----
 self.addEventListener('activate', (event) => {
     event.waitUntil(
-        caches.keys().then((keys) =>
-            Promise.all(
-                keys
-                    .filter((key) => ![CACHE_NAME, API_CACHE, IMG_CACHE].includes(key))
-                    .map((key) => caches.delete(key))
-            )
-        )
+        (async () => {
+            const keys = await caches.keys();
+            await Promise.all(keys
+                .filter(key => /^photo-(manager|api|images)-/.test(key) && key !== CACHE_NAME)
+                .map(key => caches.delete(key)));
+            await self.clients.claim();
+            const clients = await self.clients.matchAll();
+            clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
+        })()
     );
-    self.clients.claim();
-    self.clients.matchAll().then(clients => {
-        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
-    });
 });
 
 // ---- 请求拦截 ----
@@ -55,21 +50,17 @@ self.addEventListener('fetch', (event) => {
 
     const path = url.pathname;
 
-    // ---- API 请求：网络优先，缓存兜底（离线可浏览已加载的数据） ----
-    if (path.startsWith('/rest/') || path.startsWith('/auth/')) {
-        event.respondWith(networkFirst(event.request, API_CACHE));
+    // Runtime config must bypass both Cache Storage and the HTTP cache.
+    if (path === '/config.js' || path === '/src/core/config.js') {
+        event.respondWith(fetch(event.request, { cache: 'no-store' }));
         return;
     }
 
-    // ---- 照片文件：缓存优先（省流量 + 离线可看） ----
-    if (path.startsWith('/storage/')) {
-        event.respondWith(cacheFirst(event.request, IMG_CACHE));
-        return;
-    }
-
-    // ---- 非 GET 请求：只走网络 ----
-    if (event.request.method !== 'GET') {
-        event.respondWith(fetch(event.request));
+    // Private responses must never be reused between users or after logout.
+    // Check methods before any cache access (Cache.put only supports GET).
+    if (event.request.method !== 'GET' || event.request.headers.has('Authorization') ||
+        path.startsWith('/rest/') || path.startsWith('/auth/') || path.startsWith('/storage/')) {
+        event.respondWith(fetch(event.request, { cache: 'no-store' }));
         return;
     }
 
@@ -79,46 +70,30 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // ---- JS/CSS/字体等静态资源：缓存优先 ----
-    event.respondWith(cacheFirst(event.request, CACHE_NAME));
+    // Unversioned ES module dependencies must also receive security updates.
+    event.respondWith(networkFirst(event.request, CACHE_NAME));
 });
 
 // ========== 缓存策略 ==========
 
 // 网络优先：先网络，失败则读缓存
-function networkFirst(request, cacheName) {
-    return fetch(request)
-        .then((response) => {
-            if (response.ok && response.status !== 206) {
-                const clone = response.clone();
-                caches.open(cacheName).then((cache) => cache.put(request, clone));
-            }
-            return response;
-        })
-        .catch(() => caches.match(request));
-}
-
-// 缓存优先：先缓存，无缓存则网络 + 缓存
-function cacheFirst(request, cacheName) {
-    return caches.match(request).then((cached) => {
+async function networkFirst(request, cacheName) {
+    let response;
+    try {
+        // Revalidate even resources served with immutable headers in old releases.
+        response = await fetch(request, { cache: 'no-cache' });
+    } catch (err) {
+        const cache = await caches.open(cacheName);
+        const cached = await cache.match(request);
         if (cached) return cached;
-        return fetch(request).then((response) => {
-            if (response.ok && response.status !== 206) {
-                const clone = response.clone();
-                caches.open(cacheName).then((cache) => cache.put(request, clone));
-            }
-            return response;
-        });
-    });
-}
-
-// ========== 缓存清理：限制数量 -==========
-// 照片缓存最多 200 张，超出删最旧的
-async function trimCache(cacheName, maxItems) {
-    const cache = await caches.open(cacheName);
-    const keys = await cache.keys();
-    if (keys.length > maxItems) {
-        const toDelete = keys.slice(0, keys.length - maxItems);
-        await Promise.all(toDelete.map(k => cache.delete(k)));
+        throw err;
     }
+    if (response.ok && response.status !== 206 &&
+        !/no-store|private/i.test(response.headers.get('Cache-Control') || '')) {
+        try {
+            const cache = await caches.open(cacheName);
+            await cache.put(request, response.clone());
+        } catch (err) { /* A full/disabled cache must not break a network response. */ }
+    }
+    return response;
 }

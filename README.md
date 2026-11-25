@@ -56,7 +56,7 @@
 - 主题切换：蓝色经典 / 暖粉（设置页切换，夜间模式独立，跨设备同步）
 - 照片分享链接（`share.html`）
 - 账号密码登录（laoda / xiaodi 双角色）
-- Service Worker 离线缓存
+- Service Worker 缓存页面壳，私有数据与照片不做离线缓存
 - SHA-256 + PEPPER 密码哈希（亲密空间）
 - Supabase Auth JWT 认证（signInWithPassword）
 - RLS 策略收紧（anon → authenticated）
@@ -176,6 +176,8 @@
 | `qr.png` | 手机端扫码入口二维码 |
 
 ## 本地开发
+
+安全修复、服务端密钥要求及发布前验证见 [SECURITY.md](SECURITY.md)。
 
 ```bash
 npm install

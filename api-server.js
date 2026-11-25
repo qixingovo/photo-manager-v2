@@ -7,7 +7,10 @@ const path = require('path');
 const fs = require('fs');
 const { Pool } = require('pg');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (typeof JWT_SECRET !== 'string' || JWT_SECRET.length < 32) {
+    throw new Error('JWT_SECRET must be configured with at least 32 characters');
+}
 const UPLOAD_DIR = process.env.UPLOAD_DIR || '/var/www/uploads';
 const PORT = process.env.PORT || 3002;
 
@@ -24,6 +27,7 @@ const app = express();
 app.use(express.json());
 
 app.use((req, res, next) => {
+    res.header('Cache-Control', 'private, no-store');
     res.header('Access-Control-Allow-Origin', req.headers.origin || 'https://ours.qixingovo.cn');
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Headers', 'Authorization, Content-Type, apikey, x-client-info, x-supabase-api-version');
@@ -37,19 +41,19 @@ app.use((req, res, next) => {
 app.post('/auth/v1/token', async (req, res) => {
     if (req.query.grant_type !== 'password') return res.status(400).json({ error: 'unsupported_grant_type' });
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+    if (typeof email !== 'string' || !email || typeof password !== 'string' || !password) {
+        return res.status(400).json({ error: 'email and password required' });
+    }
     try {
         const r = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
         if (r.rows.length === 0) return res.status(400).json({ error: 'invalid_credentials' });
         const user = r.rows[0];
-        let valid = false;
-        if (user.password_hash.startsWith('$2')) {
-            valid = await bcrypt.compare(password, user.password_hash);
-        } else {
-            const hash = await bcrypt.hash(password, 10);
-            await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, user.id]);
-            valid = true;
+        // Unknown legacy formats require an administrator password reset.
+        // Never migrate a password before proving the supplied password is valid.
+        if (typeof user.password_hash !== 'string' || !/^\$2[aby]\$\d{2}\$/.test(user.password_hash)) {
+            return res.status(400).json({ error: 'invalid_credentials' });
         }
+        const valid = await bcrypt.compare(password, user.password_hash);
         if (!valid) return res.status(400).json({ error: 'invalid_credentials' });
         const token = jwt.sign({
             sub: String(user.id), email: user.email, role: 'authenticated',
@@ -114,11 +118,58 @@ app.post('/auth/v1/logout', (req, res) => {
 // ---- Storage ----
 const storageMulter = multer({ dest: UPLOAD_DIR, limits: { fileSize: 20 * 1024 * 1024 } });
 
+function requireStorageUser(req, res, next) {
+    const authorization = req.headers.authorization || '';
+    if (!authorization.startsWith('Bearer ')) return res.status(401).json({ error: 'no_token' });
+    try {
+        const claims = jwt.verify(authorization.slice(7), JWT_SECRET, { algorithms: ['HS256'] });
+        if (!claims.sub || claims.role !== 'authenticated') {
+            return res.status(401).json({ error: 'invalid_token' });
+        }
+    } catch (err) {
+        return res.status(401).json({ error: 'invalid_token' });
+    }
+    next();
+}
+
+// Validate before multipart parsing so rejected requests never write a file.
+// Reject symlinks too: a lexically contained path may still point outside root.
+function validateStoragePath(req, res, next) {
+    const key = req.params['0'];
+    if (typeof key !== 'string' || !key || /[\\:\0]/.test(key) || path.isAbsolute(key) ||
+        key.split('/').some(part => !part || part === '.' || part === '..')) {
+        return res.status(400).json({ error: 'invalid_storage_path' });
+    }
+    try {
+        const root = fs.realpathSync(UPLOAD_DIR);
+        const target = path.resolve(root, key);
+        const relative = path.relative(root, target);
+        if (!relative || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
+            return res.status(400).json({ error: 'invalid_storage_path' });
+        }
+        let current = root;
+        for (const part of key.split('/')) {
+            current = path.join(current, part);
+            try {
+                if (fs.lstatSync(current).isSymbolicLink()) {
+                    return res.status(400).json({ error: 'invalid_storage_path' });
+                }
+            } catch (err) {
+                if (err.code !== 'ENOENT') throw err;
+            }
+        }
+        req.storagePath = target;
+    } catch (err) {
+        return res.status(400).json({ error: 'invalid_storage_path' });
+    }
+    next();
+}
+
 // Handle POST /storage/v1/object/photo/filename
-app.post('/storage/v1/object/photo/*', storageMulter.single('file'), (req, res) => {
+app.post('/storage/v1/object/photo/*', requireStorageUser, validateStoragePath, storageMulter.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'no file' });
-    const targetName = req.params['0'] || req.file.originalname;
-    const targetPath = path.join(UPLOAD_DIR, targetName);
+    const targetName = req.params['0'];
+    const targetPath = req.storagePath;
     const dir = path.dirname(targetPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.renameSync(req.file.path, targetPath);
@@ -126,8 +177,8 @@ app.post('/storage/v1/object/photo/*', storageMulter.single('file'), (req, res) 
 });
 
 // Handle DELETE /storage/v1/object/photo/filename
-app.delete('/storage/v1/object/photo/*', (req, res) => {
-    const fp = path.join(UPLOAD_DIR, req.params['0'] || '');
+app.delete('/storage/v1/object/photo/*', requireStorageUser, validateStoragePath, (req, res) => {
+    const fp = req.storagePath;
     try { if (fs.existsSync(fp)) fs.unlinkSync(fp); res.json({ success: true }); }
     catch (err) { res.status(500).json({ error: 'delete_failed' }); }
 });
@@ -140,7 +191,15 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 // 仅在用户不存在时创建，不再覆盖已有密码
 async function initUsers() {
     try {
-        const passwords = JSON.parse(process.env.USER_PASSWORDS || '{"laoda":"change-me","xiaodi":"change-me"}');
+        if (!process.env.USER_PASSWORDS) {
+            console.warn('USER_PASSWORDS is not configured; skipping account bootstrap');
+            return;
+        }
+        const passwords = JSON.parse(process.env.USER_PASSWORDS);
+        if (!passwords || ['laoda', 'xiaodi'].some(name =>
+            typeof passwords[name] !== 'string' || passwords[name].length < 12)) {
+            throw new Error('Bootstrap passwords must each contain at least 12 characters');
+        }
         const h1 = await bcrypt.hash(passwords.laoda, 10);
         const h2 = await bcrypt.hash(passwords.xiaodi, 10);
         await pool.query(

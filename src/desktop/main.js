@@ -3,6 +3,7 @@
 import { supabase, USER_EMAIL_MAP, getUserFromSession } from '../core/supabase.js';
 import { loadCategories as loadCategoriesService } from '../core/category-service.js';
 import { loadPhotos as loadPhotosService, PHOTOS_PER_PAGE } from '../core/photo-service.js';
+import { signOutLocally, wasExplicitlyLoggedOut, authStorage } from '../core/session-service.js';
 
 // ========== 生产环境 debug 控制 ==========
 if (!window.__APP_CONFIG__?.DEBUG) { console.log = function() {}; }
@@ -135,11 +136,17 @@ async function initApp() {
 }
 
 async function checkLogin() {
+    if (wasExplicitlyLoggedOut()) {
+        await signOutLocally();
+        currentUser = null;
+        showLoginPage();
+        return;
+    }
     var _a, _b, _c, _d;
     var _e = await supabase.auth.getSession();
     var session = ((_a = _e.data) === null || _a === void 0 ? void 0 : _a.session) || null;
     if (!session) {
-        var saved = localStorage.getItem('pm2_session');
+        var saved = authStorage.getItem('pm2_session');
         if (saved) {
             try {
                 var parsed = JSON.parse(saved);
@@ -169,7 +176,7 @@ async function checkLogin() {
             if (window.checkIncomingNotes) window.checkIncomingNotes();
             if (window.checkIncomingNudges) window.checkIncomingNudges();
         } else {
-            await supabase.auth.signOut();
+            await signOutLocally(supabase);
             showLoginPage();
         }
     } else {

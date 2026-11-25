@@ -3,10 +3,15 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { PHOTO_JWT_SECRET, pool } = require('../config');
 
+if (typeof PHOTO_JWT_SECRET !== 'string' || PHOTO_JWT_SECRET.length < 32) {
+    throw new Error('PHOTO_JWT_SECRET must be configured with at least 32 characters');
+}
+
 const router = express.Router();
 
 // CORS 中间件 — 允许 ours.qixingovo.cn 跨域请求
 router.use((req, res, next) => {
+    res.header('Cache-Control', 'private, no-store');
     res.header('Access-Control-Allow-Origin', req.headers.origin || 'https://ours.qixingovo.cn');
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Headers', 'Authorization, Content-Type, apikey, x-client-info');
@@ -20,19 +25,19 @@ router.use((req, res, next) => {
 router.post('/v1/token', async (req, res) => {
     if (req.query.grant_type !== 'password') return res.status(400).json({ error: 'unsupported_grant_type' });
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+    if (typeof email !== 'string' || !email || typeof password !== 'string' || !password) {
+        return res.status(400).json({ error: 'email and password required' });
+    }
     try {
         const r = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
         if (r.rows.length === 0) return res.status(400).json({ error: 'invalid_credentials' });
         const user = r.rows[0];
-        let valid = false;
-        if (user.password_hash.startsWith('$2')) {
-            valid = await bcrypt.compare(password, user.password_hash);
-        } else {
-            const hash = await bcrypt.hash(password, 10);
-            await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, user.id]);
-            valid = true;
+        // Unknown legacy formats require an administrator password reset.
+        // Never migrate a password before proving the supplied password is valid.
+        if (typeof user.password_hash !== 'string' || !/^\$2[aby]\$\d{2}\$/.test(user.password_hash)) {
+            return res.status(400).json({ error: 'invalid_credentials' });
         }
+        const valid = await bcrypt.compare(password, user.password_hash);
         if (!valid) return res.status(400).json({ error: 'invalid_credentials' });
         const token = jwt.sign({
             sub: String(user.id), email: user.email, role: 'authenticated',

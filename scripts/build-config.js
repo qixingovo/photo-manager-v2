@@ -25,7 +25,6 @@ const SUPABASE_URL_RAW = process.env.SUPABASE_URL
 // SUPABASE_URL 设为 auto 或 origin 时，前端使用当前访问域名（同源），
 // 便于多域名/应急入口部署（如 SNI 阻断时切换到备用域名）。
 const SUPABASE_URL_AUTO = SUPABASE_URL_RAW === 'auto' || SUPABASE_URL_RAW === 'origin'
-const SUPABASE_URL = SUPABASE_URL_AUTO ? 'window.location.origin' : SUPABASE_URL_RAW
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
 const SUPABASE_STORAGE_URL = process.env.SUPABASE_STORAGE_URL || ''
 const PEPPER = process.env.PEPPER || ''
@@ -87,11 +86,12 @@ console.log('src/core/config.js 已生成')
 
 // Auto-bump version numbers in HTML for cache busting
 const BUILD_VERSION = Date.now().toString(36)
-const htmlFiles = ['index.html', 'index-mobile.html']
+const htmlFiles = ['index.html', 'index-mobile.html', 'share.html']
 htmlFiles.forEach(file => {
     const htmlPath = path.join(__dirname, '..', file)
     if (!fs.existsSync(htmlPath)) return
     let html = fs.readFileSync(htmlPath, 'utf8')
+    html = html.replace(/(src=["']config\.js)(?:\?v=[\w-]+)?(["'])/g, '$1?v=' + BUILD_VERSION + '$2')
     html = html.replace(/(app\.js\?v=)\w+/g, '$1' + BUILD_VERSION)
     html = html.replace(/(mobile-app\.js\?v=)\w+/g, '$1' + BUILD_VERSION)
     html = html.replace(/(common\.js\?v=)\w+/g, '$1' + BUILD_VERSION)

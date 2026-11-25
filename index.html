@@ -13,18 +13,19 @@
         window.location.href = 'index-mobile.html';
     }
     </script>
-    <link rel="stylesheet" href="style.css?v=46">
+    <link rel="stylesheet" href="style.css?v=47">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="config.js?v=2"></script>
-    <script src="common.js?v=mvd7pl5w"></script>
+    <script src="config.js?v=security20261022"></script>
+    <script src="common.js?v=security20261022"></script>
 </head>
 <body>
     <!-- 登录页面 -->
     <div id="loginPage" class="login-page">
         <div class="login-box">
-            <h1>📷 老大和小弟的回忆管理系统</h1>
+            <div class="login-badge" aria-hidden="true">📷</div>
+            <h1>老大和小弟的回忆管理系统</h1>
             <p class="subtitle">回忆我们的从前</p>
             <form id="loginForm" onsubmit="window.handleLogin(event)">
                 <div class="form-group">
@@ -35,151 +36,188 @@
                     <label for="loginPassword">密码</label>
                     <input type="password" id="loginPassword" required placeholder="请输入密码" autocomplete="current-password">
                 </div>
-                <button type="submit" class="btn btn-primary btn-block">登录</button>
+                <button type="submit" class="btn btn-primary btn-block login-submit-btn">登录</button>
                 <p id="loginError" class="login-error"></p>
-                <a href="/download/app-release.apk" style="display:block;margin-top:16px;text-align:center;color:#4A90D9;font-size:13px;text-decoration:none;">📱 下载 Android App</a>
+                <a href="/download/app-release.apk" class="login-apk-link">📱 下载 Android App</a>
             </form>
         </div>
     </div>
 
     <div class="container" id="mainContainer" style="display:none;">
-        <header>
-            <h1>📷 老大和小弟的回忆管理系统</h1>
-            <p class="subtitle">回忆我们的从前</p>
-        </header>
+        <div class="app-shell" id="appShell">
+        <!-- 左侧分组导航栏 -->
+        <aside class="app-sidebar" id="appSidebar" aria-label="功能导航">
+            <div class="sidebar-brand">
+                <div class="sidebar-brand-title">
+                    <span class="sidebar-brand-logo">📷</span>
+                    <span class="sidebar-brand-text">回忆空间</span>
+                </div>
+                <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseBtn" onclick="window.toggleSidebarCollapse()" title="收起/展开侧边栏" aria-label="收起或展开侧边栏">⇄</button>
+            </div>
 
-        <!-- 顶部导航栏 -->
-        <nav class="top-nav" id="topNav">
-            <div class="nav-section" onclick="window.toggleSection('upload')" title="上传照片">
-                <span class="nav-icon">📤</span>
-                <span class="nav-text">上传照片</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('category')" title="分类管理">
-                <span class="nav-icon">📁</span>
-                <span class="nav-text">分类管理</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('map')" title="我们的地图">
-                <span class="nav-icon">🗺️</span>
-                <span class="nav-text">我们的地图</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('timeline')" title="纪念日">
-                <span class="nav-icon">💝</span>
-                <span class="nav-text">纪念日</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('collage')" title="拼贴墙">
-                <span class="nav-icon">❤️</span>
-                <span class="nav-text">拼贴墙</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('achievements')" title="成就">
-                <span class="nav-icon">🏆</span>
-                <span class="nav-text">成就</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('albums')" title="相册">
-                <span class="nav-icon">📸</span>
-                <span class="nav-text">相册</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('passport')" title="足迹护照">
-                <span class="nav-icon">🛂</span>
-                <span class="nav-text">足迹护照</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('moodDiary')" title="心情日记">
-                <span class="nav-icon">📝</span>
-                <span class="nav-text">心情日记</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('dailyChatter')" title="每日叨叨">
-                <span class="nav-icon">💬</span>
-                <span class="nav-text">每日叨叨</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('intimateRecords')" title="亲密记录">
-                <span class="nav-icon">🔒</span>
-                <span class="nav-text">亲密记录</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('coupleTasks')" title="情侣打卡">
-                <span class="nav-icon">✅</span>
-                <span class="nav-text">情侣打卡</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('partnerProfile')" title="对方喜好档案">
-                <span class="nav-icon">💝</span>
-                <span class="nav-text">对方喜好</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('secretNote')" title="悄悄话">
-                <span class="nav-icon">💌</span>
-                <span class="nav-text">悄悄话</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('nudge')" title="戳一戳">
-                <span class="nav-icon">💗</span>
-                <span class="nav-text">戳一戳</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('emotionTimeline')" title="情感时间轴">
-                <span class="nav-icon">📜</span>
-                <span class="nav-text">情感时间轴</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('timeCapsule')" title="时光胶囊">
-                <span class="nav-icon">⏳</span>
-                <span class="nav-text">时光胶囊</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.toggleSection('gameCenter')" title="游戏中心">
-                <span class="nav-icon">🎮</span>
-                <span class="nav-text">游戏中心</span>
-            </div>
-            <div class="nav-divider"></div>
-            <div class="nav-section" onclick="window.refreshData()" title="刷新">
-                <span class="nav-icon">🔄</span>
-                <span class="nav-text">刷新</span>
-            </div>
-        </nav>
+            <nav class="top-nav" id="topNav">
+                <div class="nav-group">
+                    <div class="nav-group-label">照片管理</div>
+                    <div class="nav-section active" data-section="browse" onclick="window.showPhotoBrowse()" title="照片浏览">
+                        <span class="nav-icon">🏠</span>
+                        <span class="nav-text">照片浏览</span>
+                    </div>
+                    <div class="nav-section" data-section="upload" onclick="window.toggleSection('upload')" title="上传照片">
+                        <span class="nav-icon">📤</span>
+                        <span class="nav-text">上传照片</span>
+                    </div>
+                    <div class="nav-section" data-section="category" onclick="window.toggleSection('category')" title="分类管理">
+                        <span class="nav-icon">📁</span>
+                        <span class="nav-text">分类管理</span>
+                    </div>
+                    <div class="nav-section" data-section="albums" onclick="window.toggleSection('albums')" title="相册">
+                        <span class="nav-icon">📸</span>
+                        <span class="nav-text">相册</span>
+                    </div>
+                </div>
 
-        <!-- 右侧标记分类浮窗 -->
-        <div class="marked-widget" id="markedWidget" onclick="window.toggleMarkedCategories(event)">
-            <!-- 收起状态 -->
-            <div class="marked-collapsed">
-                <span>⭐</span>
-                <span>已标记</span>
+                <div class="nav-group">
+                    <div class="nav-group-label">足迹与回忆</div>
+                    <div class="nav-section" data-section="map" onclick="window.toggleSection('map')" title="我们的地图">
+                        <span class="nav-icon">🗺️</span>
+                        <span class="nav-text">我们的地图</span>
+                    </div>
+                    <div class="nav-section" data-section="passport" onclick="window.toggleSection('passport')" title="足迹护照">
+                        <span class="nav-icon">🛂</span>
+                        <span class="nav-text">足迹护照</span>
+                    </div>
+                    <div class="nav-section" data-section="timeline" onclick="window.toggleSection('timeline')" title="纪念日">
+                        <span class="nav-icon">💝</span>
+                        <span class="nav-text">纪念日</span>
+                    </div>
+                    <div class="nav-section" data-section="emotionTimeline" onclick="window.toggleSection('emotionTimeline')" title="情感时间轴">
+                        <span class="nav-icon">📜</span>
+                        <span class="nav-text">情感时间轴</span>
+                    </div>
+                    <div class="nav-section" data-section="timeCapsule" onclick="window.toggleSection('timeCapsule')" title="时光胶囊">
+                        <span class="nav-icon">⏳</span>
+                        <span class="nav-text">时光胶囊</span>
+                    </div>
+                    <div class="nav-section" data-section="collage" onclick="window.toggleSection('collage')" title="拼贴墙">
+                        <span class="nav-icon">❤️</span>
+                        <span class="nav-text">拼贴墙</span>
+                    </div>
+                </div>
+
+                <div class="nav-group">
+                    <div class="nav-group-label">双人空间</div>
+                    <div class="nav-section" data-section="moodDiary" onclick="window.toggleSection('moodDiary')" title="心情日记">
+                        <span class="nav-icon">📝</span>
+                        <span class="nav-text">心情日记</span>
+                    </div>
+                    <div class="nav-section" data-section="dailyChatter" onclick="window.toggleSection('dailyChatter')" title="每日叨叨">
+                        <span class="nav-icon">💬</span>
+                        <span class="nav-text">每日叨叨</span>
+                    </div>
+                    <div class="nav-section" data-section="secretNote" onclick="window.toggleSection('secretNote')" title="悄悄话">
+                        <span class="nav-icon">💌</span>
+                        <span class="nav-text">悄悄话</span>
+                    </div>
+                    <div class="nav-section" data-section="nudge" onclick="window.toggleSection('nudge')" title="戳一戳">
+                        <span class="nav-icon">💗</span>
+                        <span class="nav-text">戳一戳</span>
+                    </div>
+                    <div class="nav-section" data-section="coupleTasks" onclick="window.toggleSection('coupleTasks')" title="情侣打卡">
+                        <span class="nav-icon">✅</span>
+                        <span class="nav-text">情侣打卡</span>
+                    </div>
+                    <div class="nav-section" data-section="partnerProfile" onclick="window.toggleSection('partnerProfile')" title="对方喜好档案">
+                        <span class="nav-icon">💝</span>
+                        <span class="nav-text">对方喜好</span>
+                    </div>
+                    <div class="nav-section" data-section="intimateRecords" onclick="window.toggleSection('intimateRecords')" title="亲密记录">
+                        <span class="nav-icon">🔒</span>
+                        <span class="nav-text">亲密记录</span>
+                    </div>
+                </div>
+
+                <div class="nav-group">
+                    <div class="nav-group-label">趣味与成就</div>
+                    <div class="nav-section" data-section="achievements" onclick="window.toggleSection('achievements')" title="成就">
+                        <span class="nav-icon">🏆</span>
+                        <span class="nav-text">成就</span>
+                    </div>
+                    <div class="nav-section" data-section="gameCenter" onclick="window.toggleSection('gameCenter')" title="游戏中心">
+                        <span class="nav-icon">🎮</span>
+                        <span class="nav-text">游戏中心</span>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="nav-section nav-refresh" onclick="window.refreshData()" title="刷新数据">
+                    <span class="nav-icon">🔄</span>
+                    <span class="nav-text">刷新数据</span>
+                </div>
             </div>
-            <!-- 展开状态 -->
-            <div class="marked-content" onclick="event.stopPropagation()">
-                <div class="marked-header">已标记的分类 ⭐</div>
-                <div id="markedCategoriesList" class="marked-list"></div>
+        </aside>
+
+        <!-- 右侧主工作区 -->
+        <div class="app-main">
+            <header class="app-header">
+                <div class="header-brand">
+                    <h1>📷 老大和小弟的回忆管理系统</h1>
+                    <p class="subtitle">回忆我们的从前</p>
+                </div>
+                <div class="header-actions">
+                    <button type="button" class="header-action-btn theme-toggle-btn" onclick="window.toggleDesktopTheme()" title="切换主题">
+                        <span>🎨</span>
+                        <span class="header-btn-label">切换主题</span>
+                    </button>
+                    <button type="button" class="header-action-btn" onclick="window.openChangePasswordModal()" title="修改密码">
+                        <span>🔑</span>
+                        <span class="header-btn-label">修改密码</span>
+                    </button>
+                    <button type="button" class="header-action-btn header-action-logout" onclick="window.handleLogout()" title="退出登录">
+                        <span>退出登录</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- 右侧标记分类浮窗 -->
+            <div class="marked-widget" id="markedWidget" onclick="window.toggleMarkedCategories(event)">
+                <!-- 收起状态 -->
+                <div class="marked-collapsed">
+                    <span>⭐</span>
+                    <span>已标记</span>
+                </div>
+                <!-- 展开状态 -->
+                <div class="marked-content" onclick="event.stopPropagation()">
+                    <div class="marked-header">已标记的分类 ⭐</div>
+                    <div id="markedCategoriesList" class="marked-list"></div>
+                </div>
             </div>
-        </div>
 
         <!-- 上传区域 -->
         <section class="upload-section" id="uploadSection" style="display:none;">
-            <h2>上传照片</h2>
+            <div class="section-header">
+                <h2>📤 上传照片</h2>
+                <button type="button" class="section-close-btn" onclick="window.showPhotoBrowse()" title="收起面板">✕</button>
+            </div>
             <form id="uploadForm" class="upload-form">
-                <div class="form-row">
+                <div class="form-row upload-file-row">
                     <input type="file" id="photoInput" accept="image/*" multiple required>
                 </div>
-                <div class="form-row">
+                <div class="form-row form-grid-2">
                     <input type="text" id="photoName" placeholder="照片名称前缀（可选，用于批量命名）">
                     <input type="text" id="photoDesc" placeholder="照片描述（可选）">
                 </div>
                 <!-- 级联分类选择器 -->
                 <div id="uploadCategoryCascade" class="cascade-select"></div>
-                <div class="form-row" style="margin-top:8px;">
-                    <input type="text" id="photoLocationName" placeholder="📍 地点名称（如：北京故宫）" style="flex:1;">
-                    <input type="number" id="photoLatitude" placeholder="纬度" step="any" style="width:120px;">
-                    <input type="number" id="photoLongitude" placeholder="经度" step="any" style="width:120px;">
-                    <button type="button" class="btn btn-secondary" onclick="window.pickLocationOnMap()" style="white-space:nowrap;">📍 地图选点</button>
+                <div class="form-row upload-location-row">
+                    <input type="text" id="photoLocationName" placeholder="📍 地点名称（如：北京故宫）" class="upload-loc-name">
+                    <input type="number" id="photoLatitude" placeholder="纬度" step="any" class="upload-coord-input">
+                    <input type="number" id="photoLongitude" placeholder="经度" step="any" class="upload-coord-input">
+                    <button type="button" class="btn btn-secondary" onclick="window.pickLocationOnMap()">📍 地图选点</button>
                 </div>
-                <button type="submit" class="btn btn-primary">上传</button>
+                <div class="upload-submit-row">
+                    <button type="submit" class="btn btn-primary">开始上传</button>
+                </div>
                 <div id="uploadProgress" class="upload-progress" style="display:none;">
                     <div class="progress-bar">
                         <div id="progressFill" class="progress-fill"></div>
@@ -365,10 +403,6 @@
             <div id="coupleTasksList"></div>
         </section>
 
-        <button onclick="window.handleLogout()" class="btn btn-secondary" style="position:fixed;top:20px;right:20px;z-index:100;">退出登录</button>
-<button class="theme-toggle-btn" onclick="window.toggleDesktopTheme()" title="切换主题">🎨</button>
-<button onclick="window.openChangePasswordModal()" class="btn btn-secondary" style="position:fixed;top:20px;right:120px;z-index:100;">🔑 修改密码</button>
-
         <!-- 对方喜好档案 -->
         <section id="partnerProfileSection" style="display:none;" class="feature-section">
             <h2>💝 对方喜好档案</h2>
@@ -457,19 +491,27 @@
         <!-- 照片浏览 -->
         <section class="photos-section">
             <div class="photos-header">
+                <div class="photos-title-row">
+                    <h2 id="photosTitle">📷 照片浏览</h2>
+                    <div class="photos-quick-actions">
+                        <button id="favoritesFilterBtn" onclick="window.toggleFavoritesFilter()" class="btn btn-secondary">❤️ 收藏</button>
+                        <button id="selectModeBtn" onclick="window.toggleSelectMode()" class="btn btn-secondary">☑️ 多选</button>
+                    </div>
+                </div>
                 <div class="photos-controls">
-                    <input type="text" id="searchInput" placeholder="🔍 搜索照片...">
+                    <div class="search-input-wrap">
+                        <input type="text" id="searchInput" placeholder="🔍 搜索照片名称、描述或地点...">
+                    </div>
                     <div id="filterCategoryCascade" class="filter-cascade"></div>
-                    <button id="selectModeBtn" onclick="window.toggleSelectMode()" class="btn btn-secondary">☑️ 多选</button>
+                </div>
+                <div id="batchToolbar" class="batch-toolbar">
                     <button id="selectAllBtn" onclick="window.selectAllPhotos()" class="btn btn-secondary" style="display:none;">全选</button>
                     <button id="batchCategoryBtn" onclick="window.openBatchCategoryModal()" class="btn btn-secondary" style="display:none;">📁 批量改分类</button>
                     <button id="batchLocationBtn" onclick="window.openBatchLocationModal()" class="btn btn-secondary" style="display:none;">📍 批量设位置</button>
                     <button id="batchDateBtn" onclick="window.openBatchDateModal()" class="btn btn-secondary" style="display:none;">📅 调整日期</button>
                     <button id="batchExportBtn" onclick="window.exportSelectedPhotos()" class="btn btn-secondary" style="display:none;">📦 导出选中</button>
                     <button id="batchDeleteBtn" onclick="window.batchDeletePhotos()" class="btn btn-danger" style="display:none;">🗑️ 删除 (<span id="selectedCount">0</span>)</button>
-                    <button id="favoritesFilterBtn" onclick="window.toggleFavoritesFilter()" class="btn btn-secondary">❤️ 收藏</button>
                 </div>
-                <h2 id="photosTitle">照片浏览</h2>
             </div>
             <div id="driftBottleAlert" class="drift-bottle-alert" style="display:none;" onclick="window.openReceivedBottle()">
                 <span>🍾</span>
@@ -482,6 +524,8 @@
                 <small>上传一些照片开始管理吧</small>
             </div>
         </section>
+        </div><!-- /.app-main -->
+        </div><!-- /.app-shell -->
     </div>
 
     <!-- 照片详情弹窗 -->
@@ -607,43 +651,41 @@
 
     <!-- 批量调整日期弹窗 -->
     <div id="batchDateModal" class="modal" style="display:none;">
-        <div class="modal-content modal-small" style="max-width:600px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-                <h3 style="margin:0;">📅 批量调整日期</h3>
-                <button onclick="document.getElementById('batchDateModal').style.display='none'" class="btn-secondary" style="padding:4px 10px;">×</button>
-            </div>
-            <div id="batchDateCount" style="font-size:13px;color:#888;margin-bottom:12px;"></div>
-            <div style="margin-bottom:12px;">
-                <label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;cursor:pointer;">
+        <div class="modal-content modal-small batch-date-modal-content">
+            <span class="modal-close" onclick="document.getElementById('batchDateModal').style.display='none'">&times;</span>
+            <h3>📅 批量调整日期</h3>
+            <div id="batchDateCount" class="batch-date-count"></div>
+            <div class="batch-date-block">
+                <label class="batch-date-radio">
                     <input type="radio" name="batchDateMode" value="unified" checked onchange="window.onBatchDateModeChange()"> 统一设置为
                 </label>
-                <input type="datetime-local" id="batchDateUnified" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;">
+                <input type="datetime-local" id="batchDateUnified" class="batch-date-input">
             </div>
-            <div style="margin-bottom:12px;">
-                <label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;cursor:pointer;">
+            <div class="batch-date-block">
+                <label class="batch-date-radio">
                     <input type="radio" name="batchDateMode" value="offset" onchange="window.onBatchDateModeChange()"> 偏移调整
                 </label>
-                <div id="batchDateOffsetRow" style="display:flex;gap:6px;align-items:center;">
-                    <button class="btn-secondary btn-mini-offset" onclick="window.applyOffset(-365)">-1年</button>
-                    <button class="btn-secondary btn-mini-offset" onclick="window.applyOffset(-30)">-30天</button>
-                    <button class="btn-secondary btn-mini-offset" onclick="window.applyOffset(-7)">-7天</button>
-                    <button class="btn-secondary btn-mini-offset" onclick="window.applyOffset(-1)">-1天</button>
-                    <input type="number" id="batchOffsetInput" value="0" style="width:70px;padding:6px;border:1px solid #ddd;border-radius:6px;text-align:center;">
-                    <span style="font-size:13px;color:#666;">天</span>
+                <div id="batchDateOffsetRow" class="batch-date-offset-row">
+                    <button type="button" class="btn btn-secondary btn-mini-offset" onclick="window.applyOffset(-365)">-1年</button>
+                    <button type="button" class="btn btn-secondary btn-mini-offset" onclick="window.applyOffset(-30)">-30天</button>
+                    <button type="button" class="btn btn-secondary btn-mini-offset" onclick="window.applyOffset(-7)">-7天</button>
+                    <button type="button" class="btn btn-secondary btn-mini-offset" onclick="window.applyOffset(-1)">-1天</button>
+                    <input type="number" id="batchOffsetInput" value="0" class="batch-offset-input">
+                    <span class="batch-offset-unit">天</span>
                 </div>
             </div>
-            <div style="margin-bottom:12px;">
-                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <div class="batch-date-block">
+                <label class="batch-date-radio">
                     <input type="radio" name="batchDateMode" value="filename" onchange="window.onBatchDateModeChange()"> 从文件名推断（如 IMG_20240101_xxx）
                 </label>
             </div>
-            <div style="margin-bottom:12px;">
-                <strong style="font-size:13px;">预览（前5张）：</strong>
-                <div id="batchDatePreview" style="max-height:200px;overflow-y:auto;font-size:12px;margin-top:4px;"></div>
+            <div class="batch-date-block">
+                <strong class="batch-date-preview-title">预览（前5张）：</strong>
+                <div id="batchDatePreview" class="batch-date-preview"></div>
             </div>
-            <div style="display:flex;gap:8px;">
-                <button onclick="document.getElementById('batchDateModal').style.display='none'" class="btn-secondary" style="flex:1;">取消</button>
-                <button onclick="window.execBatchDateUpdate()" class="btn btn-primary" style="flex:1;">确认修改</button>
+            <div class="modal-footer-actions">
+                <button type="button" onclick="document.getElementById('batchDateModal').style.display='none'" class="btn btn-secondary">取消</button>
+                <button type="button" onclick="window.execBatchDateUpdate()" class="btn btn-primary">确认修改</button>
             </div>
         </div>
     </div>
@@ -679,6 +721,7 @@
     <script src="games/memory-card.js?v=1"></script>
     <script src="games/chinese-chess.js?v=1"></script>
     <script src="games/reversi.js?v=1"></script>
-    <script type="module" src="app.js?v=mvd7pl5w"></script>
+    <script type="module" src="app.js?v=security20261022"></script>
+    <footer id="qixing-icp-footer" aria-label="网站备案"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">浙ICP备2026102527号-1</a></footer>
 </body>
 </html>

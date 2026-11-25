@@ -7,6 +7,7 @@ function toggleSelectMode() {
     Main.selectedPhotos.clear()
 
     const selectBtn = document.getElementById('selectModeBtn')
+    const batchToolbar = document.getElementById('batchToolbar')
     const selectAllBtn = document.getElementById('selectAllBtn')
     const batchCategoryBtn = document.getElementById('batchCategoryBtn')
     const batchLocationBtn = document.getElementById('batchLocationBtn')
@@ -14,15 +15,17 @@ function toggleSelectMode() {
     const batchDateBtn = document.getElementById('batchDateBtn')
     const batchBtn = document.getElementById('batchDeleteBtn')
 
+    if (batchToolbar) batchToolbar.classList.toggle('active', Main.selectMode)
+
     if (Main.selectMode) {
         selectBtn.classList.add('active')
         selectBtn.textContent = '❌ 取消'
-        selectAllBtn.style.display = 'inline-block'
-        batchCategoryBtn.style.display = 'inline-block'
-        if (batchLocationBtn) batchLocationBtn.style.display = 'inline-block'
-        if (batchDateBtn) batchDateBtn.style.display = 'inline-block'
-        if (batchExportBtn) batchExportBtn.style.display = 'inline-block'
-        batchBtn.style.display = 'inline-block'
+        selectAllBtn.style.display = 'inline-flex'
+        batchCategoryBtn.style.display = 'inline-flex'
+        if (batchLocationBtn) batchLocationBtn.style.display = 'inline-flex'
+        if (batchDateBtn) batchDateBtn.style.display = 'inline-flex'
+        if (batchExportBtn) batchExportBtn.style.display = 'inline-flex'
+        batchBtn.style.display = 'inline-flex'
     } else {
         selectBtn.classList.remove('active')
         selectBtn.textContent = '☑️ 多选'
