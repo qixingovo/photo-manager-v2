@@ -1,10 +1,10 @@
 /* ========================================
-   Service Worker - 照片管理系统 v7
+   Service Worker - 照片管理系统 v8
    页面壳与静态资源：网络优先，离线回退
    配置、API、照片及带身份的请求：仅网络，不缓存
    ======================================== */
 
-const CACHE_NAME = 'photo-manager-v7';
+const CACHE_NAME = 'photo-manager-v8';
 
 // 预缓存壳资源
 const SHELL_ASSETS = [

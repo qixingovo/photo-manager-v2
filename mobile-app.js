@@ -1004,58 +1004,77 @@ const mobile = {
         }
 
         setRememberMe(rememberMe);
-        const { data, error } = await client.auth.signInWithPassword({ email, password });
-
-        if (error) {
-            console.error('登录失败:', error);
-            alert('登录失败\n' + (error.message || JSON.stringify(error)) + '\n\n请截图发给我');
-            errorEl.textContent = '登录失败: ' + (error.message || '未知错误');
-            return;
+        const submitBtn = typeof document.querySelector === 'function'
+            ? document.querySelector('#loginForm button[type="submit"]')
+            : null;
+        const origBtnText = submitBtn ? submitBtn.textContent : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = '登录中...';
         }
-
-        // 手动持久化 session
-        if (data?.session) {
-            authStorage.setItem('pm2_session', JSON.stringify({
-                access_token: data.session.access_token,
-                refresh_token: data.session.refresh_token,
-                expires_at: data.session.expires_at
-            }));
-        }
-
-        // 查 profiles 取 username/role
-        const { data: profile } = await client.from('profiles')
-            .select('username, role').eq('user_id', data.user.id).single();
-
-        if (!profile) {
-            errorEl.textContent = '用户档案缺失，请联系管理员';
-            await signOutLocally(client);
-            return;
-        }
-
-        this.currentUser = _getUserFromSession({ username: profile.username, role: profile.role });
-        markSignedIn();
         errorEl.textContent = '';
 
-        // 老大生日彩蛋
-        await this.loadBirthdayConfig();
-        if (this.currentUser.isLaoda && this.isBirthdayToday()) {
-            this.showBirthdayWelcomeOverlay();
-            return;
+        try {
+            const { data, error } = await client.auth.signInWithPassword({ email, password });
+
+            if (error) {
+                console.error('登录失败:', error);
+                errorEl.textContent = '登录失败：' + (error.message || '账号或密码错误');
+                return;
+            }
+
+            // 手动持久化 session
+            if (data?.session) {
+                authStorage.setItem('pm2_session', JSON.stringify({
+                    access_token: data.session.access_token,
+                    refresh_token: data.session.refresh_token,
+                    expires_at: data.session.expires_at
+                }));
+            }
+
+            // 查 profiles 取 username/role
+            const { data: profile, error: profileErr } = await client.from('profiles')
+                .select('username, role').eq('user_id', data.user.id).single();
+
+            if (profileErr || !profile) {
+                errorEl.textContent = '用户档案读取失败，请重试或联系管理员';
+                await signOutLocally(client);
+                return;
+            }
+
+            this.currentUser = _getUserFromSession({ username: profile.username, role: profile.role });
+            markSignedIn();
+            errorEl.textContent = '';
+
+            // 老大生日彩蛋
+            await this.loadBirthdayConfig();
+            if (this.currentUser.isLaoda && this.isBirthdayToday()) {
+                this.showBirthdayWelcomeOverlay();
+                return;
+            }
+
+            // 先跳转页面
+            this.showPage('home');
+            this.renderFeatureCards();
+            this._renderFloatingBall();
+            this._loadFeatureCardOrderFromServer().then(() => this.renderFeatureCards());
+
+            // 再加载数据（不阻塞页面显示）
+            this.loadData().catch(err => {
+                console.error('加载数据失败:', err);
+                this.showToast('数据加载失败，请刷新重试');
+            });
+            // 静默检测更新
+            setTimeout(() => this.checkUpdate(), 3000);
+        } catch (err) {
+            console.error('登录请求异常:', err);
+            errorEl.textContent = '网络请求异常，请检查网络后重试';
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = origBtnText || '登录';
+            }
         }
-
-        // 先跳转页面
-        this.showPage('home');
-        this.renderFeatureCards();
-        this._renderFloatingBall();
-        this._loadFeatureCardOrderFromServer().then(() => this.renderFeatureCards());
-
-        // 再加载数据（不阻塞页面显示）
-        this.loadData().catch(err => {
-            console.error('加载数据失败:', err);
-            this.showToast('数据加载失败，请刷新重试');
-        });
-        // 静默检测更新
-        setTimeout(() => this.checkUpdate(), 3000);
     },
 
     async handleLogout() {

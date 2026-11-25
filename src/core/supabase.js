@@ -11,10 +11,18 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 }
 
 // 单例：防止 Vite HMR 或多次 import 创建重复 GoTrueClient
-const supabase = window.__sb_client__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { persistSession: true, storage: authStorage, autoRefreshToken: true, detectSessionInUrl: true }
-});
-window.__sb_client__ = supabase;
+let supabase = window.__sb_client__;
+if (!supabase) {
+    if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+        const errEl = document.getElementById('loginError');
+        if (errEl) errEl.textContent = '登录组件加载失败，请刷新页面重试';
+        throw new Error('Supabase SDK 未加载');
+    }
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: true, storage: authStorage, autoRefreshToken: true, detectSessionInUrl: true }
+    });
+    window.__sb_client__ = supabase;
+}
 
 const USER_EMAIL_MAP = APP_CONFIG.USER_EMAILS || { laoda: 'laoda@couple.local', xiaodi: 'xiaodi@couple.local' };
 

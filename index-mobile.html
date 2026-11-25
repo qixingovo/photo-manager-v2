@@ -11,9 +11,9 @@
     <link rel="apple-touch-icon" sizes="192x192" href="favicon-192.png">
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="mobile.css?v=77">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.101.1"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" media="print" onload="this.media='all'" />
+    <script src="vendor/supabase.js?v=2.101.1"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="config.js?v=security20261022"></script>
     <script src="common.js?v=security20261022"></script>
 </head>
@@ -31,7 +31,7 @@
                 <h1>老大和小弟的回忆</h1>
                 <p>回忆我们的从前</p>
             </div>
-            <form id="loginForm" onsubmit="if(window.mobile){mobile.handleLogin(event)};return false;">
+            <form id="loginForm" onsubmit="if(window.mobile){mobile.handleLogin(event)}else{var e=document.getElementById('loginError');if(e)e.textContent='页面脚本尚未加载完成，请稍候或刷新重试';}return false;">
                 <div class="input-group">
                     <input type="text" id="loginUsername" placeholder="账号" required>
                 </div>
@@ -1099,7 +1099,7 @@
     <!-- Toast 提示 -->
     <div id="toast" class="toast"></div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="games/games.css?v=1">
     <script src="games/game-engine.js"></script>
     <script src="games/memory-card.js?v=1"></script>

@@ -15,8 +15,27 @@ function copyStaticFiles() {
 
   return {
     name: 'copy-static-files',
+    configureServer(server) {
+      server.middlewares.use('/vendor/supabase.js', (req, res, next) => {
+        const umd = path.resolve(__dirname, 'node_modules/@supabase/supabase-js/dist/umd/supabase.js')
+        if (fs.existsSync(umd)) {
+          res.setHeader('Content-Type', 'application/javascript; charset=utf-8')
+          fs.createReadStream(umd).pipe(res)
+          return
+        }
+        next()
+      })
+    },
     closeBundle() {
       const distDir = path.resolve(__dirname, 'dist')
+      // 复制自托管 Supabase UMD 客户端（避免国内移动网络访问 jsdelivr 失败导致无法登录）
+      const sbUmdSrc = path.resolve(__dirname, 'node_modules/@supabase/supabase-js/dist/umd/supabase.js')
+      if (fs.existsSync(sbUmdSrc)) {
+        const vendorDir = path.resolve(distDir, 'vendor')
+        fs.mkdirSync(vendorDir, { recursive: true })
+        fs.copyFileSync(sbUmdSrc, path.join(vendorDir, 'supabase.js'))
+        console.log('  复制: vendor/supabase.js')
+      }
       filesToCopy.forEach(file => {
         const src = path.resolve(__dirname, file)
         const dest = path.resolve(distDir, file)

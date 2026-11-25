@@ -25,50 +25,56 @@ export async function handleLogin(e) {
     }
 
     setRememberMe(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-        if (error) console.error('账号登录失败:', error);
-        errorEl.textContent = '登录失败，请检查账号或密码';
-        return;
-    }
-
-    // 手动持久化 session（CDN 版 supabase-js 的 localStorage 可能不生效）
-    if (data?.session) {
-        authStorage.setItem('pm2_session', JSON.stringify({
-            access_token: data.session.access_token,
-            refresh_token: data.session.refresh_token,
-            expires_at: data.session.expires_at
-        }));
-    }
-
-    // 查 profiles 取 username/role
-    const { data: profile } = await supabase.from('profiles')
-        .select('username, role').eq('user_id', data.user.id).single();
-
-    if (!profile) {
-        errorEl.textContent = '用户档案缺失，请联系管理员';
-        await signOutLocally(supabase);
-        return;
-    }
-
-    const session = {
-        username: profile.username,
-        role: profile.role
-    };
-    setCurrentUser(getUserFromSession(session));
-    markSignedIn();
     errorEl.textContent = '';
-    // 如果是老大且今天是生日，显示生日快乐欢迎界面
-    await Main.loadBirthdayConfig();
-    if (Main.isLaodaFromSession(session) && Main.isBirthdayToday()) {
-        showBirthdayWelcome();
-    } else {
-        Main.showMainApp();
-        await Promise.all([loadCategories(), loadPhotos()]);
-        window.checkIncomingBottles();
-        window.checkIncomingNotes();
-        window.checkIncomingNudges();
+    try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+        if (error) {
+            console.error('账号登录失败:', error);
+            errorEl.textContent = '登录失败，请检查账号或密码';
+            return;
+        }
+
+        // 手动持久化 session（CDN 版 supabase-js 的 localStorage 可能不生效）
+        if (data?.session) {
+            authStorage.setItem('pm2_session', JSON.stringify({
+                access_token: data.session.access_token,
+                refresh_token: data.session.refresh_token,
+                expires_at: data.session.expires_at
+            }));
+        }
+
+        // 查 profiles 取 username/role
+        const { data: profile, error: profileErr } = await supabase.from('profiles')
+            .select('username, role').eq('user_id', data.user.id).single();
+
+        if (profileErr || !profile) {
+            errorEl.textContent = '用户档案缺失，请联系管理员';
+            await signOutLocally(supabase);
+            return;
+        }
+
+        const session = {
+            username: profile.username,
+            role: profile.role
+        };
+        setCurrentUser(getUserFromSession(session));
+        markSignedIn();
+        errorEl.textContent = '';
+        // 如果是老大且今天是生日，显示生日快乐欢迎界面
+        await Main.loadBirthdayConfig();
+        if (Main.isLaodaFromSession(session) && Main.isBirthdayToday()) {
+            showBirthdayWelcome();
+        } else {
+            Main.showMainApp();
+            await Promise.all([loadCategories(), loadPhotos()]);
+            window.checkIncomingBottles();
+            window.checkIncomingNotes();
+            window.checkIncomingNudges();
+        }
+    } catch (err) {
+        console.error('桌面端登录异常:', err);
+        errorEl.textContent = '网络请求异常，请检查网络后重试';
     }
 }
 

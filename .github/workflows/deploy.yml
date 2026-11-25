@@ -19,10 +19,11 @@ jobs:
         run: npm run build
       - name: Prepare release directory (preserve production config.js)
         run: |
-          mkdir -p release/assets release/games release/modules release/icons
+          mkdir -p release/assets release/vendor release/games release/modules release/icons
           cp dist/index.html release/index.html
           cp dist/index-mobile.html release/index-mobile.html
           cp -r dist/assets/. release/assets/
+          cp -r dist/vendor/. release/vendor/
           cp dist/common.js release/common.js
           cp -r games/. release/games/
           cp -r modules/. release/modules/
