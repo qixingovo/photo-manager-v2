@@ -7,14 +7,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy to ECS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run security and unit tests
+        run: npm test
+      - name: Build production bundle
+        run: npm run build
+      - name: Prepare release directory (preserve production config.js)
+        run: |
+          mkdir -p release/assets release/games release/modules release/icons
+          cp dist/index.html release/index.html
+          cp dist/index-mobile.html release/index-mobile.html
+          cp -r dist/assets/. release/assets/
+          cp dist/common.js release/common.js
+          cp -r games/. release/games/
+          cp -r modules/. release/modules/
+          cp share.html share.js style.css mobile.css sw.js manifest.json favicon.png favicon-192.png release/
+          cp -r icons/. release/icons/
+          rm -f release/config.js
+      - name: Deploy built artifacts to ECS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_KEY }}
-          source: "."
+          source: "release/*"
           target: "/var/www/photo-manager/"
           rm: false
           overwrite: true
-          strip_components: 0
+          strip_components: 1
