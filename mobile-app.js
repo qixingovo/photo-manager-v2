@@ -364,7 +364,7 @@ const mobile = {
         if (!isCap) return; // 网页版自动同步，无需检查更新
 
         try {
-            var curVer = '1.0.1'; // 当前 APK 内置版本（构建时手动同步）
+            var curVer = '1.0.2'; // 当前 APK 内置版本（构建时手动同步）
             var resp = await fetch('https://api.github.com/repos/qixingovo/photo-manager-v2/releases/latest');
             if (!resp.ok) return;
             var release = await resp.json();

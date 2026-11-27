@@ -55,16 +55,6 @@ function copyStaticFiles() {
         fs.cpSync(modulesSrc, modulesDest, { recursive: true })
         console.log('  复制: modules/')
       }
-      // 复制 download 目录（APK 下载）
-      const dlSrc = path.resolve(__dirname, 'download')
-      const dlDest = path.resolve(distDir, 'download')
-      if (fs.existsSync(dlSrc)) {
-        fs.mkdirSync(dlDest, { recursive: true })
-        fs.readdirSync(dlSrc).forEach(f => {
-          fs.copyFileSync(path.join(dlSrc, f), path.join(dlDest, f))
-          console.log('  复制: download/' + f)
-        })
-      }
     }
   }
 }

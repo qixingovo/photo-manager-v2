@@ -5,9 +5,9 @@
   "installCommand": null,
   "framework": null,
   "rewrites": [
-    { "source": "/auth/v1/:path*", "destination": "https://47.114.121.178.nip.io/auth/v1/:path*" },
-    { "source": "/rest/v1/:path*", "destination": "https://47.114.121.178.nip.io/rest/v1/:path*" },
-    { "source": "/storage/v1/:path*", "destination": "https://47.114.121.178.nip.io/storage/v1/:path*" }
+    { "source": "/auth/v1/:path*", "destination": "https://photo.qixingovo.cn/auth/v1/:path*" },
+    { "source": "/rest/v1/:path*", "destination": "https://photo.qixingovo.cn/rest/v1/:path*" },
+    { "source": "/storage/v1/:path*", "destination": "https://photo.qixingovo.cn/storage/v1/:path*" }
   ],
   "headers": [
     {
